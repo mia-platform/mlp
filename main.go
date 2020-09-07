@@ -23,24 +23,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Println("primary prefix: ", *primary_prefix)
-	fmt.Println("fallback prefix: ", *fallback_prefix)
-	fmt.Println("File to interpolate: ", *file_path)
-
 	file, err := ioutil.ReadFile(*file_path)
 	check(err)
 
 	vars := getVariablesToInterpolate(file)
 
-	fmt.Println(vars)
-	//stop if there are no variables to interpolate
+	//exit if there are no variables to interpolate
 	if len(vars) == 0 {
 		os.Exit(0)
 	}
 
 	envs, err := checkEnvs(vars)
 	check(err)
-	fmt.Println(envs)
 
 	interpolateVariables(file, vars, envs)
 }
@@ -53,7 +47,7 @@ func check(err error) {
 }
 
 func getVariablesToInterpolate(file_content []byte) map[string]string {
-	re := regexp.MustCompile("\\{\\{(.*?)\\}\\}")
+	re := regexp.MustCompile("\\{\\{(.+?)\\}\\}")
 	match := re.FindAllStringSubmatch(string(file_content), -1)
 
 	vars := make(map[string]string, 0)
@@ -94,6 +88,13 @@ func interpolateVariables(file []byte, vars map[string]string, envs map[string]s
 	}
 
 	fmt.Println(file_string)
+	f, err := os.Create("out-" + *file_path)
+	check(err)
 
+	written_bytes, err := f.WriteString(file_string)
+	fmt.Println("Successfully written ", written_bytes, " bytes")
+	check(err)
+	err = f.Close()
+	check(err)
 	return true
 }
