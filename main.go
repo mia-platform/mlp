@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"regexp"
+	"strings"
 )
 
 var primary_prefix = flag.String("prefix", "", "primary prefix appended to pick env vars")
@@ -31,9 +32,17 @@ func main() {
 
 	vars := getVariablesToInterpolate(file)
 
+	fmt.Println(vars)
+	//stop if there are no variables to interpolate
+	if len(vars) == 0 {
+		os.Exit(0)
+	}
+
 	envs, err := checkEnvs(vars)
 	check(err)
 	fmt.Println(envs)
+
+	interpolateVariables(file, vars, envs)
 }
 
 func check(err error) {
@@ -43,34 +52,48 @@ func check(err error) {
 	}
 }
 
-func getVariablesToInterpolate(file_content []byte) []string {
-	re := regexp.MustCompile("\\$\\{(.*?)\\}")
+func getVariablesToInterpolate(file_content []byte) map[string]string {
+	re := regexp.MustCompile("\\{\\{(.*?)\\}\\}")
 	match := re.FindAllStringSubmatch(string(file_content), -1)
 
-	vars := make([]string, 0)
+	vars := make(map[string]string, 0)
 	for parsed_var := range match {
-		vars = append(vars, match[parsed_var][1])
+		//keep track of the entire pattern found by the regex
+		//using as key the variable name
+		vars[match[parsed_var][1]] = match[parsed_var][0]
 	}
 	return vars
 }
 
-func checkEnvs(vars []string) (map[string]string, error) {
+func checkEnvs(vars map[string]string) (map[string]string, error) {
 	envs := make(map[string]string, 0)
-	for index := range vars {
+	for var_name := range vars {
 
-		var_prefixed := *primary_prefix + "_" + vars[index]
-		var_prefixed_fallback := *fallback_prefix + "_" + vars[index]
+		var_prefixed := *primary_prefix + "_" + var_name
+		var_prefixed_fallback := *fallback_prefix + "_" + var_name
 
 		fmt.Println(envs)
 
 		if os.Getenv(var_prefixed) != "" {
-			envs[vars[index]] = os.Getenv(var_prefixed)
+			envs[var_name] = os.Getenv(var_prefixed)
 		} else if os.Getenv(var_prefixed_fallback) != "" {
-			envs[vars[index]] = os.Getenv(var_prefixed_fallback)
+			envs[var_name] = os.Getenv(var_prefixed_fallback)
 		} else {
-			return nil, errors.New("environment variables " + vars[index] + " does not exist")
+			return nil, errors.New("environment variables " + var_name + " does not exist")
 		}
 	}
 
 	return envs, nil
+}
+
+func interpolateVariables(file []byte, vars map[string]string, envs map[string]string) bool {
+	file_string := string(file)
+
+	for var_name, _ := range envs {
+		file_string = strings.ReplaceAll(file_string, vars[var_name], envs[var_name])
+	}
+
+	fmt.Println(file_string)
+
+	return true
 }
