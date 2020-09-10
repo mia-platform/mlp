@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -46,11 +45,21 @@ var interpolateCmd = &cobra.Command{
 		return nil
 	},
 	Short: "Interpolate variables in file",
-	Long:  `Interpolate variables in file`,
+	Long:  `Interpolate the environment variables inside {{}} in file and substitutes them with the actual value of the variables`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		file_path = args[0]
-		fmt.Println(file_path)
-		interpolate()
+		file_path := args[0]
+		file, err := ioutil.ReadFile(file_path)
+		check(err)
+
+		interpolated_file := interpolate(file)
+
+		f, err := os.Create("out-" + file_path)
+		check(err)
+		defer f.Close()
+
+		_, err = f.Write(interpolated_file)
+		check(err)
+
 		return nil
 	},
 }
@@ -58,15 +67,6 @@ var interpolateCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(interpolateCmd)
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// interpolateCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// interpolateCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	interpolateCmd.Flags().StringVarP(&primary_prefix, "prefix", "p", "", "primary prefix to add when looking for envs")
 	interpolateCmd.Flags().StringVarP(&alternative_prefix, "alternative-prefix", "a", "", "prefix to use when the primary prefix env does not exists")
 }
@@ -76,10 +76,7 @@ type env_var struct {
 	value string
 }
 
-func interpolate() {
-
-	file, err := ioutil.ReadFile(file_path)
-	check(err)
+func interpolate(file []byte) []byte {
 
 	envs := getVariablesToInterpolate(file)
 
@@ -88,18 +85,12 @@ func interpolate() {
 		os.Exit(0)
 	}
 
-	err = checkEnvs(envs)
+	err := checkEnvs(envs)
 	check(err)
 
 	interpolated_file := interpolateVariables(file, envs)
 
-	f, err := os.Create("out-" + file_path)
-	check(err)
-	defer f.Close()
-
-	_, err = f.Write(interpolated_file)
-	check(err)
-
+	return interpolated_file
 }
 
 func check(err error) {
@@ -136,10 +127,9 @@ func checkEnvs(envs map[string]*env_var) error {
 		} else if os.Getenv(var_prefixed_alternative) != "" {
 			(*env).value = os.Getenv(var_prefixed_alternative)
 		} else {
-			return errors.New("environment variables " + var_name + " does not exist")
+			return errors.New("environment variables " + var_prefixed + " and " + var_prefixed_alternative + " do not exist")
 		}
 	}
-
 	return nil
 }
 
