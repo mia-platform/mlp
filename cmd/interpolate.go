@@ -1,18 +1,3 @@
-/*
-Copyright © 2020 NAME HERE <EMAIL ADDRESS>
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
 package cmd
 
 import (
@@ -45,22 +30,20 @@ var interpolateCmd = &cobra.Command{
 		return nil
 	},
 	Short: "Interpolate variables in file",
-	Long:  `Interpolate the environment variables inside {{}} in file and substitutes them with the actual value of the variables`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	Long:  "Interpolate the environment variables inside {{}} in file and substitutes them with the corresponding value",
+	Run: func(cmd *cobra.Command, args []string) {
 		file_path := args[0]
 		file, err := ioutil.ReadFile(file_path)
-		check(err)
+		checkError(err)
 
 		interpolated_file := interpolate(file)
 
 		f, err := os.Create("out-" + file_path)
-		check(err)
+		checkError(err)
 		defer f.Close()
 
 		_, err = f.Write(interpolated_file)
-		check(err)
-
-		return nil
+		checkError(err)
 	},
 }
 
@@ -77,7 +60,6 @@ type env_var struct {
 }
 
 func interpolate(file []byte) []byte {
-
 	envs := getVariablesToInterpolate(file)
 
 	//exit if there are no variables to interpolate
@@ -86,14 +68,14 @@ func interpolate(file []byte) []byte {
 	}
 
 	err := checkEnvs(envs)
-	check(err)
+	checkError(err)
 
 	interpolated_file := interpolateVariables(file, envs)
 
 	return interpolated_file
 }
 
-func check(err error) {
+func checkError(err error) {
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -123,9 +105,9 @@ func checkEnvs(envs map[string]*env_var) error {
 		env := envs[var_name]
 
 		if os.Getenv(var_prefixed) != "" {
-			(*env).value = os.Getenv(var_prefixed)
+			(*env).value = strings.ReplaceAll(os.Getenv(var_prefixed), "\n", `\n`)
 		} else if os.Getenv(var_prefixed_alternative) != "" {
-			(*env).value = os.Getenv(var_prefixed_alternative)
+			(*env).value = strings.ReplaceAll(os.Getenv(var_prefixed_alternative), "\n", `\n`)
 		} else {
 			return errors.New("environment variables " + var_prefixed + " and " + var_prefixed_alternative + " do not exist")
 		}
