@@ -1,6 +1,6 @@
 # Deploy
 
-This repository contains the `miadeploy` CLI Tool used for deploying to a k8s cluster. This tool is responsible of interpolating the variables between {{}} in the input file with the actual content of the environment variables.
+This repository contains the `miadeploy` CLI Tool used for deploying to a k8s cluster. This tool is responsible of interpolating the variables between `{{}}` in the input file with the actual content of the environment variables.
 
 ## Interpolate command
 
