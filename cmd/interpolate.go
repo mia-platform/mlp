@@ -60,7 +60,7 @@ func interpolate(file []byte) []byte {
 	envs := make(map[string]env_var)
 	envs = getVariablesToInterpolate(file, envs)
 
-	//exit if there are no variables to interpolate
+	// exit if there are no variables to interpolate
 	if len(envs) == 0 {
 		os.Exit(0)
 	}
@@ -68,9 +68,7 @@ func interpolate(file []byte) []byte {
 	err := checkEnvs(envs)
 	checkError(err)
 
-	interpolatedFile := interpolateVariables(file, envs)
-
-	return interpolatedFile
+	return interpolateVariables(file, envs)
 }
 
 func checkError(err error) {
@@ -85,8 +83,8 @@ func getVariablesToInterpolate(file_content []byte, envs map[string]env_var) map
 
 	for parsedVar := range match {
 		varName := strings.ReplaceAll(match[parsedVar][1], " ", "")
-		//keep track of the entire pattern found by the regex
-		//using as key the variable name
+		// keep track of the entire pattern found by the regex
+		// using as key the variable name
 		if _, exists := envs[varName]; !exists {
 			envs[varName] = env_var{name: match[parsedVar][0]}
 		}
@@ -101,11 +99,12 @@ func checkEnvs(envs map[string]env_var) error {
 		var envValue string
 
 		// get the escaped environment variable
-		if os.Getenv(varPrefixed) != "" {
+		switch {
+		case os.Getenv(varPrefixed) != "":
 			envValue = strconv.Quote(os.Getenv(varPrefixed))
-		} else if os.Getenv(varPrefixedAlternative) != "" {
+		case os.Getenv(varPrefixedAlternative) != "":
 			envValue = strconv.Quote(os.Getenv(varPrefixedAlternative))
-		} else {
+		default:
 			return errors.New("environment variables " + varPrefixed + " and " + varPrefixedAlternative + " do not exist")
 		}
 
