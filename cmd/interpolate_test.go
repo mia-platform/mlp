@@ -7,8 +7,14 @@ import (
 )
 
 func initPrefix() {
-	primary_prefix = "MIA"
-	alternative_prefix = "DEV"
+	primaryPrefix = "MIA"
+	alternativePrefix = "DEV"
+}
+
+func checkResult(expected []byte, output []byte, t *testing.T) {
+	if !bytes.Equal(expected, output) {
+		t.Errorf("output not correct \nexpected: %s \nfound: %s", expected, output)
+	}
 }
 
 func TestEmptyVariable(t *testing.T) {
@@ -28,9 +34,7 @@ func TestEmptyVariable(t *testing.T) {
 
 	res := interpolate(in)
 
-	if !bytes.Equal(out, res) {
-		t.Errorf("output not correct \nexpected: %s \nfound: %s", string(out), string(res))
-	}
+	checkResult(out, res, t)
 }
 
 func TestDollar(t *testing.T) {
@@ -40,45 +44,66 @@ func TestDollar(t *testing.T) {
 	defer os.Unsetenv("MIA_FIRST_ENV")
 
 	in := []byte(`
-  "first": "aaa",
+  "first": "field",
   "second": "{{FIRST_ENV}}",
-  "third": "aaa",
+  "third": "field",
   `)
 	out := []byte(`
-  "first": "aaa",
+  "first": "field",
   "second": "$contains$dollars$",
-  "third": "aaa",
+  "third": "field",
   `)
 
 	res := interpolate(in)
 
-	if !bytes.Equal(out, res) {
-		t.Errorf("output not correct \nexpected: %s \nfound: %s", string(out), string(res))
-	}
+	checkResult(out, res, t)
 }
 
 func TestNewLines(t *testing.T) {
 	initPrefix()
 
-	os.Setenv("MIA_FIRST_ENV", `envfirstline\nenvsecondline\nenvthirdline\n`)
-	os.Setenv("DEV_SECOND_ENV", "envfirstline\nenvsecondline\nenvthirdline\n")
-	defer os.Unsetenv("MIA_FIRST_ENV")
+	os.Setenv("DEV_SECOND_ENV", `{
+    "first": "field",
+    "second": "field",
+    "third": "field",
+    "fourth": "field"
+  }`)
+
 	defer os.Unsetenv("DEV_SECOND_ENV")
 
 	in := []byte(`
-  "first": "aaa",
-  "second": "{{FIRST_ENV}}",
-  "third": "{{SECOND_ENV}}",
+  "first": "field",
+  "second": "{{SECOND_ENV}}",
   `)
 	out := []byte(`
-  "first": "aaa",
-  "second": "envfirstline\nenvsecondline\nenvthirdline\n",
-  "third": "envfirstline\nenvsecondline\nenvthirdline\n",
+  "first": "field",
+  "second": "{\n    \"first\": \"field\",\n    \"second\": \"field\",\n    \"third\": \"field\",\n    \"fourth\": \"field\"\n  }",
   `)
 
 	res := interpolate(in)
 
-	if !bytes.Equal(out, res) {
-		t.Errorf("output not correct \nexpected: %s \nfound: %s", out, res)
-	}
+	checkResult(out, res, t)
+
+}
+
+func TestSpecialChars(t *testing.T) {
+	initPrefix()
+
+	os.Setenv("DEV_SECOND_ENV", "env\\firstline\nenv\tsecondline\nenvthirdline\n")
+
+	defer os.Unsetenv("DEV_SECOND_ENV")
+
+	in := []byte(`
+  "first": "field",
+  "second": "{{SECOND_ENV}}",
+  `)
+	out := []byte(`
+  "first": "field",
+  "second": "env\\firstline\nenv\tsecondline\nenvthirdline\n",
+  `)
+
+	res := interpolate(in)
+
+	checkResult(out, res, t)
+
 }
