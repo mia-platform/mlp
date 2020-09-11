@@ -1,9 +1,16 @@
 # Deploy
 
-This repository contains the script for deploying to a k8s cluster. The script is responsible of interpolating the environment variables.
+This repository contains the `miadeploy` CLI Tool used for deploying to a k8s cluster. This tool is responsible of interpolating the variables between {{}} in the input file with the actual content of the environment variables.
 
-## Run
+## Interpolate command
 
-Usage: go run main.go -prefix `primary_prefix` -fallback-prefix `fallback prefix` -file `file_to_interpolate`
+Usage: `miadeploy interpolate --prefix <main-prefix> --alternative-prefix <fallback-prefix> file_to_interpolate`
 
-The script will search for all the strings between `{{}}` and will replace it with the environment variabile content. To find the variable the script will use a `-prefix` to add in order to get the variable name and it will use the `-fallback-prefix` whenever the primary one has no environment variables associated to it.
+where:
+- `--prefix`: specify the prefix to use when looking for the environment variable
+- `--alternative-prefix`: prefix to use when the variable with the main prefix does not exists
+
+Both the two flags are mandatory.
+
+The `interpolate` command will search for all the strings between `{{}}` and will replace them with the corresponding environment variabile content. To find the variable the script will first use the `--prefix` in order to get the variable name and it will use the `--alternative-prefix` whenever the primary one has no environment variables associated to it. 
+The `interpolate` command will not consume special characters preceeded by `\` to avoid errors when doing a release with the pipelines.
