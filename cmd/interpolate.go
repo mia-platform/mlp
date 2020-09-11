@@ -39,11 +39,7 @@ var interpolateCmd = &cobra.Command{
 
 		interpolatedFile := interpolate(file)
 
-		f, err := os.Create("out-" + filePath)
-		checkError(err)
-		defer f.Close()
-
-		_, err = f.Write(interpolatedFile)
+		err = ioutil.WriteFile(filePath, interpolatedFile, 0444)
 		checkError(err)
 	},
 }
