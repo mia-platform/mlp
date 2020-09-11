@@ -107,3 +107,21 @@ func TestSpecialChars(t *testing.T) {
 	checkResult(out, res, t)
 
 }
+
+func TestVarNotInParenthesis(t *testing.T) {
+	initPrefix()
+
+	in := []byte(`
+  "first": "field",
+  "second": "SECOND_ENV",
+  `)
+	out := []byte(`
+  "first": "field",
+  "second": "SECOND_ENV",
+  `)
+
+	res := interpolate(in)
+
+	checkResult(out, res, t)
+
+}
