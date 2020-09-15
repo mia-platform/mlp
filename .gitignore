@@ -52,3 +52,4 @@ _testmain.go
 miadeploy
 *test.yaml
 .vscode
+.idea

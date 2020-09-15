@@ -14,7 +14,6 @@ import (
 
 var primaryPrefix string
 var alternativePrefix string
-var filePath string
 
 // interpolateCmd represents the interpolate command
 var interpolateCmd = &cobra.Command{
@@ -81,9 +80,9 @@ func checkError(err error) {
 	}
 }
 
-func getVariablesToInterpolate(file_content string, envs map[string]envVar) map[string]envVar {
-	re := regexp.MustCompile("\\{\\{([A-Z0-9_]+)\\}\\}")
-	match := re.FindAllStringSubmatch(file_content, -1)
+func getVariablesToInterpolate(fileContent string, envs map[string]envVar) map[string]envVar {
+	re := regexp.MustCompile("{{([A-Z0-9_]+)}}")
+	match := re.FindAllStringSubmatch(fileContent, -1)
 
 	for parsedVar := range match {
 		varName := strings.ReplaceAll(match[parsedVar][1], " ", "")
