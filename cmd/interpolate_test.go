@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"os"
 	"testing"
 
@@ -130,6 +129,6 @@ func TestNonExistingVar(t *testing.T) {
 	envs["FIRST_ENV"] = envVar{name: "{{FIRST_ENV}}"}
 	envs["SECOND_ENV"] = envVar{name: "{{SECOND_ENV}}"}
 
-	errMsg := errors.New("environment variables DEV_SECOND_ENV and MIA_SECOND_ENV do not exist")
-	require.Error(t, errMsg, func() { checkEnvs(envs) }, "should return error if a variable does not exists")
+	errMsg := "environment variables DEV_SECOND_ENV and MIA_SECOND_ENV do not exist"
+	require.EqualError(t, checkEnvs(envs), errMsg)
 }
