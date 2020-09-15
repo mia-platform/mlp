@@ -1,20 +1,16 @@
 package cmd
 
 import (
-	"bytes"
+	"errors"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func initPrefix() {
-	primaryPrefix = "MIA"
-	alternativePrefix = "DEV"
-}
-
-func checkResult(expected []byte, output []byte, t *testing.T) {
-	if !bytes.Equal(expected, output) {
-		t.Errorf("output not correct \nexpected: %s \nfound: %s", expected, output)
-	}
+	primaryPrefix = "DEV"
+	alternativePrefix = "MIA"
 }
 
 func TestEmptyVariable(t *testing.T) {
@@ -32,9 +28,7 @@ func TestEmptyVariable(t *testing.T) {
   "second": "{{}}",
   `)
 
-	res := interpolate(in)
-
-	checkResult(out, res, t)
+	require.Equal(t, out, interpolate(in), "the regex should not match anything inside empty brackets")
 }
 
 func TestDollar(t *testing.T) {
@@ -54,9 +48,7 @@ func TestDollar(t *testing.T) {
   "third": "field",
   `)
 
-	res := interpolate(in)
-
-	checkResult(out, res, t)
+	require.Equal(t, out, interpolate(in), "they should be equal")
 }
 
 func TestNewLines(t *testing.T) {
@@ -80,9 +72,7 @@ func TestNewLines(t *testing.T) {
   "second": "{\n    \"first\": \"field\",\n    \"second\": \"field\",\n    \"third\": \"field\",\n    \"fourth\": \"field\"\n  }",
   `)
 
-	res := interpolate(in)
-
-	checkResult(out, res, t)
+	require.Equal(t, out, interpolate(in), "new lines should not be consumed while manipulating strings")
 
 }
 
@@ -102,10 +92,7 @@ func TestSpecialChars(t *testing.T) {
   "second": "env\\firstline\nenv\tsecondline\nenvthirdline\n",
   `)
 
-	res := interpolate(in)
-
-	checkResult(out, res, t)
-
+	require.Equal(t, out, interpolate(in), "special chars should not be consumed while manipulating strings")
 }
 
 func TestVarNotInParenthesis(t *testing.T) {
@@ -115,10 +102,34 @@ func TestVarNotInParenthesis(t *testing.T) {
   "first": "field",
   "second": "SECOND_ENV",
   `)
-	out := []byte(``)
 
-	res := interpolate(in)
+	require.Nil(t, interpolate(in), "an existing environment variable which is not inside {{}} should not be interpolated")
+}
 
-	checkResult(out, res, t)
+func TestVarWithSpaces(t *testing.T) {
+	initPrefix()
 
+	in := []byte(`
+  "second": "{{ SECOND_ENV }}",
+  "second": "{{SECOND_ENV }}",
+  "second": "{{ SECOND_ENV}}",
+  "second": "{{SECOND _ENV}}",
+  "second": "{{ SECOND _ENV }}",
+  `)
+
+	require.Nil(t, interpolate(in), "No variables with spaces should be matched by the regex")
+}
+
+func TestNonExistingVar(t *testing.T) {
+	initPrefix()
+
+	os.Setenv("DEV_FIRST_ENV", "first")
+	defer os.Unsetenv("DEV_FIRST_ENV")
+
+	envs := make(map[string]envVar)
+	envs["FIRST_ENV"] = envVar{name: "{{FIRST_ENV}}"}
+	envs["SECOND_ENV"] = envVar{name: "{{SECOND_ENV}}"}
+
+	errMsg := errors.New("environment variables DEV_SECOND_ENV and MIA_SECOND_ENV do not exist")
+	require.Error(t, errMsg, func() { checkEnvs(envs) }, "should return error if a variable does not exists")
 }
