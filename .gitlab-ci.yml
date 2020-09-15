@@ -5,3 +5,6 @@ include:
 
 default:
   image: golang:1.15.2
+
+variables:
+  IMAGE_NAME: platform-utilities/miadeploy
