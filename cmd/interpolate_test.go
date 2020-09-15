@@ -115,10 +115,7 @@ func TestVarNotInParenthesis(t *testing.T) {
   "first": "field",
   "second": "SECOND_ENV",
   `)
-	out := []byte(`
-  "first": "field",
-  "second": "SECOND_ENV",
-  `)
+	out := []byte(``)
 
 	res := interpolate(in)
 

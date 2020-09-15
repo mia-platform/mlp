@@ -39,6 +39,10 @@ var interpolateCmd = &cobra.Command{
 
 		interpolatedFile := interpolate(file)
 
+		if interpolatedFile == nil {
+			return
+		}
+
 		err = ioutil.WriteFile(filePath, interpolatedFile, 0444)
 		checkError(err)
 	},
@@ -60,9 +64,9 @@ func interpolate(file []byte) []byte {
 	envs := make(map[string]envVar)
 	envs = getVariablesToInterpolate(file, envs)
 
-	// exit if there are no variables to interpolate
+	// return if there are no variables to interpolate
 	if len(envs) == 0 {
-		os.Exit(0)
+		return nil
 	}
 
 	err := checkEnvs(envs)
