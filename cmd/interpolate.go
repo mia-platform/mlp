@@ -61,8 +61,9 @@ type envVar struct {
 }
 
 func interpolate(file []byte) []byte {
+	fileString := string(file)
 	envs := make(map[string]envVar)
-	envs = getVariablesToInterpolate(file, envs)
+	envs = getVariablesToInterpolate(fileString, envs)
 
 	// return if there are no variables to interpolate
 	if len(envs) == 0 {
@@ -72,7 +73,7 @@ func interpolate(file []byte) []byte {
 	err := checkEnvs(envs)
 	checkError(err)
 
-	return interpolateVariables(file, envs)
+	return interpolateVariables(fileString, envs)
 }
 
 func checkError(err error) {
@@ -81,9 +82,9 @@ func checkError(err error) {
 	}
 }
 
-func getVariablesToInterpolate(file_content []byte, envs map[string]envVar) map[string]envVar {
-	re := regexp.MustCompile("\\{\\{(.+?)\\}\\}")
-	match := re.FindAllStringSubmatch(string(file_content), -1)
+func getVariablesToInterpolate(file_content string, envs map[string]envVar) map[string]envVar {
+	re := regexp.MustCompile("\\{\\{([A-Z0-9_]+)\\}\\}")
+	match := re.FindAllStringSubmatch(file_content, -1)
 
 	for parsedVar := range match {
 		varName := strings.ReplaceAll(match[parsedVar][1], " ", "")
@@ -120,13 +121,11 @@ func checkEnvs(envs map[string]envVar) error {
 	return nil
 }
 
-func interpolateVariables(file []byte, envs map[string]envVar) []byte {
-	fileString := string(file)
-
+func interpolateVariables(file string, envs map[string]envVar) []byte {
 	for varName, _ := range envs {
 		env := envs[varName]
-		fileString = strings.ReplaceAll(fileString, env.name, env.value)
+		file = strings.ReplaceAll(file, env.name, env.value)
 	}
 
-	return []byte(fileString)
+	return []byte(file)
 }
