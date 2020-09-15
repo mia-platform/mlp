@@ -20,14 +20,13 @@ var filePath string
 var interpolateCmd = &cobra.Command{
 	Use: "interpolate",
 	Args: func(cmd *cobra.Command, args []string) error {
-		if len(args) < 1 {
-			return errors.New("no file specified")
-		}
-		_, err := os.Stat(args[0])
+		err := cobra.ExactArgs(1)(cmd, args)
+		checkError(err)
+
+		_, err = os.Stat(args[0])
 		if os.IsNotExist(err) {
 			return errors.New("file " + args[0] + " does not exists")
 		}
-
 		return nil
 	},
 	Short: "Interpolate variables in file",
