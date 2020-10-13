@@ -1,30 +1,55 @@
-FROM golang:1.15.2 AS builder
+################### Build mlp ####################
+FROM golang:1.15.2 AS mlp
 
-WORKDIR /
+WORKDIR /build
+
 COPY go.mod .
 COPY go.sum .
 
 RUN go mod download
 RUN go mod verify
 
+ARG version="DEV"
+ARG date=""
+
 COPY . .
 
-RUN GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -ldflags="-w -s" .
+ENV GO_LDFLAGS="-w -s -X git.tools.mia-platform.eu/platform/devops/deploy/internal/cli.BuildDate=${date} -X git.tools.mia-platform.eu/platform/devops/deploy/internal/cli.Version=${version}"
+RUN GOOS=linux \
+    CGO_ENABLED=0 \
+    GOARCH=amd64 \
+    go build -trimpath \
+    -ldflags="${GO_LDFLAGS}" \
+    -o "mlp" ./cmd/mlp
+
+############ Install Helm and kubectl ############
+
+FROM alpine:3.12 AS tools
+
+ENV K8S_VERSION="v1.19.2"
+ENV HELM_VERSION="v3.3.4"
 
 WORKDIR /build
 
-RUN cp -r /miadeploy /LICENSE .
+RUN wget https://storage.googleapis.com/kubernetes-release/release/${K8S_VERSION}/bin/linux/amd64/kubectl && \
+  wget https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz && \
+  tar xf helm-${HELM_VERSION}-linux-amd64.tar.gz \
+  && mv linux-amd64/helm . \
+  && rm -fr linux-amd64 helm-${HELM_VERSION}-linux-amd64.tar.gz && \
+  chmod +x kubectl helm
 
-FROM scratch
+################## Create image ##################
 
-LABEL name="miadeploy" \
-  eu.mia-platform.url="https://www.mia-platform.eu" \
-  eu.mia-platform.version="1.0.0"
+FROM alpine:3.12
 
-WORKDIR /
+LABEL maintainer="C.E.C.O.M <operations@mia-platform.eu>" \
+      name="Image for console deployments" \
+      eu.mia-platform.url="https://www.mia-platform.eu" \
+      eu.mia-platform.version="3"
 
-COPY --from=builder /build/* ./
+RUN apk add --no-cache make curl
 
-USER 5000
+COPY --from=tools /build/* /usr/local/bin/
+COPY --from=mlp /build/mlp /usr/local/bin/
 
-CMD ["/miadeploy"]
+CMD ["mlp"]

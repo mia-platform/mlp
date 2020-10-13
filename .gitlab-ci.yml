@@ -7,4 +7,34 @@ default:
   image: golang:1.15.2
 
 variables:
-  IMAGE_NAME: platform-utilities/miadeploy
+  IMAGE_NAME: tools/kubectl
+
+.docker-job:
+  image: docker:stable
+  stage: package
+
+  variables:
+    REMOTE_IMAGE_NAME: ${NEXUS_URL}/${IMAGE_NAME}
+    DOCKER_PATH: .
+
+  script:
+    - export DOCKER_DATE="$(date +%Y-%m-%d)"
+    - export ADDITIONAL_BUILD_ARGS="--build-arg version=${CI_COMMIT_TAG:-$CI_COMMIT_SHORT_SHA} --build-arg date=${DOCKER_DATE}"
+    - docker login -u ${NEXUS_USER} -p ${NEXUS_TOKEN} ${NEXUS_URL}
+    - docker build --build-arg COMMIT_SHA=${CI_COMMIT_SHA} ${ADDITIONAL_BUILD_ARGS} --pull -t ${REMOTE_IMAGE_NAME}:${DOCKER_TAG} ${DOCKER_PATH}
+    - test -z "${COMMIT_SHA_FILEPATH}" || docker run --rm ${REMOTE_IMAGE_NAME}:${DOCKER_TAG} cat ${COMMIT_SHA_FILEPATH}
+
+  after_script:
+    - docker push ${REMOTE_IMAGE_NAME}:${DOCKER_TAG}
+
+build-latest:
+
+  only:
+    - branches
+    - master
+
+build-tags:
+
+  after_script:
+    - docker tag ${REMOTE_IMAGE_NAME}:${DOCKER_TAG} ${REMOTE_IMAGE_NAME}:3
+    - docker push ${REMOTE_IMAGE_NAME}:${PATCH_TAG}

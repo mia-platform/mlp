@@ -1,0 +1,8 @@
+---
+this: is
+a:
+  yaml:
+    - file
+---
+whith:
+  two: structures
