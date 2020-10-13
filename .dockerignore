@@ -1,0 +1,15 @@
+.git
+docs
+**/testdata
+.dockerignore
+.editorconfig
+.gitignore
+.gitlab-ci.yml
+CODE_OF_CONDUCT.md
+CONTRIBUTING.md
+Dockerfile
+LICENSE
+Makefile
+mlp
+README.md
+*.out
