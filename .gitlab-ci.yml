@@ -27,12 +27,6 @@ variables:
   after_script:
     - docker push ${REMOTE_IMAGE_NAME}:${DOCKER_TAG}
 
-build-latest:
-
-  only:
-    - branches
-    - master
-
 build-tags:
 
   after_script:
