@@ -31,4 +31,4 @@ build-tags:
 
   after_script:
     - docker tag ${REMOTE_IMAGE_NAME}:${DOCKER_TAG} ${REMOTE_IMAGE_NAME}:3
-    - docker push ${REMOTE_IMAGE_NAME}:${PATCH_TAG}
+    - docker push ${REMOTE_IMAGE_NAME}:3
