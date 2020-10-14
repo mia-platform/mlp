@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2020-10-14
 ### Changed
 
 - Ignore unreadable or missing files passed as inputs to subcommands
@@ -17,4 +18,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial Release 🎉🎉🎉
 
-[0.1.0]: https://git.tools.mia-platform.eu/platform/devops/console-helm-chart/-/tags/v0.1.0
+[Unreleased]: https://git.tools.mia-platform.eu/platform/devops/deploy/-/compare/v0.1.0...HEAD
+[0.1.1]: https://git.tools.mia-platform.eu/platform/devops/deploy/-/compare/v0.1.0...v0.1.1
+[0.1.0]: https://git.tools.mia-platform.eu/platform/devops/deploy/-/tags/v0.1.0
