@@ -15,6 +15,7 @@
 package utils
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -66,7 +67,8 @@ func ExtractYAMLFiles(paths []string) ([]string, error) {
 
 		pathIsDirectory, err := fs.IsDir(globalPath)
 		if err != nil {
-			return nil, err
+			fmt.Printf("WARN: can't read input file at path %s\n", globalPath)
+			continue
 		}
 
 		if pathIsDirectory {

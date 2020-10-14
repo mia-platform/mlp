@@ -60,8 +60,8 @@ func TestExtractYAMLFiles(t *testing.T) {
 	t.Run("call function with non existent path", func(t *testing.T) {
 		paths := []string{"im-not-here.yaml"}
 		files, err := ExtractYAMLFiles(paths)
-		require.Nil(t, files, "when the function return an error the returned paths must be nil")
-		require.Error(t, err, "with no file existed return the underling error")
+		require.Nil(t, err, "We skip files we cannot read so no error is returned")
+		require.Equal(t, files, []string{}, "We skip the missing file and return an array with only other elements")
 	})
 
 	t.Run("call function with empty directory return empty array", func(t *testing.T) {
