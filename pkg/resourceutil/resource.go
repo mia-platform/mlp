@@ -41,6 +41,21 @@ type ResourceHead struct {
 	} `json:"metadata,omitempty"`
 }
 
+type Builder struct {
+	builder *resource.Builder
+}
+
+type InfoGenerator interface {
+	Generate(path string) ([]*resource.Info, error)
+}
+
+func (b *Builder) Generate(path string) ([]*resource.Info, error) {
+	return b.builder.
+		Path(false, path).
+		Flatten().
+		Do().Infos()
+}
+
 // NewResource create a new Resource from a file at `filepath`
 // does NOT support multiple documents inside a single file
 func NewResource(filepath string) (*Resource, error) {
@@ -64,11 +79,8 @@ func NewResource(filepath string) (*Resource, error) {
 
 // MakeInfo is the default function used to build `resource.Info`. It uses a builder to create
 // the Infos starting from a YAML file path and then it set the correct namespace to the resource.
-func MakeInfo(builder *resource.Builder, namespace string, path string) (*resource.Info, error) {
-	infos, err := builder.
-		Path(false, path).
-		Flatten().
-		Do().Infos()
+func MakeInfo(builder InfoGenerator, namespace string, path string) (*resource.Info, error) {
+	infos, err := builder.Generate(path)
 
 	if err != nil {
 		return nil, err
@@ -86,10 +98,12 @@ func MakeInfo(builder *resource.Builder, namespace string, path string) (*resour
 // MakeResources creates a resource list and sorts them according to
 // the standard ordering strategy
 func MakeResources(opts *utils.Options, filePaths []string) ([]Resource, error) {
-	builder := resource.NewBuilder(opts.Config).
-		Unstructured().
-		RequireObject(true).
-		Flatten()
+	builder := &Builder{
+		builder: resource.NewBuilder(opts.Config).
+			Unstructured().
+			RequireObject(true).
+			Flatten(),
+	}
 
 	resources := []Resource{}
 	for _, path := range filePaths {

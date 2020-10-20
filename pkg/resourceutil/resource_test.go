@@ -2,7 +2,13 @@ package resourceutil
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"git.tools.mia-platform.eu/platform/devops/deploy/internal/utils"
+
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/resource"
 
 	"github.com/stretchr/testify/require"
 )
@@ -40,12 +46,31 @@ func TestNewResource(t *testing.T) {
 	})
 }
 
-// func fkf(version schema.GroupVersion) (RESTClient, error){
-// 	return resource., nil
-// }
-// func TestMakeInfo(t *testing.T) {
-// 	b := resource.NewFakeBuilder()
+type FakeBuilder struct {
+	builder *resource.Builder
+}
 
-// 	MakeInfo(b,"default", "testdata/kubernetesresource.yaml")
+func (b *FakeBuilder) Generate(path string) ([]*resource.Info, error) {
+	file, err := utils.ReadFile(path)
+	utils.CheckError(err)
+	if strings.Contains(string(file), "---\n") {
+		return make([]*resource.Info, 2), nil
+	}
+	return []*resource.Info{
+		&resource.Info{
+			Name:      "",
+			Namespace: "",
+		},
+	}, nil
+}
 
-// }
+func TestMakeInfo(t *testing.T) {
+	b := &FakeBuilder{
+		builder: resource.NewBuilder(genericclioptions.NewTestConfigFlags()),
+	}
+
+	_, err := MakeInfo(b, "default", "testdata/tworesources.yaml")
+
+	require.EqualError(t, err, "Multiple objects in single yaml file currently not supported")
+
+}
