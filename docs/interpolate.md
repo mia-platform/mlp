@@ -1,16 +1,23 @@
 # `interpolate` Command
 
-TODO
+The `interpolate` command performs the interpolation of the specified files with the corresponding environment variables.
 
-mlp interpolate --filename=[] --env-prefix=[] --out='./interpolated-files'
+Flags:
+- `--filename`: files/folder paths containing data to interpolate.
+- `--env-prefix`: prefixes to add when looking for environment variables
+- `--out`: output directories where interpolated files are saved
 
-mlp interpolate --filename=./configurations --filename=./configurations/DEV --env-prefix=DEV_ --env-prefix=MIA_
+The command reads the environment variables name contained inside the regular expression `{{[A-Z0-9_]+}}` and it performs the lookups using the prefixes passed as input.  
+To perform a correct interpolation it is necessary to pass the prefixes in order of preference. Indeed, the command will start to lookup by using the first prefix and will try the others one by one until a variable with that prefix is found.  
+The command will try to perform the lookup on the variable without the prefix if none of the prefixed ones exists. If even that does not exists, the interpolation will stop. 
 
-mlp interpolate --filename=./configurations --filename=./configurations/CLOUD --env-prefix=CLOUD_ --env-prefix=MIA_
+Example:
 
-CLOUD_
-PREPROD_
-DEV_
-TEST_
+`mlp interpolate --filename ... --env-prefix FIRST_ --env-prefix SECOND_ --out ...`
 
-{{[A-Z0-9_]+}}
+will define the following lookup order for the environment variable `VAR`:
+
+1) `FIRST_VAR`
+2) `SECOND_VAR`
+3) `VAR`
+

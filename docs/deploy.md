@@ -1,8 +1,10 @@
 # `deploy` Command
 
-mlp deploy
+The `deploy` command deploys the specified files in a given namespace of a Kubernetes cluster.
 
-mlp deploy --filename=[] --wait='5m' --prune -> whitelist delle risorse appena create, cancella tutto il resto
+Flags:
+- `--filename`: file and/or folder paths containing data to interpolate
 
-mlp deploy --prune -> cancella tutte le risorse
-
+To make the command work, also the following flags described in [options](./options.md) are required:
+- `--namespace`: to specify the namespace in which the resources are deployed
+- The set of flags required to connect to the Kubernetes cluster

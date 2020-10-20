@@ -15,8 +15,8 @@
 package cli
 
 import (
-	"git.tools.mia-platform.eu/platform/devops/deploy/pkg/interpolate"
 	"git.tools.mia-platform.eu/platform/devops/deploy/internal/utils"
+	"git.tools.mia-platform.eu/platform/devops/deploy/pkg/interpolate"
 	"github.com/spf13/cobra"
 )
 
@@ -37,6 +37,6 @@ func InterpolateSubcommand(cmd *cobra.Command, options *utils.Options) {
 
 	interpolateCmd.Flags().StringSliceVarP(&prefixes, "env-prefix", "e", []string{}, "Prefixes to add when looking for ENV variables")
 	interpolateCmd.Flags().StringSliceVarP(&inputPaths, "filename", "f", []string{}, "file/folder paths containing data to interpolate")
-	interpolateCmd.Flags().StringVarP(&outputPath, "out", "o", "./interpolated-files", "Output directory where interpolated fileNames are saved")
+	interpolateCmd.Flags().StringVarP(&outputPath, "out", "o", "./interpolated-files", "Output directory where interpolated files are saved")
 	cmd.AddCommand(interpolateCmd)
 }
