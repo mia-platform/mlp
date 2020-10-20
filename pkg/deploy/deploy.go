@@ -5,14 +5,20 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/util/uuid"
+
 	"k8s.io/client-go/kubernetes"
 
 	"git.tools.mia-platform.eu/platform/devops/deploy/internal/utils"
 	"git.tools.mia-platform.eu/platform/devops/deploy/pkg/resourceutil"
 	"github.com/pkg/errors"
+	batchapiv1 "k8s.io/api/batch/v1"
+	batchapiv1beta1 "k8s.io/api/batch/v1beta1"
+
 	apiv1 "k8s.io/api/core/v1"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -26,6 +32,7 @@ import (
 )
 
 var options *utils.Options
+var client *kubernetes.Clientset
 
 type resHelper interface {
 	Get(namespace, name string) (runtime.Object, error)
@@ -37,6 +44,13 @@ type resHelper interface {
 // Run execute the deploy command from cli
 func Run(inputPaths []string, opts *utils.Options) {
 	options = opts
+
+	config, err := options.Config.ToRESTConfig()
+	utils.CheckError(err)
+
+	client, err = kubernetes.NewForConfig(config)
+	utils.CheckError(err)
+
 	filePaths, err := utils.ExtractYAMLFiles(inputPaths)
 	utils.CheckError(err)
 
@@ -64,13 +78,7 @@ func makeResources(filePaths []string) ([]resourceutil.Resource, error) {
 func deploy(resources []resourceutil.Resource) error {
 
 	// Check that the namespace exists
-	config, err := options.Config.ToRESTConfig()
-	utils.CheckError(err)
-
-	client, err := kubernetes.NewForConfig(config)
-	utils.CheckError(err)
-
-	if _, err = client.CoreV1().Namespaces().Get(context.TODO(), options.Namespace, metav1.GetOptions{}); err != nil {
+	if _, err := client.CoreV1().Namespaces().Get(context.TODO(), options.Namespace, metav1.GetOptions{}); err != nil {
 		if apierrors.IsNotFound(err) {
 			fmt.Printf("Creating Namespace: %s\n", options.Namespace)
 
@@ -95,12 +103,84 @@ func deploy(resources []resourceutil.Resource) error {
 	return nil
 }
 
+func createJobFromCronjob(res resourceutil.Resource) (*batchapiv1.Job, error) {
+	cronJobMetadata, err := meta.Accessor(res.Info.Object)
+	if err != nil {
+		return nil, err
+	}
+
+	uncastVersionedObj, err := scheme.Scheme.ConvertToVersion(res.Info.Object, batchapiv1beta1.SchemeGroupVersion)
+	if err != nil {
+		return nil, err
+	}
+	cronjobObj, ok := uncastVersionedObj.(*batchapiv1beta1.CronJob)
+	if !ok {
+		return nil, fmt.Errorf("Error in conversion to Cronjob")
+	}
+
+	cronUUID := uuid.NewUUID()
+
+	// use the old UID if the cron already exists
+	if oldCron, err := client.BatchV1().Jobs(options.Namespace).Get(context.TODO(), cronJobMetadata.GetName(), metav1.GetOptions{}); err == nil {
+		cronUUID = oldCron.GetUID()
+	}
+
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+
+	cronjobObj.SetUID(cronUUID)
+
+	annotations := make(map[string]string)
+	annotations["cronjob.kubernetes.io/instantiate"] = "manual"
+	job := &batchapiv1.Job{
+		TypeMeta: metav1.TypeMeta{APIVersion: batchapiv1.SchemeGroupVersion.String(), Kind: "Job"},
+		ObjectMeta: metav1.ObjectMeta{
+			// Use this instead of Name field to avoid name conflicts
+			GenerateName: cronJobMetadata.GetName() + "-",
+			Annotations:  annotations,
+			Labels:       cronjobObj.Spec.JobTemplate.Labels,
+
+			// TODO: decide if it necessary to include it or not. At the moment it
+			// prevents the pod creation saying that it cannot mount the default token
+			// inside the container
+			//
+			// OwnerReferences: []metav1.OwnerReference{
+			// 	{
+			// 		APIVersion: batchapiv1beta1.SchemeGroupVersion.String(),
+			// 		Kind:       cronjobObj.Kind,
+			// 		Name:       cronjobObj.GetName(),
+			// 		UID:        cronjobObj.GetUID(),
+			// 	},
+			// },
+		},
+		Spec: cronjobObj.Spec.JobTemplate.Spec,
+	}
+	return job, nil
+}
+
 func apply(res resourceutil.Resource, helper resHelper) error {
 
 	var (
 		currentObj runtime.Object
 		err        error
 	)
+
+	// Create a Job from every CronJob having the mia-platform.eu/autocreate annotation set to true
+	if res.Head.Kind == "CronJob" {
+		if val, ok := res.Head.Metadata.Annotations["mia-platform.eu/autocreate"]; ok && val == "true" {
+			job, err := createJobFromCronjob(res)
+			if err != nil {
+				return err
+			}
+
+			fmt.Printf("Creating job from cronjob: %s\n", res.Name)
+			_, err = client.BatchV1().Jobs(options.Namespace).Create(context.TODO(), job, metav1.CreateOptions{})
+			if err != nil {
+				return err
+			}
+		}
+	}
 
 	if currentObj, err = helper.Get(res.Info.Namespace, res.Info.Name); err != nil {
 		// create the resource only if it is not present in the cluster
