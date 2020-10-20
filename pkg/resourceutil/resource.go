@@ -15,6 +15,8 @@
 package resourceutil
 
 import (
+	"errors"
+
 	"git.tools.mia-platform.eu/platform/devops/deploy/internal/utils"
 	"k8s.io/cli-runtime/pkg/resource"
 	"sigs.k8s.io/yaml"
@@ -26,29 +28,38 @@ type Resource struct {
 	Name      string
 	Head      ResourceHead
 	Namespace string
-	Info			*resource.Info
+	Info      *resource.Info
 }
 
 // ResourceHead the head of the resource
 type ResourceHead struct {
-	GroupVersion  string `json:"apiVersion"`
-	Kind     string `json:"kind,omitempty"`
-	Metadata *struct {
+	GroupVersion string `json:"apiVersion"`
+	Kind         string `json:"kind,omitempty"`
+	Metadata     *struct {
 		Name        string            `json:"name"`
 		Annotations map[string]string `json:"annotations"`
 	} `json:"metadata,omitempty"`
 }
 
+// InfoMacker creates a `resource.Info` given a `resource.Builder`,
+// a namespace and a path to a YAML file.
+type InfoMacker func(builder *resource.Builder, namespace string, path string) (*resource.Info, error)
+
 // NewResource create a new Resource from a file at `filepath`
 // does NOT support multiple documents inside a single file
-func NewResource(filepath string) (*Resource, error) {
+func NewResource(builder *resource.Builder, maker InfoMacker, namespace string, filepath string) (*Resource, error) {
 	data, err := utils.ReadFile(filepath)
 	if err != nil {
 		return nil, err
 	}
 
 	var head ResourceHead
-	if err := yaml.Unmarshal([]byte(data), &head); err != nil {
+	if err = yaml.Unmarshal([]byte(data), &head); err != nil {
+		return nil, err
+	}
+
+	info, err := maker(builder, namespace, filepath)
+	if err != nil {
 		return nil, err
 	}
 
@@ -56,5 +67,48 @@ func NewResource(filepath string) (*Resource, error) {
 		Filepath: filepath,
 		Name:     head.Metadata.Name,
 		Head:     head,
+		Info:     info,
 	}, nil
+}
+
+// MakeInfo is the default function used to build `resource.Info`. It uses a builder to create
+// the Infos starting from a YAML file path and then it set the correct namespace to the resource.
+func MakeInfo(builder *resource.Builder, namespace string, path string) (*resource.Info, error) {
+	infos, err := builder.
+		Path(false, path).
+		Flatten().
+		Do().Infos()
+
+	if err != nil {
+		return nil, err
+	}
+
+	if len(infos) != 1 {
+		return nil, errors.New("Multiple objects in single yaml file currently not supported")
+	}
+
+	info := infos[0]
+	info.Namespace = namespace
+	return info, nil
+}
+
+// MakeResources creates a resource list and sorts them according to
+// the standard ordering strategy
+func MakeResources(opts *utils.Options, filePaths []string) ([]Resource, error) {
+	builder := resource.NewBuilder(opts.Config).
+		Unstructured().
+		RequireObject(true).
+		Flatten()
+
+	resources := []Resource{}
+	for _, path := range filePaths {
+		res, err := NewResource(builder, MakeInfo, opts.Namespace, path)
+		if err != nil {
+			return nil, err
+		}
+		resources = append(resources, *res)
+	}
+
+	resources = SortResourcesByKind(resources, nil)
+	return resources, nil
 }

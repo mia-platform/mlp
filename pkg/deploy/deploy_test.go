@@ -10,14 +10,17 @@ import (
 	"git.tools.mia-platform.eu/platform/devops/deploy/pkg/resourceutil"
 	"github.com/stretchr/testify/require"
 	apiv1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/resource"
-
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes/fake"
+	fakecorev1 "k8s.io/client-go/kubernetes/typed/core/v1/fake"
+	faketesting "k8s.io/client-go/testing"
 )
 
 type clusterObj struct {
@@ -34,7 +37,6 @@ type mockHelper struct {
 
 func (mh mockHelper) Get(namespace, name string) (runtime.Object, error) {
 	for _, v := range mh.clusterObjs {
-		fmt.Printf("name: %s, namespace: %s, groupkind: %s", v.namespace, v.name, v.groupVersionKind)
 		if namespace == v.namespace && name == v.name && mh.groupVersionKind == v.groupVersionKind {
 			return v.obj, nil
 		}
@@ -75,7 +77,7 @@ func (mh mockHelper) Replace(namespace string, name string, overwrite bool, obj 
 	return nil, errors.New("Object Not found")
 }
 
-func (mh mockHelper) Patch(namespace, name string, pt types.PatchType, data []byte, options *metav1.PatchOptions) (runtime.Object, error){
+func (mh mockHelper) Patch(namespace, name string, pt types.PatchType, data []byte, options *metav1.PatchOptions) (runtime.Object, error) {
 	return nil, nil
 }
 
@@ -103,13 +105,32 @@ func mockAddInfos(oldresources []resourceutil.Resource) []resourceutil.Resource 
 	return resources
 }
 
-func TestCreatingResources(t *testing.T) {
-	filePaths, err := utils.ExtractYAMLFiles([]string{"testdata"})
-	require.Nil(t, err)
-	resources, err := makeResources(filePaths)
-	require.Nil(t, err)
+// func TestApply(t *testing.T) {
+// 	path := "testdata/"
+// 	t.Run()
+// }
 
-	resources = mockAddInfos(resources)
+func TestCreatingResources(t *testing.T) {
+	expectedMetadata := struct {
+		Name        string            `json:"name"`
+		Annotations map[string]string `json:"annotations"`
+	}{
+		Name: "literal",
+	}
+
+	testcases := []resourceutil.Resource{
+		{
+			Filepath: "testdata/files-configmap.yaml",
+			Name:     "literal",
+			Head: resourceutil.ResourceHead{
+				GroupVersion: "v1",
+				Kind:         "ConfigMap",
+				Metadata:     &expectedMetadata,
+			},
+		},
+	}
+
+	resources := mockAddInfos(testcases)
 	// Mocking deploy
 	helper := mockHelper{}
 	for _, res := range resources {
@@ -119,4 +140,35 @@ func TestCreatingResources(t *testing.T) {
 		err = apply(res, helper)
 		require.Nil(t, err)
 	}
+}
+
+func TestEnsureNamespaceExistance(t *testing.T) {
+	t.Run("Create a Namespace if does not exists", func(t *testing.T) {
+		namespace := "foo"
+		client := fake.NewSimpleClientset(&apiv1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{Name: namespace},
+			TypeMeta:   metav1.TypeMeta{Kind: "Namespace", APIVersion: "v1"},
+		})
+		client.CoreV1().(*fakecorev1.FakeCoreV1).PrependReactor("get", "namespace", func(action faketesting.Action) (handled bool, ret runtime.Object, err error) {
+			return true, &v1.Namespace{}, apierrors.NewNotFound(schema.GroupResource{Group: "v1", Resource: "Namespace"}, "foo")
+		})
+		client.CoreV1().(*fakecorev1.FakeCoreV1).PrependReactor("create", "namespace", func(action faketesting.Action) (handled bool, ret runtime.Object, err error) {
+			return true, &v1.Namespace{}, nil
+		})
+		require.Nil(t, ensureNamespaceExistance(client, namespace))
+	})
+
+	// t.Run("Don't create a Namespace if already exists", func(t *testing.T) {
+	// 	namespace := "foo"
+	// 	client := fake.NewSimpleClientset()
+	// 	client.CoreV1().(*fakecorev1.FakeCoreV1).PrependReactor("get", "namespace", func(action faketesting.Action) (handled bool, ret runtime.Object, err error) {
+	// 		return true, &v1.Namespace{}, nil
+	// 	})
+	// 	err := ensureNamespaceExistance(client, namespace)
+	// 	require.Nil(t, err)
+	// })
+}
+
+func TestCreateJobFromCronJob(t *testing.T) {
+
 }

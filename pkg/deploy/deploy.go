@@ -32,7 +32,7 @@ import (
 )
 
 var options *utils.Options
-var client *kubernetes.Clientset
+var client kubernetes.Interface
 
 type resHelper interface {
 	Get(namespace, name string) (runtime.Object, error)
@@ -54,42 +54,20 @@ func Run(inputPaths []string, opts *utils.Options) {
 	filePaths, err := utils.ExtractYAMLFiles(inputPaths)
 	utils.CheckError(err)
 
-	resources, err := makeResources(filePaths)
+	resources, err := resourceutil.MakeResources(opts, filePaths)
 	utils.CheckError(err)
-	addInfos(&resources)
+
 	err = deploy(resources)
 	utils.CheckError(err)
-}
-
-func makeResources(filePaths []string) ([]resourceutil.Resource, error) {
-	resources := []resourceutil.Resource{}
-	for _, path := range filePaths {
-		res, err := resourceutil.NewResource(path)
-		if err != nil {
-			return nil, err
-		}
-		resources = append(resources, *res)
-	}
-
-	resources = resourceutil.SortResourcesByKind(resources, nil)
-	return resources, nil
 }
 
 func deploy(resources []resourceutil.Resource) error {
 
 	// Check that the namespace exists
-	if _, err := client.CoreV1().Namespaces().Get(context.TODO(), options.Namespace, metav1.GetOptions{}); err != nil {
-		if apierrors.IsNotFound(err) {
-			fmt.Printf("Creating Namespace: %s\n", options.Namespace)
+	err := ensureNamespaceExistance(client, options.Namespace)
 
-			ns := &apiv1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{Name: options.Namespace},
-				TypeMeta:   metav1.TypeMeta{Kind: "Namespace", APIVersion: "v1"},
-			}
-
-			_, err = client.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-			utils.CheckError(err)
-		}
+	if err != nil {
+		return err
 	}
 
 	// apply the resources
@@ -101,6 +79,21 @@ func deploy(resources []resourceutil.Resource) error {
 		}
 	}
 	return nil
+}
+
+func ensureNamespaceExistance(client kubernetes.Interface, namespace string) (err error) {
+	if _, err = client.CoreV1().Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{}); err != nil {
+		if apierrors.IsNotFound(err) {
+			fmt.Printf("Creating Namespace: %s\n", options.Namespace)
+
+			ns := &apiv1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: options.Namespace},
+				TypeMeta:   metav1.TypeMeta{Kind: "Namespace", APIVersion: "v1"},
+			}
+			_, err = client.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+		}
+	}
+	return err
 }
 
 func createJobFromCronjob(res resourceutil.Resource) (*batchapiv1.Job, error) {
@@ -273,26 +266,4 @@ func createPatch(currentObj runtime.Object, target resourceutil.Resource) ([]byt
 
 	patch, err := strategicpatch.CreateThreeWayMergePatch(original, desired, current, patchMeta, true)
 	return patch, types.StrategicMergePatchType, err
-}
-
-func addInfos(resources *[]resourceutil.Resource) {
-	files := []string{}
-
-	for _, resource := range *resources {
-		files = append(files, resource.Filepath)
-	}
-
-	infos, err := resource.NewBuilder(options.Config).
-		Unstructured().
-		RequireObject(true).
-		FilenameParam(false, &resource.FilenameOptions{Filenames: files, Recursive: false}).
-		Flatten().
-		Do().Infos()
-
-	utils.CheckError(err)
-
-	for i, v := range infos {
-		v.Namespace = options.Namespace
-		(*resources)[i].Info = v
-	}
 }
