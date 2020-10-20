@@ -15,8 +15,8 @@
 package cli
 
 import (
-	"git.tools.mia-platform.eu/platform/devops/deploy/pkg/generate"
 	"git.tools.mia-platform.eu/platform/devops/deploy/internal/utils"
+	"git.tools.mia-platform.eu/platform/devops/deploy/pkg/generate"
 	"github.com/spf13/cobra"
 )
 
@@ -35,7 +35,7 @@ func GenerateSubcommand(cmd *cobra.Command, options *utils.Options) {
 		},
 	}
 
-	generateCmd.Flags().StringSliceVarP(&configPath, "config-file", "c", []string{}, "config file that contains all ConfigMap and Secrets definitions")
+	generateCmd.Flags().StringSliceVarP(&configPath, "config-file", "c", []string{}, "config file that contains all ConfigMaps and Secrets definitions")
 	generateCmd.Flags().StringSliceVarP(&prefixes, "env-prefix", "e", []string{}, "Prefixes to add when looking for ENV variables")
 	generateCmd.Flags().StringVarP(&outputPath, "out", "o", "./interpolated-files", "Output directory where interpolated fileNames are saved")
 	cmd.AddCommand(generateCmd)

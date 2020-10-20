@@ -21,6 +21,42 @@ TODO
 
 If you want to read detailed documentation on all the subcommand availables go to the [doc](./docs)
 
+## Pipeline usage
+
+In order to use `mlp` in a pipeline these are the steps to follow:
+
+- In the configuration files use `{{VAR}}` to reference the environment variable `VAR`
+- Prepare a `mlp.yaml` file with all the secrets and configmaps to generate and apply inside the cluster (see file structure in [generate](./docs/generate.md)).
+- run `mlp generate` with the flags:
+  - `--config-file`: the configuration files containing secrets and configmaps structure.
+  - `--env-prefix`: the prefixes to use while perfoming the environment variables lookup inside the configuration files.
+  - `--out`: output directory in which generated files will be placed
+- run `mlp interpolate` with:
+  - `--filename`: the files/folders containing files to interpolate. The command does not look into sub-dirs.
+  - `--env-prefix`: the prefixes to use while perfoming the environment variables lookup.
+  - `--out`: output directory in which generated files will be placed
+- run `mlp deploy` with:
+  - `--filename`: the files/folders containing files to deploy into the Kubernetes cluster.
+  - `--server`: Kubernetes URL
+  - `--certificate-authority`: Kubernetes CA 
+  - `--token`: Kubernetes token
+  - `--namespace`: the namespace in which the resources will be deployed
+  
+Example:
+
+The `script` section of the CI file should look like this:
+
+```
+  script:
+    - mkdir OUTPUT_DIR
+    - mlp generate -c config-file.yaml -e FIRST_PREFIX -e SECOND_PREFIX -o OUTPUT_DIR
+    - mlp interpolate -f SOURCE_PATH -e FIRST_PREFIX -e SECOND_PREFIX -o OUTPUT_DIR
+    - mlp deploy --server KUBERNETES_URL --certificate-authority /path/to/kubernetes/ca.pem --token KUBERNETES_TOKEN -f OUTPUT_DIR -n KUBERNETES_NAMESPACE
+
+```
+
+Note that `mlp` suppose that the output directory already exists so it needs to be created before using the command.
+
 ## Contributing
 
 Partecipation to the project is governed by the [Code of Conduct](./CODE_OF_CONDUCT.md) and you can read
