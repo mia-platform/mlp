@@ -196,7 +196,7 @@ func apply(res resourceutil.Resource, helper resHelper) error {
 	// Do not modify the resource if the annotation is set to `once`
 	if res.Head.Metadata.Annotations["mia-platform.eu/deploy"] != "once" {
 
-		// Replace only if it is a Secret or configmap otherwise path the resource
+		// Replace only if it is a Secret or configmap otherwise patch the resource
 		if res.Head.Kind == "Secret" || res.Head.Kind == "ConfigMap" {
 			fmt.Printf("Replacing %s: %s\n", res.Head.Kind, res.Info.Name)
 			_, err = helper.Replace(res.Info.Namespace, res.Info.Name, true, res.Info.Object)

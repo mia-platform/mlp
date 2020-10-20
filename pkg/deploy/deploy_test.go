@@ -9,6 +9,7 @@ import (
 	"git.tools.mia-platform.eu/platform/devops/deploy/internal/utils"
 	"git.tools.mia-platform.eu/platform/devops/deploy/pkg/resourceutil"
 	"github.com/stretchr/testify/require"
+	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -33,11 +34,14 @@ type clusterObj struct {
 type mockHelper struct {
 	clusterObjs      []clusterObj
 	groupVersionKind schema.GroupVersionKind
+	patchCalled      bool
+	replaceCalled    bool
+	createCalled     bool
 }
 
-func (mh mockHelper) Get(namespace, name string) (runtime.Object, error) {
+func (mh *mockHelper) Get(namespace, name string) (runtime.Object, error) {
 	for _, v := range mh.clusterObjs {
-		if namespace == v.namespace && name == v.name && mh.groupVersionKind == v.groupVersionKind {
+		if namespace == v.namespace && name == v.name {
 			return v.obj, nil
 		}
 	}
@@ -54,11 +58,12 @@ func (mh mockHelper) Get(namespace, name string) (runtime.Object, error) {
 	}}
 }
 
-func (mh mockHelper) Create(namespace string, modify bool, obj runtime.Object) (runtime.Object, error) {
+func (mh *mockHelper) Create(namespace string, modify bool, obj runtime.Object) (runtime.Object, error) {
+	mh.createCalled = true
 	objMeta, err := meta.Accessor(obj)
 	utils.CheckError(err)
 	for _, v := range mh.clusterObjs {
-		if namespace == v.namespace && objMeta.GetName() == v.name && mh.groupVersionKind == v.groupVersionKind {
+		if namespace == v.namespace && objMeta.GetName() == v.name {
 			errorString := fmt.Sprintf("Creating already existing object: %s", v.name)
 			return nil, errors.New(errorString)
 		}
@@ -68,73 +73,111 @@ func (mh mockHelper) Create(namespace string, modify bool, obj runtime.Object) (
 	return obj, nil
 }
 
-func (mh mockHelper) Replace(namespace string, name string, overwrite bool, obj runtime.Object) (runtime.Object, error) {
+func (mh *mockHelper) Replace(namespace string, name string, overwrite bool, obj runtime.Object) (runtime.Object, error) {
+	mh.replaceCalled = true
 	for _, v := range mh.clusterObjs {
-		if namespace == v.namespace && name == v.name && mh.groupVersionKind == v.groupVersionKind {
+		if namespace == v.namespace && name == v.name {
 			return v.obj, nil
 		}
 	}
 	return nil, errors.New("Object Not found")
 }
 
-func (mh mockHelper) Patch(namespace, name string, pt types.PatchType, data []byte, options *metav1.PatchOptions) (runtime.Object, error) {
+func (mh *mockHelper) Patch(namespace, name string, pt types.PatchType, data []byte, options *metav1.PatchOptions) (runtime.Object, error) {
+	mh.patchCalled = true
 	return nil, nil
 }
 
-var randomObj runtime.Object = &apiv1.Secret{
-	Type: apiv1.SecretTypeDockerConfigJson,
-	ObjectMeta: metav1.ObjectMeta{
-		Name: "foo",
-	},
-	TypeMeta: metav1.TypeMeta{Kind: "Secret", APIVersion: "v1"},
-}
+func TestApply(t *testing.T) {
 
-func mockAddInfos(oldresources []resourceutil.Resource) []resourceutil.Resource {
-	resources := []resourceutil.Resource{}
-	for _, res := range oldresources {
-		res.Info = &resource.Info{}
-		res.Info.Object = randomObj
-		res.Info.Namespace = "default" // TODO check this out
-		res.Info.Name = res.Name
-		gv, err := schema.ParseGroupVersion(res.Head.GroupVersion)
+	t.Run("Create and patch deployment", func(t *testing.T) {
+		helper := &mockHelper{}
+		deployment, err := resourceutil.NewResource("testdata/aaa-test-deployent.yml")
 		utils.CheckError(err)
-		gvk := gv.WithKind(res.Head.Kind)
-		res.Info.Object.GetObjectKind().SetGroupVersionKind(gvk)
-		resources = append(resources, res)
-	}
-	return resources
-}
-
-func TestCreatingResources(t *testing.T) {
-	expectedMetadata := struct {
-		Name        string            `json:"name"`
-		Annotations map[string]string `json:"annotations"`
-	}{
-		Name: "literal",
-	}
-
-	testcases := []resourceutil.Resource{
-		{
-			Filepath: "testdata/files-configmap.yaml",
-			Name:     "literal",
-			Head: resourceutil.ResourceHead{
-				GroupVersion: "v1",
-				Kind:         "ConfigMap",
-				Metadata:     &expectedMetadata,
+		deployment.Info = &resource.Info{
+			Object: &appsv1.Deployment{
+				TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      deployment.Name,
+					Namespace: deployment.Namespace,
+				},
 			},
-		},
-	}
+			Namespace: deployment.Namespace,
+			Name:      deployment.Name,
+			Mapping:   &meta.RESTMapping{GroupVersionKind: schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}},
+		}
+		err = apply(*deployment, helper)
+		require.True(t, helper.createCalled)
+		require.False(t, helper.replaceCalled)
+		require.False(t, helper.patchCalled)
+		require.Nil(t, err)
 
-	resources := mockAddInfos(testcases)
-	// Mocking deploy
-	helper := mockHelper{}
-	for _, res := range resources {
-		helper.groupVersionKind = res.Info.Object.GetObjectKind().GroupVersionKind()
-		err := apply(res, helper)
+		err = apply(*deployment, helper)
+		require.True(t, helper.createCalled)
+		require.False(t, helper.replaceCalled)
+		require.True(t, helper.patchCalled)
 		require.Nil(t, err)
-		err = apply(res, helper)
+
+	})
+
+	t.Run("Create and replace secret", func(t *testing.T) {
+		helper := &mockHelper{}
+		secret, err := resourceutil.NewResource("testdata/opaque.secret.yaml")
+		utils.CheckError(err)
+
+		secret.Info = &resource.Info{
+			Object: &apiv1.Secret{
+				Type: apiv1.SecretTypeOpaque,
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      secret.Name,
+					Namespace: secret.Namespace,
+				},
+				TypeMeta: metav1.TypeMeta{Kind: "Secret", APIVersion: "v1"},
+			},
+			Namespace: secret.Namespace,
+			Name:      secret.Name,
+		}
+		err = apply(*secret, helper)
+		require.True(t, helper.createCalled)
+		require.False(t, helper.replaceCalled)
+		require.False(t, helper.patchCalled)
 		require.Nil(t, err)
-	}
+		err = apply(*secret, helper)
+		require.True(t, helper.createCalled)
+		require.True(t, helper.replaceCalled)
+		require.False(t, helper.patchCalled)
+		require.Nil(t, err)
+
+	})
+
+	t.Run("Create a secret and not replace it", func(t *testing.T) {
+		helper := &mockHelper{}
+		secret, err := resourceutil.NewResource("testdata/tls.secret.yaml")
+		utils.CheckError(err)
+
+		secret.Info = &resource.Info{
+			Object: &apiv1.Secret{
+				Type: apiv1.SecretTypeTLS,
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      secret.Name,
+					Namespace: secret.Namespace,
+				},
+				TypeMeta: metav1.TypeMeta{Kind: "Secret", APIVersion: "v1"},
+			},
+			Namespace: secret.Namespace,
+			Name:      secret.Name,
+		}
+		err = apply(*secret, helper)
+		require.True(t, helper.createCalled)
+		require.False(t, helper.replaceCalled)
+		require.False(t, helper.patchCalled)
+		require.Nil(t, err)
+		err = apply(*secret, helper)
+		require.True(t, helper.createCalled)
+		require.False(t, helper.replaceCalled)
+		require.False(t, helper.patchCalled)
+		require.Nil(t, err)
+	})
 }
 
 func TestEnsureNamespaceExistance(t *testing.T) {

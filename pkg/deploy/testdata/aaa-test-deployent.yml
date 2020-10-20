@@ -5,6 +5,7 @@ metadata:
   labels:
     app: aaa-test-deployment
   name: aaa-test-deployment
+  namespace: default
 spec:
   replicas: 1
   selector:
