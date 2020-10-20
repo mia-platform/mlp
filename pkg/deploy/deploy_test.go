@@ -105,11 +105,6 @@ func mockAddInfos(oldresources []resourceutil.Resource) []resourceutil.Resource 
 	return resources
 }
 
-// func TestApply(t *testing.T) {
-// 	path := "testdata/"
-// 	t.Run()
-// }
-
 func TestCreatingResources(t *testing.T) {
 	expectedMetadata := struct {
 		Name        string            `json:"name"`
@@ -144,29 +139,37 @@ func TestCreatingResources(t *testing.T) {
 
 func TestEnsureNamespaceExistance(t *testing.T) {
 	t.Run("Create a Namespace if does not exists", func(t *testing.T) {
-		namespace := "foo"
-		client := fake.NewSimpleClientset(&apiv1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{Name: namespace},
+		namespaceName := "foo"
+		namespace := &apiv1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{Name: namespaceName},
 			TypeMeta:   metav1.TypeMeta{Kind: "Namespace", APIVersion: "v1"},
-		})
-		client.CoreV1().(*fakecorev1.FakeCoreV1).PrependReactor("get", "namespace", func(action faketesting.Action) (handled bool, ret runtime.Object, err error) {
+		}
+		client = fake.NewSimpleClientset()
+		client.CoreV1().(*fakecorev1.FakeCoreV1).PrependReactor("get", "namespaces", func(action faketesting.Action) (handled bool, ret runtime.Object, err error) {
 			return true, &v1.Namespace{}, apierrors.NewNotFound(schema.GroupResource{Group: "v1", Resource: "Namespace"}, "foo")
 		})
-		client.CoreV1().(*fakecorev1.FakeCoreV1).PrependReactor("create", "namespace", func(action faketesting.Action) (handled bool, ret runtime.Object, err error) {
-			return true, &v1.Namespace{}, nil
+		client.CoreV1().(*fakecorev1.FakeCoreV1).PrependReactor("create", "namespaces", func(action faketesting.Action) (handled bool, ret runtime.Object, err error) {
+			return true, namespace, nil
 		})
-		require.Nil(t, ensureNamespaceExistance(client, namespace))
+		actual, err := ensureNamespaceExistance(client, namespaceName)
+		require.Nil(t, err)
+		require.Equal(t, namespace, actual)
 	})
 
-	// t.Run("Don't create a Namespace if already exists", func(t *testing.T) {
-	// 	namespace := "foo"
-	// 	client := fake.NewSimpleClientset()
-	// 	client.CoreV1().(*fakecorev1.FakeCoreV1).PrependReactor("get", "namespace", func(action faketesting.Action) (handled bool, ret runtime.Object, err error) {
-	// 		return true, &v1.Namespace{}, nil
-	// 	})
-	// 	err := ensureNamespaceExistance(client, namespace)
-	// 	require.Nil(t, err)
-	// })
+	t.Run("Don't create a Namespace if already exists", func(t *testing.T) {
+		namespaceName := "foo"
+		namespace := &apiv1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{Name: namespaceName},
+			TypeMeta:   metav1.TypeMeta{Kind: "Namespace", APIVersion: "v1"},
+		}
+		client := fake.NewSimpleClientset()
+		client.CoreV1().(*fakecorev1.FakeCoreV1).PrependReactor("get", "namespace", func(action faketesting.Action) (handled bool, ret runtime.Object, err error) {
+			return true, namespace, nil
+		})
+		actual, err := ensureNamespaceExistance(client, namespaceName)
+		require.Nil(t, err)
+		require.Equal(t, namespace, actual)
+	})
 }
 
 func TestCreateJobFromCronJob(t *testing.T) {

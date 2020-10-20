@@ -64,7 +64,7 @@ func Run(inputPaths []string, opts *utils.Options) {
 func deploy(resources []resourceutil.Resource) error {
 
 	// Check that the namespace exists
-	err := ensureNamespaceExistance(client, options.Namespace)
+	_, err := ensureNamespaceExistance(client, options.Namespace)
 
 	if err != nil {
 		return err
@@ -81,19 +81,19 @@ func deploy(resources []resourceutil.Resource) error {
 	return nil
 }
 
-func ensureNamespaceExistance(client kubernetes.Interface, namespace string) (err error) {
-	if _, err = client.CoreV1().Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{}); err != nil {
+func ensureNamespaceExistance(client kubernetes.Interface, namespace string) (created *apiv1.Namespace, err error) {
+	if created, err = client.CoreV1().Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{}); err != nil {
 		if apierrors.IsNotFound(err) {
-			fmt.Printf("Creating Namespace: %s\n", options.Namespace)
+			fmt.Printf("Creating Namespace: %s\n", namespace)
 
-			ns := &apiv1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{Name: options.Namespace},
+			toCreate := &apiv1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: namespace},
 				TypeMeta:   metav1.TypeMeta{Kind: "Namespace", APIVersion: "v1"},
 			}
-			_, err = client.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+			created, err = client.CoreV1().Namespaces().Create(context.TODO(), toCreate, metav1.CreateOptions{})
 		}
 	}
-	return err
+	return created, err
 }
 
 func createJobFromCronjob(res resourceutil.Resource) (*batchapiv1.Job, error) {
