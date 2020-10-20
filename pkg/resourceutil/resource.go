@@ -41,13 +41,10 @@ type ResourceHead struct {
 	} `json:"metadata,omitempty"`
 }
 
-// InfoMacker creates a `resource.Info` given a `resource.Builder`,
-// a namespace and a path to a YAML file.
-type InfoMacker func(builder *resource.Builder, namespace string, path string) (*resource.Info, error)
-
 // NewResource create a new Resource from a file at `filepath`
 // does NOT support multiple documents inside a single file
-func NewResource(builder *resource.Builder, maker InfoMacker, namespace string, filepath string) (*Resource, error) {
+func NewResource(filepath string) (*Resource, error) {
+
 	data, err := utils.ReadFile(filepath)
 	if err != nil {
 		return nil, err
@@ -58,16 +55,10 @@ func NewResource(builder *resource.Builder, maker InfoMacker, namespace string, 
 		return nil, err
 	}
 
-	info, err := maker(builder, namespace, filepath)
-	if err != nil {
-		return nil, err
-	}
-
 	return &Resource{
 		Filepath: filepath,
 		Name:     head.Metadata.Name,
 		Head:     head,
-		Info:     info,
 	}, nil
 }
 
@@ -102,10 +93,15 @@ func MakeResources(opts *utils.Options, filePaths []string) ([]Resource, error) 
 
 	resources := []Resource{}
 	for _, path := range filePaths {
-		res, err := NewResource(builder, MakeInfo, opts.Namespace, path)
+		res, err := NewResource(path)
 		if err != nil {
 			return nil, err
 		}
+		info, err := MakeInfo(builder, opts.Namespace, path)
+		if err != nil {
+			return nil, err
+		}
+		res.Info = info
 		resources = append(resources, *res)
 	}
 
