@@ -13,6 +13,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type FakeBuilder struct {
+	builder *resource.Builder
+}
+
+func (b *FakeBuilder) Generate(path string) ([]*resource.Info, error) {
+	file, err := utils.ReadFile(path)
+	utils.CheckError(err)
+	if strings.Contains(string(file), "---\n") {
+		return make([]*resource.Info, 2), nil
+	}
+	return []*resource.Info{
+		&resource.Info{},
+	}, nil
+}
+
 func TestNewResource(t *testing.T) {
 	t.Run("Read a valid kubernetes resource", func(t *testing.T) {
 		filePath := filepath.Join(testdata, "kubernetesersource.yaml")
@@ -46,31 +61,20 @@ func TestNewResource(t *testing.T) {
 	})
 }
 
-type FakeBuilder struct {
-	builder *resource.Builder
-}
-
-func (b *FakeBuilder) Generate(path string) ([]*resource.Info, error) {
-	file, err := utils.ReadFile(path)
-	utils.CheckError(err)
-	if strings.Contains(string(file), "---\n") {
-		return make([]*resource.Info, 2), nil
-	}
-	return []*resource.Info{
-		&resource.Info{
-			Name:      "",
-			Namespace: "",
-		},
-	}, nil
-}
-
 func TestMakeInfo(t *testing.T) {
 	b := &FakeBuilder{
 		builder: resource.NewBuilder(genericclioptions.NewTestConfigFlags()),
 	}
 
-	_, err := MakeInfo(b, "default", "testdata/tworesources.yaml")
+	t.Run("File with two resources", func(t *testing.T) {
+		_, err := MakeInfo(b, "default", "testdata/tworesources.yaml")
 
-	require.EqualError(t, err, "Multiple objects in single yaml file currently not supported")
+		require.EqualError(t, err, "Multiple objects in single yaml file currently not supported")
+	})
 
+	t.Run("resource built with correct namespace", func(t *testing.T) {
+		info, err := MakeInfo(b, "default", "testdata/kubernetesersource.yaml")
+		require.Nil(t, err)
+		require.Equal(t, "default", info.Namespace, "Multiple objects in single yaml file currently not supported")
+	})
 }
