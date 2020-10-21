@@ -259,3 +259,59 @@ func TestCreateJobFromCronJob(t *testing.T) {
 	require.Contains(t, job.ObjectMeta.GenerateName, cron.Name)
 	require.Nil(t, err)
 }
+
+func TestCreatePatch(t *testing.T) {
+	t.Run("Pass the same object should produce empty patch", func(t *testing.T) {
+		deployment, err := resourceutil.NewResource("testdata/aaa-test-deployent.yml")
+		utils.CheckError(err)
+		deployment.Info = &resource.Info{
+			Object: &appsv1.Deployment{
+				TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      deployment.Name,
+					Namespace: deployment.Namespace,
+					Annotations: map[string]string{
+						"kubectl.kubernetes.io/last-applied-configuration": "{\"kind\":\"Deployment\",\"apiVersion\":\"apps/v1\",\"metadata\":{\"name\":\"aaa-test-deployment\",\"creationTimestamp\":null},\"spec\":{\"selector\":null,\"template\":{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":null}},\"strategy\":{}},\"status\":{}}\n",
+					},
+				},
+			},
+			Namespace: deployment.Namespace,
+			Name:      deployment.Name,
+			Mapping:   &meta.RESTMapping{GroupVersionKind: schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}},
+		}
+
+		patch, patchType, err := createPatch(deployment.Info.Object, *deployment)
+		require.Equal(t, []byte(`{}`), patch, "patch should be empty")
+		require.Equal(t, patchType, types.StrategicMergePatchType)
+		require.Nil(t, err)
+	})
+
+	t.Run("change resource name", func(t *testing.T) {
+		deployment, err := resourceutil.NewResource("testdata/aaa-test-deployent.yml")
+		utils.CheckError(err)
+		deploymentObject := &appsv1.Deployment{
+			TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      deployment.Name,
+				Namespace: deployment.Namespace,
+				Annotations: map[string]string{
+					"kubectl.kubernetes.io/last-applied-configuration": "{\"kind\":\"Deployment\",\"apiVersion\":\"apps/v1\",\"metadata\":{\"name\":\"aaa-test-deployment\",\"creationTimestamp\":null},\"spec\":{\"selector\":null,\"template\":{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":null}},\"strategy\":{}},\"status\":{}}\n",
+				},
+			},
+		}
+		deployment.Info = &resource.Info{
+			Object:    deploymentObject,
+			Namespace: deployment.Namespace,
+			Name:      deployment.Name,
+			Mapping:   &meta.RESTMapping{GroupVersionKind: schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}},
+		}
+
+		var oldDeploy appsv1.Deployment
+		deploymentObject.DeepCopyInto(&oldDeploy)
+		oldDeploy.ObjectMeta.Name = "foo"
+		patch, patchType, err := createPatch(&oldDeploy, *deployment)
+		require.Equal(t, []byte(`{"metadata":{"name":"aaa-test-deployment"}}`), patch, "patch should contain the new resource name")
+		require.Equal(t, patchType, types.StrategicMergePatchType)
+		require.Nil(t, err)
+	})
+}
