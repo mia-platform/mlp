@@ -186,7 +186,6 @@ func apply(res resourceutil.Resource, helper resHelper) error {
 					return err
 				}
 			}
-
 			_, err = helper.Create(res.Info.Namespace, false, res.Info.Object)
 		}
 		return err
