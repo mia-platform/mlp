@@ -3,7 +3,7 @@ kind: CronJob
 metadata:
   name: hello
   annotations:
-    mia-platform.eu/autocreate: 'false'
+    mia-platform.eu/autocreate: 'true'
 spec:
   schedule: "*/5 * * * *"
   jobTemplate:
