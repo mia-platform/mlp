@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/util/uuid"
-
 	"k8s.io/client-go/kubernetes"
 
 	"git.tools.mia-platform.eu/platform/devops/deploy/internal/utils"
@@ -32,7 +30,7 @@ import (
 )
 
 var options *utils.Options
-var client *kubernetes.Clientset
+var client kubernetes.Interface
 
 type resHelper interface {
 	Get(namespace, name string) (runtime.Object, error)
@@ -54,42 +52,20 @@ func Run(inputPaths []string, opts *utils.Options) {
 	filePaths, err := utils.ExtractYAMLFiles(inputPaths)
 	utils.CheckError(err)
 
-	resources, err := makeResources(filePaths)
+	resources, err := resourceutil.MakeResources(opts, filePaths)
 	utils.CheckError(err)
-	addInfos(&resources)
+
 	err = deploy(resources)
 	utils.CheckError(err)
-}
-
-func makeResources(filePaths []string) ([]resourceutil.Resource, error) {
-	resources := []resourceutil.Resource{}
-	for _, path := range filePaths {
-		res, err := resourceutil.NewResource(path)
-		if err != nil {
-			return nil, err
-		}
-		resources = append(resources, *res)
-	}
-
-	resources = resourceutil.SortResourcesByKind(resources, nil)
-	return resources, nil
 }
 
 func deploy(resources []resourceutil.Resource) error {
 
 	// Check that the namespace exists
-	if _, err := client.CoreV1().Namespaces().Get(context.TODO(), options.Namespace, metav1.GetOptions{}); err != nil {
-		if apierrors.IsNotFound(err) {
-			fmt.Printf("Creating Namespace: %s\n", options.Namespace)
+	_, err := ensureNamespaceExistance(client, options.Namespace)
 
-			ns := &apiv1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{Name: options.Namespace},
-				TypeMeta:   metav1.TypeMeta{Kind: "Namespace", APIVersion: "v1"},
-			}
-
-			_, err = client.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-			utils.CheckError(err)
-		}
+	if err != nil {
+		return err
 	}
 
 	// apply the resources
@@ -103,7 +79,22 @@ func deploy(resources []resourceutil.Resource) error {
 	return nil
 }
 
-func createJobFromCronjob(res resourceutil.Resource) (*batchapiv1.Job, error) {
+func ensureNamespaceExistance(client kubernetes.Interface, namespace string) (created *apiv1.Namespace, err error) {
+	if created, err = client.CoreV1().Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{}); err != nil {
+		if apierrors.IsNotFound(err) {
+			fmt.Printf("Creating Namespace: %s\n", namespace)
+
+			toCreate := &apiv1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: namespace},
+				TypeMeta:   metav1.TypeMeta{Kind: "Namespace", APIVersion: "v1"},
+			}
+			created, err = client.CoreV1().Namespaces().Create(context.TODO(), toCreate, metav1.CreateOptions{})
+		}
+	}
+	return created, err
+}
+
+func createJobFromCronjob(client kubernetes.Interface, res resourceutil.Resource) (*batchapiv1.Job, error) {
 	cronJobMetadata, err := meta.Accessor(res.Info.Object)
 	if err != nil {
 		return nil, err
@@ -118,18 +109,19 @@ func createJobFromCronjob(res resourceutil.Resource) (*batchapiv1.Job, error) {
 		return nil, fmt.Errorf("Error in conversion to Cronjob")
 	}
 
-	cronUUID := uuid.NewUUID()
+	// TODO useless if OwnerReferences are not used
+	// cronUUID := uuid.NewUUID()
 
-	// use the old UID if the cron already exists
-	if oldCron, err := client.BatchV1().Jobs(options.Namespace).Get(context.TODO(), cronJobMetadata.GetName(), metav1.GetOptions{}); err == nil {
-		cronUUID = oldCron.GetUID()
-	}
+	// // use the old UID if the cron already exists
+	// if oldCron, err := client.BatchV1beta1().CronJobs(options.Namespace).Get(context.TODO(), cronJobMetadata.GetName(), metav1.GetOptions{}); err == nil {
+	// 	cronUUID = oldCron.GetUID()
+	// }
 
-	if err != nil && !apierrors.IsNotFound(err) {
-		return nil, err
-	}
+	// if err != nil && !apierrors.IsNotFound(err) {
+	// 	return nil, err
+	// }
 
-	cronjobObj.SetUID(cronUUID)
+	// cronjobObj.SetUID(cronUUID)
 
 	annotations := make(map[string]string)
 	annotations["cronjob.kubernetes.io/instantiate"] = "manual"
@@ -156,6 +148,12 @@ func createJobFromCronjob(res resourceutil.Resource) (*batchapiv1.Job, error) {
 		},
 		Spec: cronjobObj.Spec.JobTemplate.Spec,
 	}
+
+	fmt.Printf("Creating job from cronjob: %s\n", res.Name)
+	_, err = client.BatchV1().Jobs(res.Namespace).Create(context.TODO(), job, metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
 	return job, nil
 }
 
@@ -169,13 +167,7 @@ func apply(res resourceutil.Resource, helper resHelper) error {
 	// Create a Job from every CronJob having the mia-platform.eu/autocreate annotation set to true
 	if res.Head.Kind == "CronJob" {
 		if val, ok := res.Head.Metadata.Annotations["mia-platform.eu/autocreate"]; ok && val == "true" {
-			job, err := createJobFromCronjob(res)
-			if err != nil {
-				return err
-			}
-
-			fmt.Printf("Creating job from cronjob: %s\n", res.Name)
-			_, err = client.BatchV1().Jobs(options.Namespace).Create(context.TODO(), job, metav1.CreateOptions{})
+			_, err := createJobFromCronjob(client, res)
 			if err != nil {
 				return err
 			}
@@ -194,7 +186,6 @@ func apply(res resourceutil.Resource, helper resHelper) error {
 					return err
 				}
 			}
-
 			_, err = helper.Create(res.Info.Namespace, false, res.Info.Object)
 		}
 		return err
@@ -203,7 +194,7 @@ func apply(res resourceutil.Resource, helper resHelper) error {
 	// Do not modify the resource if the annotation is set to `once`
 	if res.Head.Metadata.Annotations["mia-platform.eu/deploy"] != "once" {
 
-		// Replace only if it is a Secret or configmap otherwise path the resource
+		// Replace only if it is a Secret or configmap otherwise patch the resource
 		if res.Head.Kind == "Secret" || res.Head.Kind == "ConfigMap" {
 			fmt.Printf("Replacing %s: %s\n", res.Head.Kind, res.Info.Name)
 			_, err = helper.Replace(res.Info.Namespace, res.Info.Name, true, res.Info.Object)
@@ -273,26 +264,4 @@ func createPatch(currentObj runtime.Object, target resourceutil.Resource) ([]byt
 
 	patch, err := strategicpatch.CreateThreeWayMergePatch(original, desired, current, patchMeta, true)
 	return patch, types.StrategicMergePatchType, err
-}
-
-func addInfos(resources *[]resourceutil.Resource) {
-	files := []string{}
-
-	for _, resource := range *resources {
-		files = append(files, resource.Filepath)
-	}
-
-	infos, err := resource.NewBuilder(options.Config).
-		Unstructured().
-		RequireObject(true).
-		FilenameParam(false, &resource.FilenameOptions{Filenames: files, Recursive: false}).
-		Flatten().
-		Do().Infos()
-
-	utils.CheckError(err)
-
-	for i, v := range infos {
-		v.Namespace = options.Namespace
-		(*resources)[i].Info = v
-	}
 }
