@@ -10,6 +10,8 @@ import (
 	"git.tools.mia-platform.eu/platform/devops/deploy/pkg/resourceutil"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
+	batchapiv1 "k8s.io/api/batch/v1"
+	batchapiv1beta1 "k8s.io/api/batch/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -20,6 +22,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes/fake"
+	fakebatchv1 "k8s.io/client-go/kubernetes/typed/batch/v1/fake"
+	fakebatchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1/fake"
 	fakecorev1 "k8s.io/client-go/kubernetes/typed/core/v1/fake"
 	faketesting "k8s.io/client-go/testing"
 )
@@ -216,5 +220,42 @@ func TestEnsureNamespaceExistance(t *testing.T) {
 }
 
 func TestCreateJobFromCronJob(t *testing.T) {
+	cron, err := resourceutil.NewResource("testdata/cronjob-test.cronjob.yml")
+	utils.CheckError(err)
+	cron.Info = &resource.Info{
+		Object: &batchapiv1beta1.CronJob{
+			TypeMeta: metav1.TypeMeta{APIVersion: "batch/v1beta1", Kind: "CronJob"},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      cron.Name,
+				Namespace: cron.Namespace,
+			},
+		},
+		Namespace: cron.Namespace,
+		Name:      cron.Name,
+		Mapping:   &meta.RESTMapping{GroupVersionKind: schema.GroupVersionKind{Group: "batch", Version: "v1beta1", Kind: "CronJob"}},
+	}
 
+	expected := &batchapiv1.Job{
+		TypeMeta: metav1.TypeMeta{APIVersion: batchapiv1.SchemeGroupVersion.String(), Kind: "Job"},
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: cron.Name + "-",
+			Annotations: map[string]string{
+				"cronjob.kubernetes.io/instantiate": "manual",
+			},
+		},
+	}
+
+	client := fake.NewSimpleClientset()
+	client.BatchV1beta1().(*fakebatchv1beta1.FakeBatchV1beta1).PrependReactor("get", "cronjobs", func(action faketesting.Action) (handled bool, ret runtime.Object, err error) {
+		return true, cron.Info.Object, nil
+	})
+	client.BatchV1().(*fakebatchv1.FakeBatchV1).PrependReactor("create", "jobs", func(action faketesting.Action) (handled bool, ret runtime.Object, err error) {
+		return false, expected, nil
+	})
+	job, err := createJobFromCronjob(client, *cron)
+
+	require.Equal(t, expected.TypeMeta, job.TypeMeta)
+	require.Equal(t, expected.ObjectMeta.Annotations, job.ObjectMeta.Annotations)
+	require.Contains(t, job.ObjectMeta.GenerateName, cron.Name)
+	require.Nil(t, err)
 }

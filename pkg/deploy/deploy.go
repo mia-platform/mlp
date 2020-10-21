@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/util/uuid"
-
 	"k8s.io/client-go/kubernetes"
 
 	"git.tools.mia-platform.eu/platform/devops/deploy/internal/utils"
@@ -96,7 +94,7 @@ func ensureNamespaceExistance(client kubernetes.Interface, namespace string) (cr
 	return created, err
 }
 
-func createJobFromCronjob(res resourceutil.Resource) (*batchapiv1.Job, error) {
+func createJobFromCronjob(client kubernetes.Interface, res resourceutil.Resource) (*batchapiv1.Job, error) {
 	cronJobMetadata, err := meta.Accessor(res.Info.Object)
 	if err != nil {
 		return nil, err
@@ -111,18 +109,19 @@ func createJobFromCronjob(res resourceutil.Resource) (*batchapiv1.Job, error) {
 		return nil, fmt.Errorf("Error in conversion to Cronjob")
 	}
 
-	cronUUID := uuid.NewUUID()
+	// TODO useless if OwnerReferences are not used
+	// cronUUID := uuid.NewUUID()
 
-	// use the old UID if the cron already exists
-	if oldCron, err := client.BatchV1().Jobs(options.Namespace).Get(context.TODO(), cronJobMetadata.GetName(), metav1.GetOptions{}); err == nil {
-		cronUUID = oldCron.GetUID()
-	}
+	// // use the old UID if the cron already exists
+	// if oldCron, err := client.BatchV1beta1().CronJobs(options.Namespace).Get(context.TODO(), cronJobMetadata.GetName(), metav1.GetOptions{}); err == nil {
+	// 	cronUUID = oldCron.GetUID()
+	// }
 
-	if err != nil && !apierrors.IsNotFound(err) {
-		return nil, err
-	}
+	// if err != nil && !apierrors.IsNotFound(err) {
+	// 	return nil, err
+	// }
 
-	cronjobObj.SetUID(cronUUID)
+	// cronjobObj.SetUID(cronUUID)
 
 	annotations := make(map[string]string)
 	annotations["cronjob.kubernetes.io/instantiate"] = "manual"
@@ -149,6 +148,12 @@ func createJobFromCronjob(res resourceutil.Resource) (*batchapiv1.Job, error) {
 		},
 		Spec: cronjobObj.Spec.JobTemplate.Spec,
 	}
+
+	fmt.Printf("Creating job from cronjob: %s\n", res.Name)
+	_, err = client.BatchV1().Jobs(res.Namespace).Create(context.TODO(), job, metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
 	return job, nil
 }
 
@@ -162,13 +167,7 @@ func apply(res resourceutil.Resource, helper resHelper) error {
 	// Create a Job from every CronJob having the mia-platform.eu/autocreate annotation set to true
 	if res.Head.Kind == "CronJob" {
 		if val, ok := res.Head.Metadata.Annotations["mia-platform.eu/autocreate"]; ok && val == "true" {
-			job, err := createJobFromCronjob(res)
-			if err != nil {
-				return err
-			}
-
-			fmt.Printf("Creating job from cronjob: %s\n", res.Name)
-			_, err = client.BatchV1().Jobs(options.Namespace).Create(context.TODO(), job, metav1.CreateOptions{})
+			_, err := createJobFromCronjob(client, res)
 			if err != nil {
 				return err
 			}
