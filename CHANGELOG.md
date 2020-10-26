@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Add label `"app.kubernetes.io/managed-by": "mia-platform"`
+- Unset original resource namespace
+
 ## [0.2.0] - 2020-10-20
 
 ### Added

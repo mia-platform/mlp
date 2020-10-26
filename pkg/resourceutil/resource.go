@@ -18,8 +18,15 @@ import (
 	"errors"
 
 	"git.tools.mia-platform.eu/platform/devops/deploy/internal/utils"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/resource"
 	"sigs.k8s.io/yaml"
+)
+
+const (
+	managedByLabel = "app.kubernetes.io/managed-by"
+	managedByMia   = "mia-platform"
 )
 
 // Resource a resource reppresentation
@@ -58,6 +65,8 @@ func (b *Builder) Generate(path string) ([]*resource.Info, error) {
 		Flatten().
 		Do().Infos()
 }
+
+var accessor = meta.NewAccessor()
 
 // NewResource create a new Resource from a file at `filepath`
 // does NOT support multiple documents inside a single file
@@ -122,10 +131,50 @@ func MakeResources(opts *utils.Options, filePaths []string) ([]Resource, error) 
 		if err != nil {
 			return nil, err
 		}
+
+		accessor.SetNamespace(info.Object, "")
+
+		err = updateLabels(info.Object, map[string]string{
+			managedByLabel: managedByMia,
+		})
+
+		if err != nil {
+			return nil, err
+		}
+
 		res.Info = info
 		resources = append(resources, *res)
 	}
 
 	resources = SortResourcesByKind(resources, nil)
 	return resources, nil
+}
+
+// updateLabels add or update the current object labels with
+// the ones contained in `new` map.
+func updateLabels(obj runtime.Object, new map[string]string) error {
+
+	current, err := accessor.Labels(obj)
+
+	if err != nil {
+		return err
+	}
+
+	result := mergeLabels(current, new)
+
+	return accessor.SetLabels(obj, result)
+}
+
+func mergeLabels(current, new map[string]string) map[string]string {
+	result := make(map[string]string)
+
+	for k, v := range current {
+		result[k] = v
+	}
+
+	for k, v := range new {
+		result[k] = v
+	}
+
+	return result
 }
