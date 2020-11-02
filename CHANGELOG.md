@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add label `"app.kubernetes.io/managed-by": "mia-platform"`
 - Unset original resource namespace
+- Add resource deletion if no longer deployed with `mlp`
 
 ## [0.2.0] - 2020-10-20
 

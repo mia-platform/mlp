@@ -2,34 +2,13 @@ package resourceutil
 
 import (
 	"path/filepath"
-	"strings"
 	"testing"
 
-	"git.tools.mia-platform.eu/platform/devops/deploy/internal/utils"
+	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/resource"
-
-	"github.com/stretchr/testify/require"
 )
-
-type FakeBuilder struct {
-	builder *resource.Builder
-}
-
-func (b *FakeBuilder) Generate(path string) ([]*resource.Info, error) {
-	file, err := utils.ReadFile(path)
-	utils.CheckError(err)
-	if strings.Contains(string(file), "---\n") {
-		return make([]*resource.Info, 2), nil
-	}
-	return []*resource.Info{
-		&resource.Info{},
-	}, nil
-}
 
 func TestNewResource(t *testing.T) {
 	t.Run("Read a valid kubernetes resource", func(t *testing.T) {
@@ -65,9 +44,7 @@ func TestNewResource(t *testing.T) {
 }
 
 func TestMakeInfo(t *testing.T) {
-	b := &FakeBuilder{
-		builder: resource.NewBuilder(genericclioptions.NewTestConfigFlags()),
-	}
+	b := NewFakeBuilder()
 
 	t.Run("File with two resources", func(t *testing.T) {
 		_, err := MakeInfo(b, "default", "testdata/tworesources.yaml")
@@ -162,7 +139,7 @@ func TestUpdateLabels(t *testing.T) {
 			},
 
 			changes: map[string]string{
-				managedByLabel: managedByMia,
+				ManagedByLabel: ManagedByMia,
 			},
 		},
 	}
@@ -173,7 +150,7 @@ func TestUpdateLabels(t *testing.T) {
 			require.Nil(t, err)
 			labels, err := accessor.Labels(tt.current)
 			require.Nil(t, err)
-			require.Equal(t, labels[managedByLabel], managedByMia, tt.message)
+			require.Equal(t, labels[ManagedByLabel], ManagedByMia, tt.message)
 		})
 	}
 }

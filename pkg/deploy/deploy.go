@@ -1,20 +1,16 @@
 package deploy
 
 import (
-	"context"
+	"bytes"
 	"encoding/json"
 	"fmt"
-
-	"k8s.io/client-go/kubernetes"
 
 	"git.tools.mia-platform.eu/platform/devops/deploy/internal/utils"
 	"git.tools.mia-platform.eu/platform/devops/deploy/pkg/resourceutil"
 	"github.com/pkg/errors"
 	batchapiv1 "k8s.io/api/batch/v1"
 	batchapiv1beta1 "k8s.io/api/batch/v1beta1"
-
 	apiv1 "k8s.io/api/core/v1"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,13 +20,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/jsonmergepatch"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
+	"sigs.k8s.io/yaml"
 )
-
-var options *utils.Options
-var client kubernetes.Interface
 
 type resHelper interface {
 	Get(namespace, name string) (runtime.Object, error)
@@ -41,13 +36,6 @@ type resHelper interface {
 
 // Run execute the deploy command from cli
 func Run(inputPaths []string, opts *utils.Options) {
-	options = opts
-
-	config, err := options.Config.ToRESTConfig()
-	utils.CheckError(err)
-
-	client, err = kubernetes.NewForConfig(config)
-	utils.CheckError(err)
 
 	filePaths, err := utils.ExtractYAMLFiles(inputPaths)
 	utils.CheckError(err)
@@ -55,14 +43,117 @@ func Run(inputPaths []string, opts *utils.Options) {
 	resources, err := resourceutil.MakeResources(opts, filePaths)
 	utils.CheckError(err)
 
-	err = deploy(resources)
+	err = deploy(opts.Config, opts.Namespace, resources)
+	utils.CheckError(err)
+
+	err = cleanup(opts, resources)
 	utils.CheckError(err)
 }
 
-func deploy(resources []resourceutil.Resource) error {
+// cleanup removes the resources no longer deployed by `mlp` and updates
+// the secret in the cluster with the updated set of resources
+func cleanup(opts *utils.Options, resources []resourceutil.Resource) error {
+	actual := makeResourceMap(resources)
 
+	builder := resourceutil.NewBuilder(opts.Config)
+
+	old, err := getOldResourceMap(builder, opts.Namespace)
+	if err != nil {
+		return err
+	}
+
+	// Prune only if it is not the first release
+	if len(old) != 0 {
+		deleteMap := deletedResources(actual, old)
+
+		err = prune(opts.Config, opts.Namespace, deleteMap)
+		if err != nil {
+			return err
+		}
+	}
+
+	return updateResourceSecret(builder, opts.Namespace, actual)
+}
+
+func updateResourceSecret(infoGen resourceutil.InfoGenerator, namespace string, resources map[string]*ResourceList) error {
+	secretContent, err := json.Marshal(resources)
+	if err != nil {
+		return err
+	}
+	secret := &apiv1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      resourceSecretName,
+			Namespace: namespace,
+		},
+		TypeMeta: metav1.TypeMeta{Kind: "Secret", APIVersion: "v1"},
+		Data:     map[string][]byte{"resources": secretContent},
+	}
+
+	buf, err := yaml.Marshal(secret)
+
+	if err != nil {
+		return err
+	}
+
+	secretInfo, err := infoGen.FromStream(bytes.NewBuffer(buf))
+
+	if err != nil {
+		return err
+	}
+
+	helper := infoGen.NewHelper(secretInfo[0].Client, secretInfo[0].Mapping)
+
+	if _, err = helper.Create(namespace, false, secretInfo[0].Object); err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			_, err = helper.Replace(namespace, resourceSecretName, true, secretInfo[0].Object)
+
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// prune resources no longer managed by `mlp`
+func prune(config *genericclioptions.ConfigFlags, namespace string, deleteMap map[string]*ResourceList) error {
+	for _, resourceGroup := range deleteMap {
+		builder := resourceutil.NewBuilder(config)
+
+		infos, err := builder.FromNames(namespace, resourceGroup.Mapping.Resource, resourceGroup.Resources)
+		utils.CheckError(err)
+
+		for _, objectInfo := range infos {
+			fmt.Printf("deleting: %v %v\n", resourceGroup.Kind, objectInfo.Name)
+
+			objMeta, err := meta.Accessor(objectInfo.Object)
+			if err != nil {
+				return err
+			}
+
+			// delete the object only if the resource has the managed by MIA label
+			if objMeta.GetLabels()[resourceutil.ManagedByLabel] != resourceutil.ManagedByMia {
+				continue
+			}
+
+			helper := resource.NewHelper(objectInfo.Client, objectInfo.Mapping)
+
+			_, err = helper.Delete(objectInfo.Namespace, objectInfo.Name)
+
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func deploy(config *genericclioptions.ConfigFlags, namespace string, resources []resourceutil.Resource) error {
+
+	builder := resourceutil.NewBuilder(config)
 	// Check that the namespace exists
-	_, err := ensureNamespaceExistance(client, options.Namespace)
+	_, err := ensureNamespaceExistance(builder, namespace)
 
 	if err != nil {
 		return err
@@ -70,8 +161,7 @@ func deploy(resources []resourceutil.Resource) error {
 
 	// apply the resources
 	for _, res := range resources {
-		helper := resource.NewHelper(res.Info.Client, res.Info.Mapping)
-		err := apply(res, helper)
+		err := apply(builder, res)
 		if err != nil {
 			return err
 		}
@@ -79,22 +169,39 @@ func deploy(resources []resourceutil.Resource) error {
 	return nil
 }
 
-func ensureNamespaceExistance(client kubernetes.Interface, namespace string) (created *apiv1.Namespace, err error) {
-	if created, err = client.CoreV1().Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{}); err != nil {
-		if apierrors.IsNotFound(err) {
-			fmt.Printf("Creating Namespace: %s\n", namespace)
+func ensureNamespaceExistance(infoGen resourceutil.InfoGenerator, namespace string) (created *apiv1.Namespace, err error) {
 
-			toCreate := &apiv1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{Name: namespace},
-				TypeMeta:   metav1.TypeMeta{Kind: "Namespace", APIVersion: "v1"},
-			}
-			created, err = client.CoreV1().Namespaces().Create(context.TODO(), toCreate, metav1.CreateOptions{})
-		}
+	ns := &apiv1.Namespace{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Namespace",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespace,
+		},
 	}
-	return created, err
+
+	buf, err := yaml.Marshal(ns)
+
+	if err != nil {
+		return nil, err
+	}
+	namespaceInfo, err := infoGen.FromStream(bytes.NewBuffer(buf))
+
+	if err != nil {
+		return nil, err
+	}
+
+	helper := infoGen.NewHelper(namespaceInfo[0].Client, namespaceInfo[0].Mapping)
+
+	if _, err := helper.Create(namespace, false, namespaceInfo[0].Object); err != nil && !apierrors.IsAlreadyExists(err) {
+		return nil, err
+	}
+
+	return ns, err
 }
 
-func createJobFromCronjob(client kubernetes.Interface, res resourceutil.Resource) (*batchapiv1.Job, error) {
+func createJobFromCronjob(infoGen resourceutil.InfoGenerator, res resourceutil.Resource) (*batchapiv1.Job, error) {
 	cronJobMetadata, err := meta.Accessor(res.Info.Object)
 	if err != nil {
 		return nil, err
@@ -149,25 +256,42 @@ func createJobFromCronjob(client kubernetes.Interface, res resourceutil.Resource
 		Spec: cronjobObj.Spec.JobTemplate.Spec,
 	}
 
-	fmt.Printf("Creating job from cronjob: %s\n", res.Name)
-	_, err = client.BatchV1().Jobs(res.Namespace).Create(context.TODO(), job, metav1.CreateOptions{})
+	buf, err := yaml.Marshal(job)
+
 	if err != nil {
 		return nil, err
 	}
+
+	jobInfo, err := infoGen.FromStream(bytes.NewBuffer(buf))
+
+	if err != nil {
+		return nil, err
+	}
+
+	helper := infoGen.NewHelper(jobInfo[0].Client, jobInfo[0].Mapping)
+
+	fmt.Printf("Creating job from cronjob: %s\n", res.Name)
+
+	if _, err := helper.Create(res.Namespace, false, jobInfo[0].Object); err != nil {
+		return nil, err
+	}
+
 	return job, nil
 }
 
-func apply(res resourceutil.Resource, helper resHelper) error {
+func apply(infoGen resourceutil.InfoGenerator, res resourceutil.Resource) error {
 
 	var (
 		currentObj runtime.Object
 		err        error
 	)
 
+	helper := infoGen.NewHelper(res.Info.Client, res.Info.Mapping)
+
 	// Create a Job from every CronJob having the mia-platform.eu/autocreate annotation set to true
 	if res.Head.Kind == "CronJob" {
 		if val, ok := res.Head.Metadata.Annotations["mia-platform.eu/autocreate"]; ok && val == "true" {
-			_, err := createJobFromCronjob(client, res)
+			_, err := createJobFromCronjob(infoGen, res)
 			if err != nil {
 				return err
 			}

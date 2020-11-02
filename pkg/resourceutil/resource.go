@@ -25,8 +25,8 @@ import (
 )
 
 const (
-	managedByLabel = "app.kubernetes.io/managed-by"
-	managedByMia   = "mia-platform"
+	ManagedByLabel = "app.kubernetes.io/managed-by"
+	ManagedByMia   = "mia-platform"
 )
 
 // Resource a resource reppresentation
@@ -46,24 +46,6 @@ type ResourceHead struct {
 		Name        string            `json:"name"`
 		Annotations map[string]string `json:"annotations"`
 	} `json:"metadata,omitempty"`
-}
-
-// InfoGenerator generate `resource.Info` given an input path
-type InfoGenerator interface {
-	Generate(path string) ([]*resource.Info, error)
-}
-
-// Builder wraps a `resource.Builder` and implements `InfoGenerator` interface
-type Builder struct {
-	builder *resource.Builder
-}
-
-// Generate use `resource.Builder` to generate a `resource.Info`
-func (b *Builder) Generate(path string) ([]*resource.Info, error) {
-	return b.builder.
-		Path(false, path).
-		Flatten().
-		Do().Infos()
 }
 
 var accessor = meta.NewAccessor()
@@ -92,7 +74,7 @@ func NewResource(filepath string) (*Resource, error) {
 // MakeInfo is the default function used to build `resource.Info`. It uses a builder to create
 // the Infos starting from a YAML file path and then it set the correct namespace to the resource.
 func MakeInfo(builder InfoGenerator, namespace string, path string) (*resource.Info, error) {
-	infos, err := builder.Generate(path)
+	infos, err := builder.FromFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -115,12 +97,7 @@ func MakeResources(opts *utils.Options, filePaths []string) ([]Resource, error) 
 
 		// built every time because there is no mapping between `resourceutil.Resource`
 		// and its corresponding `resource.Info`
-		builder := &Builder{
-			builder: resource.NewBuilder(opts.Config).
-				Unstructured().
-				RequireObject(true).
-				Flatten(),
-		}
+		builder := NewBuilder(opts.Config)
 
 		res, err := NewResource(path)
 		if err != nil {
@@ -135,7 +112,7 @@ func MakeResources(opts *utils.Options, filePaths []string) ([]Resource, error) 
 		accessor.SetNamespace(info.Object, "")
 
 		err = updateLabels(info.Object, map[string]string{
-			managedByLabel: managedByMia,
+			ManagedByLabel: ManagedByMia,
 		})
 
 		if err != nil {
