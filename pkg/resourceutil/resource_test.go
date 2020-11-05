@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
+	apiv1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -44,18 +46,34 @@ func TestNewResource(t *testing.T) {
 }
 
 func TestMakeInfo(t *testing.T) {
-	b := NewFakeBuilder()
+
+	cf := &apiv1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "literal",
+		},
+		Data: map[string]string{
+			"dueKey": "deuValue",
+			"unaKey": "unValue",
+		},
+	}
 
 	t.Run("File with two resources", func(t *testing.T) {
+		b := NewFakeBuilder()
 		_, err := MakeInfo(b, "default", "testdata/tworesources.yaml")
 
 		require.EqualError(t, err, "Multiple objects in single yaml file currently not supported")
 	})
 
 	t.Run("resource built with correct namespace", func(t *testing.T) {
+		b := NewFakeBuilder()
+		b.AddResources([]runtime.Object{cf}, false)
 		info, err := MakeInfo(b, "default", "testdata/kubernetesersource.yaml")
 		require.Nil(t, err)
-		require.Equal(t, "default", info.Namespace, "Multiple objects in single yaml file currently not supported")
+		require.Equal(t, "default", info.Namespace, "The resource namespace must be the one passed as parameter")
 	})
 }
 
@@ -153,4 +171,43 @@ func TestUpdateLabels(t *testing.T) {
 			require.Equal(t, labels[ManagedByLabel], ManagedByMia, tt.message)
 		})
 	}
+}
+
+func TestMakeResource(t *testing.T) {
+	filePath := filepath.Join(testdata, "kubernetesersource.yaml")
+
+	cf := &apiv1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "literal",
+		},
+		Data: map[string]string{
+			"dueKey": "deuValue",
+			"unaKey": "unValue",
+		},
+	}
+
+	builder := NewFakeBuilder()
+	builder.AddResources([]runtime.Object{cf}, false)
+
+	head := ResourceHead{
+		GroupVersion: cf.APIVersion,
+		Kind:         cf.Kind,
+	}
+
+	resource, err := MakeResource(builder, "bar", filePath)
+	require.Nil(t, err)
+	require.Equal(t, filePath, resource.Filepath, "the paths should coincide")
+	require.Equal(t, "bar", resource.Namespace, "the namespaces should coincide")
+	require.Equal(t, cf.Name, resource.Name, "the names should coincide")
+	require.Equal(t, head.Kind, resource.Head.Kind, "the kinds should coincide")
+	require.Equal(t, head.GroupVersion, resource.Head.GroupVersion, "the groupversions should coincide")
+
+	objMeta, err := meta.Accessor(resource.Info.Object)
+	require.Nil(t, err)
+
+	require.Equal(t, ManagedByMia, objMeta.GetLabels()[ManagedByLabel], "should contain the managed by MIA label")
 }

@@ -25,8 +25,12 @@ import (
 )
 
 const (
+	// ManagedByLabel is the label used to identify the agent
+	// responsible of deploying the resources into the cluster.
 	ManagedByLabel = "app.kubernetes.io/managed-by"
-	ManagedByMia   = "mia-platform"
+	// ManagedByMia is used to identify the resources deployed
+	// with `mlp`.
+	ManagedByMia = "mia-platform"
 )
 
 // Resource a resource reppresentation
@@ -99,32 +103,43 @@ func MakeResources(opts *utils.Options, filePaths []string) ([]Resource, error) 
 		// and its corresponding `resource.Info`
 		builder := NewBuilder(opts.Config)
 
-		res, err := NewResource(path)
-		if err != nil {
-			return nil, err
-		}
-		res.Namespace = opts.Namespace
-		info, err := MakeInfo(builder, res.Namespace, path)
-		if err != nil {
-			return nil, err
-		}
-
-		accessor.SetNamespace(info.Object, "")
-
-		err = updateLabels(info.Object, map[string]string{
-			ManagedByLabel: ManagedByMia,
-		})
+		res, err := MakeResource(builder, opts.Namespace, path)
 
 		if err != nil {
 			return nil, err
 		}
 
-		res.Info = info
 		resources = append(resources, *res)
 	}
 
 	resources = SortResourcesByKind(resources, nil)
 	return resources, nil
+}
+
+// MakeResource creates a `Resource` from file
+func MakeResource(infoGen InfoGenerator, namespace, path string) (*Resource, error) {
+	res, err := NewResource(path)
+	if err != nil {
+		return nil, err
+	}
+	res.Namespace = namespace
+	info, err := MakeInfo(infoGen, res.Namespace, path)
+	if err != nil {
+		return nil, err
+	}
+
+	accessor.SetNamespace(info.Object, "")
+
+	err = updateLabels(info.Object, map[string]string{
+		ManagedByLabel: ManagedByMia,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	res.Info = info
+	return res, nil
 }
 
 // updateLabels add or update the current object labels with
