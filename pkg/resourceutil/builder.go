@@ -29,6 +29,7 @@ type InfoGenerator interface {
 // Helper gives facilities to interact with Kubernetes resources
 type Helper interface {
 	Get(namespace, name string) (runtime.Object, error)
+	Delete(namespace, name string) (runtime.Object, error)
 	Create(namespace string, modify bool, obj runtime.Object) (runtime.Object, error)
 	Replace(namespace, name string, overwrite bool, obj runtime.Object) (runtime.Object, error)
 	Patch(namespace, name string, pt types.PatchType, data []byte, options *metav1.PatchOptions) (runtime.Object, error)

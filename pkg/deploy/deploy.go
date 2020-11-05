@@ -21,18 +21,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
 	"sigs.k8s.io/yaml"
 )
-
-type resHelper interface {
-	Get(namespace, name string) (runtime.Object, error)
-	Create(namespace string, modify bool, obj runtime.Object) (runtime.Object, error)
-	Replace(namespace, name string, overwrite bool, obj runtime.Object) (runtime.Object, error)
-	Patch(namespace, name string, pt types.PatchType, data []byte, options *metav1.PatchOptions) (runtime.Object, error)
-}
 
 // Run execute the deploy command from cli
 func Run(inputPaths []string, opts *utils.Options) {
@@ -66,19 +58,22 @@ func cleanup(opts *utils.Options, resources []resourceutil.Resource) error {
 	if len(old) != 0 {
 		deleteMap := deletedResources(actual, old)
 
-		err = prune(opts.Config, opts.Namespace, deleteMap)
-		if err != nil {
-			return err
+		for _, resourceGroup := range deleteMap {
+			builder := resourceutil.NewBuilder(opts.Config)
+			err = prune(builder, opts.Namespace, resourceGroup)
+			if err != nil {
+				return err
+			}
 		}
 	}
-
-	return updateResourceSecret(builder, opts.Namespace, actual)
+	_, err = updateResourceSecret(builder, opts.Namespace, actual)
+	return err
 }
 
-func updateResourceSecret(infoGen resourceutil.InfoGenerator, namespace string, resources map[string]*ResourceList) error {
+func updateResourceSecret(infoGen resourceutil.InfoGenerator, namespace string, resources map[string]*ResourceList) (*apiv1.Secret, error) {
 	secretContent, err := json.Marshal(resources)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	secret := &apiv1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -92,13 +87,13 @@ func updateResourceSecret(infoGen resourceutil.InfoGenerator, namespace string, 
 	buf, err := yaml.Marshal(secret)
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	secretInfo, err := infoGen.FromStream(bytes.NewBuffer(buf))
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	helper := infoGen.NewHelper(secretInfo[0].Client, secretInfo[0].Mapping)
@@ -108,41 +103,38 @@ func updateResourceSecret(infoGen resourceutil.InfoGenerator, namespace string, 
 			_, err = helper.Replace(namespace, resourceSecretName, true, secretInfo[0].Object)
 
 			if err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
-	return nil
+	return secret, nil
 }
 
 // prune resources no longer managed by `mlp`
-func prune(config *genericclioptions.ConfigFlags, namespace string, deleteMap map[string]*ResourceList) error {
-	for _, resourceGroup := range deleteMap {
-		builder := resourceutil.NewBuilder(config)
+func prune(infoGen resourceutil.InfoGenerator, namespace string, resourceGroup *ResourceList) error {
 
-		infos, err := builder.FromNames(namespace, resourceGroup.Mapping.Resource, resourceGroup.Resources)
-		utils.CheckError(err)
+	infos, err := infoGen.FromNames(namespace, resourceGroup.Mapping.Resource, resourceGroup.Resources)
+	utils.CheckError(err)
 
-		for _, objectInfo := range infos {
-			fmt.Printf("deleting: %v %v\n", resourceGroup.Kind, objectInfo.Name)
+	for _, objectInfo := range infos {
+		fmt.Printf("deleting: %v %v\n", resourceGroup.Kind, objectInfo.Name)
 
-			objMeta, err := meta.Accessor(objectInfo.Object)
-			if err != nil {
-				return err
-			}
+		objMeta, err := meta.Accessor(objectInfo.Object)
+		if err != nil {
+			return err
+		}
 
-			// delete the object only if the resource has the managed by MIA label
-			if objMeta.GetLabels()[resourceutil.ManagedByLabel] != resourceutil.ManagedByMia {
-				continue
-			}
+		// delete the object only if the resource has the managed by MIA label
+		if objMeta.GetLabels()[resourceutil.ManagedByLabel] != resourceutil.ManagedByMia {
+			continue
+		}
 
-			helper := resource.NewHelper(objectInfo.Client, objectInfo.Mapping)
+		helper := infoGen.NewHelper(objectInfo.Client, objectInfo.Mapping)
 
-			_, err = helper.Delete(objectInfo.Namespace, objectInfo.Name)
+		_, err = helper.Delete(objectInfo.Namespace, objectInfo.Name)
 
-			if err != nil {
-				return err
-			}
+		if err != nil {
+			return err
 		}
 	}
 

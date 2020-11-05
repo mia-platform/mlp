@@ -118,7 +118,7 @@ func TestGetOldResourceMap(t *testing.T) {
 	for _, tt := range testcases {
 		t.Run(tt.description, func(t *testing.T) {
 			builder := resourceutil.NewFakeBuilder()
-			err := builder.AddResources([]runtime.Object{tt.old})
+			err := builder.AddResources([]runtime.Object{tt.old}, true)
 			require.Nil(t, err)
 			actual, err := getOldResourceMap(builder, "foo")
 			require.Equal(t, tt.expected, actual)
