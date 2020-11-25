@@ -114,7 +114,10 @@ func updateResourceSecret(infoGen resourceutil.InfoGenerator, namespace string, 
 func prune(infoGen resourceutil.InfoGenerator, namespace string, resourceGroup *ResourceList) error {
 
 	infos, err := infoGen.FromNames(namespace, resourceGroup.Mapping.Resource, resourceGroup.Resources)
-	utils.CheckError(err)
+
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
 
 	for _, objectInfo := range infos {
 		fmt.Printf("deleting: %v %v\n", resourceGroup.Kind, objectInfo.Name)
@@ -133,7 +136,7 @@ func prune(infoGen resourceutil.InfoGenerator, namespace string, resourceGroup *
 
 		_, err = helper.Delete(objectInfo.Namespace, objectInfo.Name)
 
-		if err != nil {
+		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
 	}

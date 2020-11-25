@@ -343,4 +343,25 @@ func TestPrune(t *testing.T) {
 		require.Equal(t, toPrune, builder.Helper.ClusterObjs[0].GetObject(), "the cluster still contains the resource")
 
 	})
+
+	t.Run("Skip non existing resource", func(t *testing.T) {
+		toPrune := &apiv1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "other-name",
+				Namespace: "bar",
+			},
+			TypeMeta: metav1.TypeMeta{Kind: "Secret", APIVersion: "v1"},
+		}
+
+		builder := resourceutil.NewFakeBuilder()
+		err := builder.AddResources([]runtime.Object{toPrune}, true)
+		require.Nil(t, err)
+
+		resourceCount := len(builder.Helper.ClusterObjs)
+		err = prune(builder, "bar", deleteList)
+		require.Nil(t, err)
+		require.False(t, builder.Helper.DeleteCalled, "No resources should be pruned")
+		require.Equal(t, resourceCount, len(builder.Helper.ClusterObjs), "the cluster should contain the same resources after the prune of a non existing resource")
+
+	})
 }
