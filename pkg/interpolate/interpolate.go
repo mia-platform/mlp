@@ -134,6 +134,12 @@ func getEnv(env string, prefixes []string) (string, error) {
 func interpolateVariables(file string, envs map[string]envVar) []byte {
 	for env := range envs {
 		env := envs[env]
+
+		file = strings.ReplaceAll(file, fmt.Sprintf(`"%s"`, env.name), fmt.Sprintf(`"%s"`, env.value))
+
+		envValue := strings.ReplaceAll(env.value, `\"`, `"`)
+		file = strings.ReplaceAll(file, fmt.Sprintf(`'%s'`, env.name), fmt.Sprintf(`'%s'`, envValue))
+
 		file = strings.ReplaceAll(file, env.name, env.value)
 	}
 
