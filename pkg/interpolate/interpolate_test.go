@@ -86,6 +86,34 @@ func TestNewLines(t *testing.T) {
 
 }
 
+func TestEscapeQuote(t *testing.T) {
+	os.Setenv("DEV_SECOND_ENV", `{ "foo": "bar" }`)
+	defer os.Unsetenv("DEV_SECOND_ENV")
+
+	in := []byte(`
+	"noEscape_singleQuote": '{{SECOND_ENV}}',
+
+	"escape_singleQuoteMiddle": 'abc{{SECOND_ENV}}def',
+	"escape_doubleQuote": "{{SECOND_ENV}}",
+	"escape_doubleQuoteMiddle": "abc{{SECOND_ENV}}def",
+	"escape_noQuote": {{SECOND_ENV}},
+	"escape_noQuoteMiddle": abc{{SECOND_ENV}}def
+	`)
+	expout := []byte(`
+	"noEscape_singleQuote": '{ "foo": "bar" }',
+
+	"escape_singleQuoteMiddle": 'abc{ \"foo\": \"bar\" }def',
+	"escape_doubleQuote": "{ \"foo\": \"bar\" }",
+	"escape_doubleQuoteMiddle": "abc{ \"foo\": \"bar\" }def",
+	"escape_noQuote": { \"foo\": \"bar\" },
+	"escape_noQuoteMiddle": abc{ \"foo\": \"bar\" }def
+	`)
+
+	out, err := Interpolate(in, prefixes, re)
+	require.Nil(t, err)
+	require.Equal(t, string(expout), string(out), "double quote should be escaped only inside double quote")
+}
+
 func TestSpecialChars(t *testing.T) {
 	os.Setenv("DEV_SECOND_ENV", "env\\firstline\nenv\tsecondline\nenvthirdline\n")
 
@@ -140,4 +168,22 @@ func TestNonExistingVar(t *testing.T) {
 
 	errMsg := "Environment Variable SECOND_ENV: not found"
 	require.EqualError(t, checkEnvs(envs, prefixes), errMsg)
+}
+
+func TestStringifiedObjectWithSingleApex(t *testing.T) {
+	os.Setenv("DEV_SECOND_ENV", `{"piatti-json":"platform-development.development.piatti-json"}`)
+	defer os.Unsetenv("DEV_SECOND_ENV")
+
+	in := []byte(`
+  "first": 'field',
+  "second": '{{SECOND_ENV}}',
+  `)
+	expout := []byte(`
+  "first": 'field',
+  "second": '{"piatti-json":"platform-development.development.piatti-json"}',
+  `)
+
+	out, err := Interpolate(in, prefixes, re)
+	require.Nil(t, err)
+	require.Equal(t, string(expout[:]), string(out[:]))
 }

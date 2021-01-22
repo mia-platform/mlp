@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- [MPPS-57](https://makeitapp.atlassian.net/browse/MPPS-57): interpolation of variables inside single quotes
+
 ## [0.3.1] - 2020-11-25
 
 ### Added
