@@ -1,5 +1,5 @@
 ################### Build mlp ####################
-FROM golang:1.15.2 AS mlp
+FROM golang:1.15.7 AS mlp
 
 WORKDIR /build
 
@@ -24,10 +24,10 @@ RUN GOOS=linux \
 
 ############ Install Helm and kubectl ############
 
-FROM alpine:3.12 AS tools
+FROM alpine:3.13 AS tools
 
-ENV K8S_VERSION="v1.19.2"
-ENV HELM_VERSION="v3.3.4"
+ENV K8S_VERSION="v1.20.2"
+ENV HELM_VERSION="v3.5.2"
 
 WORKDIR /build
 
@@ -40,7 +40,7 @@ RUN wget https://storage.googleapis.com/kubernetes-release/release/${K8S_VERSION
 
 ################## Create image ##################
 
-FROM alpine:3.12
+FROM alpine:3.13
 
 LABEL maintainer="C.E.C.O.M <operations@mia-platform.eu>" \
       name="Image for console deployments" \
