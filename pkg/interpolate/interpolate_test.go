@@ -15,6 +15,7 @@
 package interpolate
 
 import (
+	"io/ioutil"
 	"os"
 	"testing"
 
@@ -82,31 +83,40 @@ func TestNewLines(t *testing.T) {
 
 	out, err := Interpolate(in, prefixes, re)
 	require.Nil(t, err)
-	require.Equal(t, expout, out, "new lines should not be consumed while manipulating strings")
-
+	require.Equal(t, string(expout), string(out), "new lines should not be consumed while manipulating strings")
 }
 
 func TestEscapeQuote(t *testing.T) {
 	os.Setenv("DEV_SECOND_ENV", `{ "foo": "bar" }`)
 	defer os.Unsetenv("DEV_SECOND_ENV")
+	os.Setenv("ESCAPED_ENV", `{ \"foo\": \"bar\" }`)
+	defer os.Unsetenv("ESCAPED_ENV")
+	os.Setenv("NAMESPACE", `my-namespace`)
+	defer os.Unsetenv("NAMESPACE")
+	os.Setenv("DEV_THIRD_ENV", `{ "foo": "bar\ntaz" }`)
+	defer os.Unsetenv("DEV_THIRD_ENV")
 
 	in := []byte(`
 	"noEscape_singleQuote": '{{SECOND_ENV}}',
 
 	"escape_singleQuoteMiddle": 'abc{{SECOND_ENV}}def',
 	"escape_doubleQuote": "{{SECOND_ENV}}",
-	"escape_doubleQuoteMiddle": "abc{{SECOND_ENV}}def",
+	"escape_doubleQuoteMiddle": "abc{{ESCAPED_ENV}}def",
+	"escape_string": "{{NAMESPACE}}.svc.cluster.local",
 	"escape_noQuote": {{SECOND_ENV}},
-	"escape_noQuoteMiddle": abc{{SECOND_ENV}}def
+	"escape_noQuoteMiddle": abc{{SECOND_ENV}}def,
+	"escape_doubleQuoteNewline": {{THIRD_ENV}},
 	`)
 	expout := []byte(`
 	"noEscape_singleQuote": '{ "foo": "bar" }',
 
-	"escape_singleQuoteMiddle": 'abc{ \"foo\": \"bar\" }def',
+	"escape_singleQuoteMiddle": 'abc{ "foo": "bar" }def',
 	"escape_doubleQuote": "{ \"foo\": \"bar\" }",
 	"escape_doubleQuoteMiddle": "abc{ \"foo\": \"bar\" }def",
-	"escape_noQuote": { \"foo\": \"bar\" },
-	"escape_noQuoteMiddle": abc{ \"foo\": \"bar\" }def
+	"escape_string": "my-namespace.svc.cluster.local",
+	"escape_noQuote": { "foo": "bar" },
+	"escape_noQuoteMiddle": abc{ "foo": "bar" }def,
+	"escape_doubleQuoteNewline": { "foo": "bar\ntaz" },
 	`)
 
 	out, err := Interpolate(in, prefixes, re)
@@ -186,4 +196,33 @@ func TestStringifiedObjectWithSingleApex(t *testing.T) {
 	out, err := Interpolate(in, prefixes, re)
 	require.Nil(t, err)
 	require.Equal(t, string(expout[:]), string(out[:]))
+}
+
+func TestJSONConfigmap(t *testing.T) {
+	os.Setenv("DEV_THIRD_ENV", `{"type":"a type","project_id":"something","private_key_id":"my-key","private_key":"-----BEGIN PRIVATE KEY-----\nfooo\nbar\n-----END PRIVATE KEY-----\n","client_email":"my@email.com","client_id":"client-id","auth_uri":"https://auth-uri.com","token_uri":"https://auth-uri.com","auth_provider_x509_cert_url":"https://api.com/certs","client_x509_cert_url":"https://api.com/certs/fooo%40bar"}`)
+	defer os.Unsetenv("DEV_THIRD_ENV")
+
+	in, err := ioutil.ReadFile("testdata/file.json")
+	require.NoError(t, err)
+
+	expout, err := ioutil.ReadFile("testdata/outFile.json")
+	require.NoError(t, err)
+
+	out, err := Interpolate(in, prefixes, re)
+	require.Nil(t, err)
+	require.Equal(t, string(expout), string(out))
+}
+
+func TestJSONWithEscapes(t *testing.T) {
+	os.Setenv("DEV_THIRD_ENV", `"{\"type\":\"a type\"}"`)
+	defer os.Unsetenv("DEV_THIRD_ENV")
+
+	in, err := ioutil.ReadFile("testdata/file.json")
+	require.NoError(t, err)
+
+	expout := `"{\"type\":\"a type\"}"`
+
+	out, err := Interpolate(in, prefixes, re)
+	require.Nil(t, err)
+	require.Equal(t, string(expout), string(out))
 }
