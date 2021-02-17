@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixes
+
+- [BMP-823](https://makeitapp.atlassian.net/browse/BMP-823): fix quote in configmap strings
+
 ## [0.3.2] - 2021-01-22
 
 ### Fixed
