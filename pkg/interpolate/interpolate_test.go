@@ -89,8 +89,10 @@ func TestNewLines(t *testing.T) {
 func TestEscapeQuote(t *testing.T) {
 	os.Setenv("DEV_SECOND_ENV", `{ "foo": "bar" }`)
 	defer os.Unsetenv("DEV_SECOND_ENV")
-	os.Setenv("ESCAPED_ENV", `{ \"foo\": \"bar\" }`)
-	defer os.Unsetenv("ESCAPED_ENV")
+	os.Setenv("DEV_STRING_ESCAPED_ENV", `abd\def`)
+	defer os.Unsetenv("DEV_STRING_ESCAPED_ENV")
+	os.Setenv("JSON_ESCAPED_ENV", `{ \"foo\": \"bar\" }`)
+	defer os.Unsetenv("JSON_ESCAPED_ENV")
 	os.Setenv("NAMESPACE", `my-namespace`)
 	defer os.Unsetenv("NAMESPACE")
 	os.Setenv("DEV_THIRD_ENV", `{ "foo": "bar\ntaz" }`)
@@ -100,8 +102,9 @@ func TestEscapeQuote(t *testing.T) {
 	"noEscape_singleQuote": '{{SECOND_ENV}}',
 
 	"escape_singleQuoteMiddle": 'abc{{SECOND_ENV}}def',
+	"escape_singleQuoteMiddle2": '{{STRING_ESCAPED_ENV}}',
 	"escape_doubleQuote": "{{SECOND_ENV}}",
-	"escape_doubleQuoteMiddle": "abc{{ESCAPED_ENV}}def",
+	"escape_doubleQuoteMiddle": "abc{{JSON_ESCAPED_ENV}}def",
 	"escape_string": "{{NAMESPACE}}.svc.cluster.local",
 	"escape_noQuote": {{SECOND_ENV}},
 	"escape_noQuoteMiddle": abc{{SECOND_ENV}}def,
@@ -111,6 +114,7 @@ func TestEscapeQuote(t *testing.T) {
 	"noEscape_singleQuote": '{ "foo": "bar" }',
 
 	"escape_singleQuoteMiddle": 'abc{ "foo": "bar" }def',
+	"escape_singleQuoteMiddle2": 'abd\def',
 	"escape_doubleQuote": "{ \"foo\": \"bar\" }",
 	"escape_doubleQuoteMiddle": "abc{ \"foo\": \"bar\" }def",
 	"escape_string": "my-namespace.svc.cluster.local",
@@ -125,22 +129,30 @@ func TestEscapeQuote(t *testing.T) {
 }
 
 func TestSpecialChars(t *testing.T) {
-	os.Setenv("DEV_SECOND_ENV", "env\\firstline\nenv\tsecondline\nenvthirdline\n")
+	os.Setenv("DEV_FIRST_ENV", `env\\first\line`)
+	os.Setenv("DEV_SECOND_ENV", "env\\\\first\\line\nenv\tsecondline\nenvthirdline\n")
 
 	defer os.Unsetenv("DEV_SECOND_ENV")
+	defer os.Unsetenv("DEV_FIRST_ENV")
 
 	in := []byte(`
   "first": "field",
   "second": "{{SECOND_ENV}}",
+  "third": '{{SECOND_ENV}}',
+  "fourth": "{{FIRST_ENV}}",
+  "fifth": '{{FIRST_ENV}}'
   `)
 	expout := []byte(`
   "first": "field",
-  "second": "env\\firstline\nenv\tsecondline\nenvthirdline\n",
+  "second": "env\\first\line\nenv\tsecondline\nenvthirdline\n",
+  "third": 'env\\first\line\nenv\tsecondline\nenvthirdline\n',
+  "fourth": "env\\first\line",
+  "fifth": 'env\\first\line'
   `)
 
 	out, err := Interpolate(in, prefixes, re)
 	require.Nil(t, err)
-	require.Equal(t, expout, out, "special chars should not be consumed while manipulating strings")
+	require.Equal(t, string(expout), string(out), "special chars should not be consumed while manipulating strings")
 }
 
 func TestVarNotInParenthesis(t *testing.T) {
@@ -221,6 +233,50 @@ func TestJSONWithEscapes(t *testing.T) {
 	require.NoError(t, err)
 
 	expout := `"{\"type\":\"a type\"}"`
+
+	out, err := Interpolate(in, prefixes, re)
+	require.Nil(t, err)
+	require.Equal(t, string(expout), string(out))
+}
+
+func TestCertificateInString(t *testing.T) {
+	os.Setenv("DEV_SECOND_ENV", `-----BEGIN RSA PRIVATE KEY-----
+XXXXXXXXXXXXXXXXXXXXXXXXX
+YYYYYYYYYYYYYYYYYYYYYYYYYY
+ZZZZZZZZZZZZZZZZZZZZZZZZZZ
+-----END RSA PRIVATE KEY-----`)
+	defer os.Unsetenv("DEV_SECOND_ENV")
+
+	in := []byte(`
+  "doubleQuote": "{{SECOND_ENV}}"
+  `)
+	expout := []byte(`
+  "doubleQuote": "-----BEGIN RSA PRIVATE KEY-----\nXXXXXXXXXXXXXXXXXXXXXXXXX\nYYYYYYYYYYYYYYYYYYYYYYYYYY\nZZZZZZZZZZZZZZZZZZZZZZZZZZ\n-----END RSA PRIVATE KEY-----"
+  `)
+
+	out, err := Interpolate(in, prefixes, re)
+	require.Nil(t, err)
+	require.Equal(t, string(expout), string(out))
+}
+
+func TestCertificateInFile(t *testing.T) {
+	os.Setenv("SECOND_ENV", `-----BEGIN RSA PRIVATE KEY-----
+XXXXXXXXXXXXXXXXXXXXXXXXX
+YYYYYYYYYYYYYYYYYYYYYYYYYY
+ZZZZZZZZZZZZZZZZZZZZZZZZZZ
+-----END RSA PRIVATE KEY-----`)
+	defer os.Unsetenv("SECOND_ENV")
+
+	in := []byte(`
+{{SECOND_ENV}}
+`)
+	expout := []byte(`
+-----BEGIN RSA PRIVATE KEY-----
+XXXXXXXXXXXXXXXXXXXXXXXXX
+YYYYYYYYYYYYYYYYYYYYYYYYYY
+ZZZZZZZZZZZZZZZZZZZZZZZZZZ
+-----END RSA PRIVATE KEY-----
+`)
 
 	out, err := Interpolate(in, prefixes, re)
 	require.Nil(t, err)
