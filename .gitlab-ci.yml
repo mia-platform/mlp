@@ -2,7 +2,7 @@ include:
   - project: 'platform/pipelines-templates'
     file: '/build/golang/template-app-go.yml'
     ref: master
-
+        
 default:
   image: golang:1.15.2
 

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added 
+
+- Add deploy type support, `smart deploy` or `deploy all`.
+
 ### Fixes
 
 - [BMP-823](https://makeitapp.atlassian.net/browse/BMP-823): fix quote in configmap strings

@@ -22,6 +22,7 @@ import (
 
 	"git.tools.mia-platform.eu/platform/devops/deploy/internal/utils"
 	"git.tools.mia-platform.eu/platform/devops/deploy/pkg/interpolate"
+	"git.tools.mia-platform.eu/platform/devops/deploy/pkg/resourceutil"
 	"github.com/google/go-cmp/cmp"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -148,7 +149,7 @@ func generateSecret(secret secret) *apiv1.Secret {
 	object := metav1.ObjectMeta{
 		Name: secret.Name,
 		Annotations: map[string]string{
-			"mia-platform.eu/deploy": when,
+			resourceutil.GetMiaAnnotation("deploy"): when,
 		},
 	}
 

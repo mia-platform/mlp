@@ -26,6 +26,12 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 )
 
+// DeployConfig are all the specific configurations used in deploy phase
+type DeployConfig struct {
+	DeployType              string
+	ForceDeployWhenNoSemver bool
+}
+
 // Options global option for the cli that can be passed to all commands
 type Options struct {
 	Config *genericclioptions.ConfigFlags
