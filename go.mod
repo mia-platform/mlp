@@ -4,7 +4,9 @@ go 1.14
 
 require (
 	github.com/MakeNowJust/heredoc/v2 v2.0.1
+	github.com/Masterminds/semver v1.5.0
 	github.com/google/go-cmp v0.5.2
+	github.com/masterminds/semver v1.5.0
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/afero v1.5.1
 	github.com/spf13/cobra v1.1.3

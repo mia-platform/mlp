@@ -41,6 +41,8 @@ In order to use `mlp` in a pipeline these are the steps to follow:
   - `--certificate-authority`: Kubernetes CA 
   - `--token`: Kubernetes token
   - `--namespace`: the namespace in which the resources will be deployed
+  - `--deploy-type`: the deploy type used
+  - `--force-deploy-when-no-semver`: flag used to force deploy of services that are not following semantic versioning.
   
 Example:
 
@@ -51,7 +53,7 @@ The `script` section of the CI file should look like this:
     - mkdir OUTPUT_DIR
     - mlp generate -c config-file.yaml -e FIRST_PREFIX -e SECOND_PREFIX -o OUTPUT_DIR
     - mlp interpolate -f SOURCE_PATH -e FIRST_PREFIX -e SECOND_PREFIX -o OUTPUT_DIR
-    - mlp deploy --server KUBERNETES_URL --certificate-authority /path/to/kubernetes/ca.pem --token KUBERNETES_TOKEN -f OUTPUT_DIR -n KUBERNETES_NAMESPACE
+    - mlp deploy --server KUBERNETES_URL --certificate-authority /path/to/kubernetes/ca.pem --token KUBERNETES_TOKEN -f OUTPUT_DIR -n KUBERNETES_NAMESPACE --deploy-type DEPLOY_TYPE --force-deploy-when-no-semver=FORCE_DEPLOY_WHEN_NO_SEMVER
 
 ```
 

@@ -23,15 +23,20 @@ import (
 // DeploySubcommand add deploy subcommand to the main command
 func DeploySubcommand(cmd *cobra.Command, options *utils.Options) {
 	var inputPaths []string
+	var deployConfig utils.DeployConfig
+
 	deployCmd := &cobra.Command{
 		Use:   "deploy",
 		Short: "deploy Mia-Platform created resource on K8S",
 		Long:  "",
 		Run: func(cmd *cobra.Command, args []string) {
-			deploy.Run(inputPaths, options)
+			deploy.Run(inputPaths, deployConfig, options)
 		},
 	}
 
 	deployCmd.Flags().StringSliceVarP(&inputPaths, "filename", "f", []string{}, "file and/or folder paths containing data to interpolate")
+	deployCmd.Flags().StringVar(&deployConfig.DeployType, "deploy-type", "deploy_all", "Set the deployment type (accepted values: deploy_all, smart_deploy)")
+	deployCmd.Flags().BoolVar(&deployConfig.ForceDeployWhenNoSemver, "force-deploy-when-no-semver", false, "Set whether deployment for services not following semantic versioning should be deployed forcibly (useful when using --deploy-type=smart_deploy")
+
 	cmd.AddCommand(deployCmd)
 }

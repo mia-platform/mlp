@@ -3,20 +3,20 @@ kind: Deployment
 metadata:
   creationTimestamp: null
   labels:
-    app: aaa-test-deployment
-  name: aaa-test-deployment
+    app: test-deployment
+  name: test-deployment
   namespace: default
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: aaa-test-deployment
+      app: test-deployment
   strategy: {}
   template:
     metadata:
       creationTimestamp: null
       labels:
-        app: aaa-test-deployment
+        app: test-deployment
     spec:
       containers:
       - image: nginx

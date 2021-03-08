@@ -75,7 +75,9 @@ func (b *FakeBuilder) NewHelper(client resource.RESTClient, mapping *meta.RESTMa
 	return b.Helper
 }
 
-// AddResources add clusterObj to the Builder and optionally to the helper
+// AddResources add clusterObj to the Builder and optionally to the helper.
+// The addToHelper flag is used to append to the helper the resource which
+// it represents the cluster on kubernetes
 func (b *FakeBuilder) AddResources(objects []runtime.Object, addToHelper bool) error {
 	for _, obj := range objects {
 		objectMeta, err := meta.Accessor(obj)
