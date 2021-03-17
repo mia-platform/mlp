@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added 
+## [0.4.0] - 2021-03-17
+
+### Added
 
 - Add deploy type support, `smart deploy` or `deploy all`.
 
