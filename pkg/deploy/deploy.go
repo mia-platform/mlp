@@ -28,6 +28,7 @@ import (
 )
 
 const (
+	dependenciesChecksum = "dependencies-checksum"
 	deployChecksum = "deploy-checksum"
 	smartDeploy    = "smart_deploy"
 	deployAll      = "deploy_all"
@@ -102,17 +103,24 @@ func insertDependencies(res *resourceutil.Resource, configMapMap map[string]stri
 
 	// NOTE: ConfigMaps and Secrets that are used as depedency for the resource but do not exist
 	// in the resource files provided are ignored and no annotation is created for them.
+	var checksumMap = map[string]string{}
 	for _, configMapName := range dependencies[resourceutil.ConfigMap] {
 		if checksum, ok := configMapMap[configMapName]; ok {
-			annotations[fmt.Sprintf(resourceutil.GetMiaAnnotation("%s-configmap-checksum"), configMapName)] = checksum
+			checksumMap[fmt.Sprintf("%s-configmap", configMapName)] = checksum
 		}
 	}
 	for _, secretName := range dependencies[resourceutil.Secret] {
 		if checksum, ok := secretMap[secretName]; ok {
-			annotations[fmt.Sprintf(resourceutil.GetMiaAnnotation("%s-secret-checksum"), secretName)] = checksum
+			checksumMap[fmt.Sprintf("%s-secret", secretName)] = checksum
 		}
 	}
 
+	jsonCheckSumMap, err := json.Marshal(checksumMap)
+	if err != nil {
+		fmt.Printf("can not convert checksumMap to json: %s", err.Error())
+	}
+
+	annotations[resourceutil.GetMiaAnnotation(dependenciesChecksum)] = fmt.Sprintf("%s", jsonCheckSumMap)
 	return nil
 }
 

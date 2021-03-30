@@ -727,7 +727,7 @@ func TestEnsureSmartDeploy(t *testing.T) {
 }
 
 func TestInsertDependencies(t *testing.T) {
-	var configMapMap = map[string]string{"configMap1": "aaa", "configMap2": "bbb"}
+	var configMapMap = map[string]string{"configMap1": "aaa", "configMap2": "bbb", "configMapLongLoongLoooooooooooooooooooooooooooooooooooooooooooooong": "eee"}
 	var secretMap = map[string]string{"secret1": "ccc", "secret2": "ddd"}
 	testVolumes := []v1.Volume{
 		{
@@ -762,6 +762,15 @@ func TestInsertDependencies(t *testing.T) {
 				},
 			},
 		},
+		{
+			VolumeSource: apiv1.VolumeSource{
+				ConfigMap: &apiv1.ConfigMapVolumeSource{
+					LocalObjectReference: apiv1.LocalObjectReference{
+						Name: "configMapLongLoongLoooooooooooooooooooooooooooooooooooooooooooooong",
+					},
+				},
+			},
+		},
 	}
 
 	t.Run("Test Deployment", func(t *testing.T) {
@@ -776,10 +785,7 @@ func TestInsertDependencies(t *testing.T) {
 		annotations := newDeployment.Spec.Template.ObjectMeta.Annotations
 		require.Nil(t, err)
 		require.Equal(t, map[string]string{
-			resourceutil.GetMiaAnnotation("configMap1-configmap-checksum"): "aaa",
-			resourceutil.GetMiaAnnotation("configMap2-configmap-checksum"): "bbb",
-			resourceutil.GetMiaAnnotation("secret1-secret-checksum"):       "ccc",
-			resourceutil.GetMiaAnnotation("secret2-secret-checksum"):       "ddd",
+			resourceutil.GetMiaAnnotation(dependenciesChecksum): "{\"configMap1-configmap\":\"aaa\",\"configMap2-configmap\":\"bbb\",\"configMapLongLoongLoooooooooooooooooooooooooooooooooooooooooooooong-configmap\":\"eee\",\"secret1-secret\":\"ccc\",\"secret2-secret\":\"ddd\"}",
 		}, annotations)
 	})
 
@@ -796,10 +802,7 @@ func TestInsertDependencies(t *testing.T) {
 		annotations := newCronJob.Spec.JobTemplate.Spec.Template.ObjectMeta.Annotations
 		require.Nil(t, err)
 		require.Equal(t, map[string]string{
-			resourceutil.GetMiaAnnotation("configMap1-configmap-checksum"): "aaa",
-			resourceutil.GetMiaAnnotation("configMap2-configmap-checksum"): "bbb",
-			resourceutil.GetMiaAnnotation("secret1-secret-checksum"):       "ccc",
-			resourceutil.GetMiaAnnotation("secret2-secret-checksum"):       "ddd",
+			resourceutil.GetMiaAnnotation(dependenciesChecksum): "{\"configMap1-configmap\":\"aaa\",\"configMap2-configmap\":\"bbb\",\"configMapLongLoongLoooooooooooooooooooooooooooooooooooooooooooooong-configmap\":\"eee\",\"secret1-secret\":\"ccc\",\"secret2-secret\":\"ddd\"}",
 		}, annotations)
 	})
 }
