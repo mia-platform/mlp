@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2021-03-30
 ### Fixed
 
 - [BMP-940](https://makeitapp.atlassian.net/browse/BMP-940): fix annotation length by using an unique name, `mia-platform.eu/dependenciesChecksum`, for all dependencies and its value is a object of key-values of all the dependencies.
@@ -59,7 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial Release 🎉🎉🎉
 
-[Unreleased]: https://git.tools.mia-platform.eu/platform/devops/deploy/-/compare/v0.4.0...HEAD
+[Unreleased]: https://git.tools.mia-platform.eu/platform/devops/deploy/-/compare/v0.4.1...HEAD
+[0.4.1]: https://git.tools.mia-platform.eu/platform/devops/deploy/-/compare/v0.4.0...v0.4.1
 [0.4.0]: https://git.tools.mia-platform.eu/platform/devops/deploy/-/compare/v0.3.2...v0.4.0
 [0.3.2]: https://git.tools.mia-platform.eu/platform/devops/deploy/-/compare/v0.3.1...v0.3.2
 [0.3.1]: https://git.tools.mia-platform.eu/platform/devops/deploy/-/compare/v0.3.0...v0.3.1
