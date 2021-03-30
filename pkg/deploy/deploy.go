@@ -42,7 +42,6 @@ func Run(inputPaths []string, deployConfig utils.DeployConfig, opts *utils.Optio
 
 	resources, err := resourceutil.MakeResources(opts, filePaths)
 	utils.CheckError(err)
-
 	err = prepareResources(deployConfig.DeployType, resources, currentTime)
 	utils.CheckError(err)
 
@@ -58,12 +57,14 @@ func prepareResources(deployType string, resources []resourceutil.Resource, curr
 	utils.CheckError(err)
 
 	for _, res := range resources {
-		if deployType == deployAll && (res.Head.Kind == "Deployment" || res.Head.Kind == "CronJob") {
+		if res.Head.Kind != "Deployment" && res.Head.Kind != "CronJob" {
+			continue
+		}
+		if deployType == deployAll {
 			if err := ensureDeployAll(&res, currentTime); err != nil {
 				return err
 			}
 		}
-
 		if err := insertDependencies(&res, configMapMap, secretMap); err != nil {
 			return err
 		}

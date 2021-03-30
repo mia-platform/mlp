@@ -633,6 +633,21 @@ func TestPrepareResources(t *testing.T) {
 		require.Nil(t, err)
 		require.Equal(t, expectedCheckSum, annotations[resourceutil.GetMiaAnnotation(deployChecksum)])
 	})
+
+	t.Run("With deploy all and a secret", func(t *testing.T) {
+		secret, err := resourceutil.NewResource("testdata/opaque.secret.yaml")
+		utils.CheckError(err)
+
+		secretType := apiv1.SecretTypeOpaque
+		secret.Info = resourceutil.GetSecretResource(secret, &secretType)
+		resources := make([]resourceutil.Resource, 1)
+
+		resources[0] = *secret
+
+		err = prepareResources(deployAll, resources, mockTime)
+
+		require.Nil(t, err)
+	})
 }
 
 func TestEnsureSmartDeploy(t *testing.T) {
