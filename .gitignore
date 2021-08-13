@@ -1,3 +1,4 @@
+
 # Created by https://www.toptal.com/developers/gitignore/api/macos,linux,windows,go,visualstudiocode
 # Edit at https://www.toptal.com/developers/gitignore?templates=macos,linux,windows,go,visualstudiocode
 
@@ -46,6 +47,7 @@
 # Icon must end with two \r
 Icon
 
+
 # Thumbnails
 ._*
 
@@ -73,9 +75,13 @@ Temporary Items
 !.vscode/extensions.json
 *.code-workspace
 
+# Local History for Visual Studio Code
+.history/
+
 ### VisualStudioCode Patch ###
 # Ignore all local history of files
 .history
+.ionide
 
 ### Windows ###
 # Windows thumbnail cache files
@@ -105,5 +111,7 @@ $RECYCLE.BIN/
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,linux,windows,go,visualstudiocode
 
-# Executable
+
+# Custom Rules
 mlp
+# End of Custom Rules
