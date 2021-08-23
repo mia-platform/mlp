@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## Added
+
+- [BPSINS-27](https://makeitapp.atlassian.net/browse/BPSINS-27): add flag to skip namespace ensure when deploy
+
 ## [0.4.1] - 2021-03-30
+
 ### Fixed
 
 - [BMP-940](https://makeitapp.atlassian.net/browse/BMP-940): fix annotation length by using an unique name, `mia-platform.eu/dependenciesChecksum`, for all dependencies and its value is a object of key-values of all the dependencies.
