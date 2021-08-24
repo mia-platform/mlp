@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2021-08-24
+
 ## Added
 
 - [BPSINS-27](https://makeitapp.atlassian.net/browse/BPSINS-27): add flag to skip namespace ensure when deploy
@@ -65,7 +67,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial Release 🎉🎉🎉
 
-[Unreleased]: https://git.tools.mia-platform.eu/platform/devops/deploy/-/compare/v0.4.1...HEAD
+[Unreleased]: https://git.tools.mia-platform.eu/platform/devops/deploy/-/compare/v0.5.0...HEAD
+[0.5.0]: https://git.tools.mia-platform.eu/platform/devops/deploy/-/compare/v0.4.1...v0.5.0
 [0.4.1]: https://git.tools.mia-platform.eu/platform/devops/deploy/-/compare/v0.4.0...v0.4.1
 [0.4.0]: https://git.tools.mia-platform.eu/platform/devops/deploy/-/compare/v0.3.2...v0.4.0
 [0.3.2]: https://git.tools.mia-platform.eu/platform/devops/deploy/-/compare/v0.3.1...v0.3.2

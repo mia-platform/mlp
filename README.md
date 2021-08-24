@@ -49,13 +49,12 @@ Example:
 
 The `script` section of the CI file should look like this:
 
-```
-  script:
-    - mkdir OUTPUT_DIR
-    - mlp generate -c config-file.yaml -e FIRST_PREFIX -e SECOND_PREFIX -o OUTPUT_DIR
-    - mlp interpolate -f SOURCE_PATH -e FIRST_PREFIX -e SECOND_PREFIX -o OUTPUT_DIR
-    - mlp deploy --server KUBERNETES_URL --certificate-authority /path/to/kubernetes/ca.pem --token KUBERNETES_TOKEN -f OUTPUT_DIR -n KUBERNETES_NAMESPACE --deploy-type DEPLOY_TYPE --force-deploy-when-no-semver=FORCE_DEPLOY_WHEN_NO_SEMVER
-
+```yaml
+script:
+  - mkdir OUTPUT_DIR
+  - mlp generate -c config-file.yaml -e FIRST_PREFIX -e SECOND_PREFIX -o OUTPUT_DIR
+  - mlp interpolate -f SOURCE_PATH -e FIRST_PREFIX -e SECOND_PREFIX -o OUTPUT_DIR
+  - mlp deploy --server KUBERNETES_URL --certificate-authority /path/to/kubernetes/ca.pem --token KUBERNETES_TOKEN -f OUTPUT_DIR -n KUBERNETES_NAMESPACE --deploy-type DEPLOY_TYPE --force-deploy-when-no-semver=FORCE_DEPLOY_WHEN_NO_SEMVER
 ```
 
 Note that `mlp` suppose that the output directory already exists so it needs to be created before using the command.
