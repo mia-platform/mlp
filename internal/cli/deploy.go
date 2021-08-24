@@ -37,6 +37,7 @@ func DeploySubcommand(cmd *cobra.Command, options *utils.Options) {
 	deployCmd.Flags().StringSliceVarP(&inputPaths, "filename", "f", []string{}, "file and/or folder paths containing data to interpolate")
 	deployCmd.Flags().StringVar(&deployConfig.DeployType, "deploy-type", "deploy_all", "Set the deployment type (accepted values: deploy_all, smart_deploy)")
 	deployCmd.Flags().BoolVar(&deployConfig.ForceDeployWhenNoSemver, "force-deploy-when-no-semver", false, "Set whether deployment for services not following semantic versioning should be deployed forcibly (useful when using --deploy-type=smart_deploy")
+	deployCmd.Flags().BoolVar(&deployConfig.EnsureNamespace, "ensure-namespace", true, "Set if the namespace existence should be ensured. By default it is set to true so that the namespace existence is checked and, if it not exists, created. If set to false, it throws if namespace not already exists")
 
 	cmd.AddCommand(deployCmd)
 }

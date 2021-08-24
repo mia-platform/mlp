@@ -318,15 +318,17 @@ func TestEnsureNamespaceExistance(t *testing.T) {
 		err := builder.AddResources([]runtime.Object{namespace}, false)
 		require.Nil(t, err)
 
-		actual, err := ensureNamespaceExistance(builder, namespaceName)
+		err = ensureNamespaceExistence(builder, namespaceName)
 		require.Nil(t, err, "No errors when namespace is created")
 		require.True(t, builder.Helper.CreateCalled)
-		require.Equal(t, namespace, actual)
+		require.Len(t, builder.Helper.ClusterObjs, 1)
+		require.Equal(t, namespace, builder.Helper.ClusterObjs[0].GetObject())
 
-		actual, err = ensureNamespaceExistance(builder, namespaceName)
+		err = ensureNamespaceExistence(builder, namespaceName)
 		require.Nil(t, err, "No errors when namespace already exists")
 		require.True(t, builder.Helper.CreateCalled)
-		require.Equal(t, namespace, actual)
+		require.Len(t, builder.Helper.ClusterObjs, 1)
+		require.Equal(t, namespace, builder.Helper.ClusterObjs[0].GetObject())
 	})
 }
 
@@ -819,5 +821,40 @@ func TestInsertDependencies(t *testing.T) {
 		require.Equal(t, map[string]string{
 			resourceutil.GetMiaAnnotation(dependenciesChecksum): "{\"configMap1-configmap\":\"aaa\",\"configMap2-configmap\":\"bbb\",\"configMapLongLoongLoooooooooooooooooooooooooooooooooooooooooooooong-configmap\":\"eee\",\"secret1-secret\":\"ccc\",\"secret2-secret\":\"ddd\"}",
 		}, annotations)
+	})
+}
+
+func TestDeploy(t *testing.T) {
+	t.Run("does not ensure namespace existence if flag is set to false", func(t *testing.T) {
+		builder := resourceutil.NewFakeBuilder()
+		namespaceName := "foo"
+
+		err := builder.AddResources(nil, false)
+		require.Nil(t, err)
+
+		err = deploy(builder, namespaceName, nil, utils.DeployConfig{
+			EnsureNamespace: false,
+		})
+		require.Nil(t, err)
+		require.False(t, builder.Helper.CreateCalled)
+	})
+
+	t.Run("ensure namespace existence if flag is set to true", func(t *testing.T) {
+		builder := resourceutil.NewFakeBuilder()
+		namespaceName := "foo"
+		namespace := &apiv1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{Name: namespaceName},
+			TypeMeta:   metav1.TypeMeta{Kind: "Namespace", APIVersion: "v1"},
+		}
+
+		err := builder.AddResources([]runtime.Object{namespace}, false)
+		require.Nil(t, err)
+
+		err = deploy(builder, namespaceName, nil, utils.DeployConfig{
+			EnsureNamespace: true,
+		})
+		require.Nil(t, err)
+		require.True(t, builder.Helper.CreateCalled)
+		require.Equal(t, namespace, builder.Helper.ClusterObjs[0].GetObject())
 	})
 }

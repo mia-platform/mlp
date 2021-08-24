@@ -21,7 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/jsonmergepatch"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
 	"sigs.k8s.io/yaml"
@@ -29,9 +28,9 @@ import (
 
 const (
 	dependenciesChecksum = "dependencies-checksum"
-	deployChecksum = "deploy-checksum"
-	smartDeploy    = "smart_deploy"
-	deployAll      = "deploy_all"
+	deployChecksum       = "deploy-checksum"
+	smartDeploy          = "smart_deploy"
+	deployAll            = "deploy_all"
 )
 
 // Run execute the deploy command from cli
@@ -45,7 +44,8 @@ func Run(inputPaths []string, deployConfig utils.DeployConfig, opts *utils.Optio
 	err = prepareResources(deployConfig.DeployType, resources, currentTime)
 	utils.CheckError(err)
 
-	err = deploy(opts.Config, opts.Namespace, resources, deployConfig)
+	builder := resourceutil.NewBuilder(opts.Config)
+	err = deploy(builder, opts.Namespace, resources, deployConfig)
 	utils.CheckError(err)
 
 	err = cleanup(opts, resources)
@@ -258,14 +258,12 @@ func prune(infoGen resourceutil.InfoGenerator, namespace string, resourceGroup *
 	return nil
 }
 
-func deploy(config *genericclioptions.ConfigFlags, namespace string, resources []resourceutil.Resource, deployConfig utils.DeployConfig) error {
-
-	builder := resourceutil.NewBuilder(config)
+func deploy(builder resourceutil.InfoGenerator, namespace string, resources []resourceutil.Resource, deployConfig utils.DeployConfig) error {
 	// Check that the namespace exists
-	_, err := ensureNamespaceExistance(builder, namespace)
-
-	if err != nil {
-		return err
+	if deployConfig.EnsureNamespace {
+		if err := ensureNamespaceExistence(builder, namespace); err != nil {
+			return err
+		}
 	}
 
 	// apply the resources
@@ -278,8 +276,7 @@ func deploy(config *genericclioptions.ConfigFlags, namespace string, resources [
 	return nil
 }
 
-func ensureNamespaceExistance(infoGen resourceutil.InfoGenerator, namespace string) (created *apiv1.Namespace, err error) {
-
+func ensureNamespaceExistence(infoGen resourceutil.InfoGenerator, namespace string) error {
 	ns := &apiv1.Namespace{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
@@ -293,21 +290,21 @@ func ensureNamespaceExistance(infoGen resourceutil.InfoGenerator, namespace stri
 	buf, err := yaml.Marshal(ns)
 
 	if err != nil {
-		return nil, err
+		return err
 	}
 	namespaceInfo, err := infoGen.FromStream(bytes.NewBuffer(buf))
 
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	helper := infoGen.NewHelper(namespaceInfo[0].Client, namespaceInfo[0].Mapping)
 
 	if _, err := helper.Create(namespace, false, namespaceInfo[0].Object); err != nil && !apierrors.IsAlreadyExists(err) {
-		return nil, err
+		return err
 	}
 
-	return ns, err
+	return err
 }
 
 func createJobFromCronjob(infoGen resourceutil.InfoGenerator, res resourceutil.Resource) (*batchapiv1.Job, error) {

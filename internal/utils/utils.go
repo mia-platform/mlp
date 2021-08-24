@@ -30,6 +30,7 @@ import (
 type DeployConfig struct {
 	DeployType              string
 	ForceDeployWhenNoSemver bool
+	EnsureNamespace         bool
 }
 
 // Options global option for the cli that can be passed to all commands
