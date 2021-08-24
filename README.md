@@ -43,7 +43,8 @@ In order to use `mlp` in a pipeline these are the steps to follow:
   - `--namespace`: the namespace in which the resources will be deployed
   - `--deploy-type`: the deploy type used
   - `--force-deploy-when-no-semver`: flag used to force deploy of services that are not following semantic versioning.
-  
+  - `--ensure-namespace` (default to `true`): set if the namespace existence should be ensured. By default it is set to true so that the namespace existence is checked and, if it not exists, created. If set to false, it throws if namespace not already exists.
+
 Example:
 
 The `script` section of the CI file should look like this:
