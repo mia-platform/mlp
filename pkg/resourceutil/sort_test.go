@@ -15,45 +15,33 @@
 package resourceutil
 
 import (
-	"bytes"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-const testdata = "testdata/"
-
 func TestSortResourcesByKind(t *testing.T) {
-
 	resources := []Resource{
-		{Name: "a", Head: ResourceHead{Kind: "Unknown"}},
-		{Name: "b", Head: ResourceHead{Kind: "Secret"}},
-		{Name: "c", Head: ResourceHead{Kind: "ConfigMap"}},
-		{Name: "d", Head: ResourceHead{Kind: "ClusterRole"}},
-		{Name: "e", Head: ResourceHead{Kind: "IngressRoute"}},
-		{Name: "f", Head: ResourceHead{Kind: "ClusterRoleBinding"}},
-		{Name: "g", Head: ResourceHead{Kind: "ConfigMap"}},
-		{Name: "h", Head: ResourceHead{Kind: "Deployment"}},
-		{Name: "i", Head: ResourceHead{Kind: "PodSecurityPolicy"}},
-		{Name: "j", Head: ResourceHead{Kind: "ServiceAccount"}},
-		{Name: "k", Head: ResourceHead{Kind: "Service"}},
+		{GroupVersionKind: &schema.GroupVersionKind{Kind: "Unknown"}},
+		{GroupVersionKind: &schema.GroupVersionKind{Kind: "Secret"}},
+		{GroupVersionKind: &schema.GroupVersionKind{Kind: "ConfigMap"}},
+		{GroupVersionKind: &schema.GroupVersionKind{Kind: "ClusterRole"}},
+		{GroupVersionKind: &schema.GroupVersionKind{Kind: "IngressRoute"}},
+		{GroupVersionKind: &schema.GroupVersionKind{Kind: "ClusterRoleBinding"}},
+		{GroupVersionKind: &schema.GroupVersionKind{Kind: "ConfigMap"}},
+		{GroupVersionKind: &schema.GroupVersionKind{Kind: "Deployment"}},
+		{GroupVersionKind: &schema.GroupVersionKind{Kind: "PodSecurityPolicy"}},
+		{GroupVersionKind: &schema.GroupVersionKind{Kind: "ServiceAccount"}},
+		{GroupVersionKind: &schema.GroupVersionKind{Kind: "Service"}},
 	}
 
 	t.Run("Reordering resources based on default reordering function", func(t *testing.T) {
-		expected := "ijdfbcgkhea"
-		var orderedNames bytes.Buffer
-		defer orderedNames.Reset()
-		originalInput := resources
+		expected := []string{"PodSecurityPolicy", "ServiceAccount", "ClusterRole", "ClusterRoleBinding", "Secret", "ConfigMap", "ConfigMap", "Service", "Deployment", "IngressRoute", "Unknown"}
+		var orderedNames []string
 		for _, resource := range SortResourcesByKind(resources, nil) {
-			orderedNames.WriteString(resource.Name)
+			orderedNames = append(orderedNames, resource.GroupVersionKind.Kind)
 		}
-
-		if got := orderedNames.String(); got != expected {
-			t.Errorf("Expected %q, got %q", expected, got)
-		}
-
-		for idx, resource := range originalInput {
-			if resource != resources[idx] {
-				t.Fatal("Expected input to SortResourcesByKind to stay the same")
-			}
-		}
+		require.ElementsMatch(t, expected, orderedNames)
 	})
 }

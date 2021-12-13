@@ -8,8 +8,8 @@ metadata:
 ---
 apiVersion: v1
 data:
-  dueKey: deuValue
-  unaKey: unValue
+  dueKey: deuValue2
+  unaKey: unValue2
 kind: ConfigMap
 metadata:
-  name: literal
+  name: literal2

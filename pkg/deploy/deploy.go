@@ -1,7 +1,22 @@
+// Copyright 2020 Mia srl
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package deploy
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -9,11 +24,10 @@ import (
 	"git.tools.mia-platform.eu/platform/devops/deploy/internal/utils"
 	"git.tools.mia-platform.eu/platform/devops/deploy/pkg/resourceutil"
 	"github.com/pkg/errors"
-	batchapiv1 "k8s.io/api/batch/v1"
-	batchapiv1beta1 "k8s.io/api/batch/v1beta1"
-	apiv1 "k8s.io/api/core/v1"
+	batchv1 "k8s.io/api/batch/v1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -21,9 +35,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/jsonmergepatch"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/kubectl/pkg/scheme"
-	"k8s.io/kubectl/pkg/util"
-	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -33,23 +47,44 @@ const (
 	deployAll            = "deploy_all"
 )
 
+type k8sClients struct {
+	dynamic   dynamic.Interface
+	discovery discovery.DiscoveryInterface
+}
+
 // Run execute the deploy command from cli
 func Run(inputPaths []string, deployConfig utils.DeployConfig, opts *utils.Options) {
+	restConfig, err := opts.Config.ToRESTConfig()
+	utils.CheckError(err)
+
+	clients := &k8sClients{
+		dynamic:   dynamic.NewForConfigOrDie(restConfig),
+		discovery: discovery.NewDiscoveryClientForConfigOrDie(restConfig),
+	}
 	currentTime := time.Now()
+	err = doRun(clients, opts.Namespace, inputPaths, deployConfig, currentTime)
+	utils.CheckError(err)
+}
+
+func doRun(clients *k8sClients, namespace string, inputPaths []string, deployConfig utils.DeployConfig, currentTime time.Time) error {
 	filePaths, err := utils.ExtractYAMLFiles(inputPaths)
 	utils.CheckError(err)
 
-	resources, err := resourceutil.MakeResources(opts, filePaths)
-	utils.CheckError(err)
+	resources, err := resourceutil.MakeResources(filePaths, namespace)
+	if err != nil {
+		return err
+	}
 	err = prepareResources(deployConfig.DeployType, resources, currentTime)
-	utils.CheckError(err)
+	if err != nil {
+		return err
+	}
 
-	builder := resourceutil.NewBuilder(opts.Config)
-	err = deploy(builder, opts.Namespace, resources, deployConfig)
-	utils.CheckError(err)
+	err = deploy(clients, namespace, resources, deployConfig)
+	if err != nil {
+		return err
+	}
 
-	err = cleanup(opts, resources)
-	utils.CheckError(err)
+	return cleanup(clients, namespace, resources)
 }
 
 func prepareResources(deployType string, resources []resourceutil.Resource, currentTime time.Time) error {
@@ -57,7 +92,7 @@ func prepareResources(deployType string, resources []resourceutil.Resource, curr
 	utils.CheckError(err)
 
 	for _, res := range resources {
-		if res.Head.Kind != "Deployment" && res.Head.Kind != "CronJob" {
+		if res.GroupVersionKind.Kind != "Deployment" && res.GroupVersionKind.Kind != "CronJob" {
 			continue
 		}
 		if deployType == deployAll {
@@ -74,33 +109,25 @@ func prepareResources(deployType string, resources []resourceutil.Resource, curr
 }
 
 func insertDependencies(res *resourceutil.Resource, configMapMap map[string]string, secretMap map[string]string) error {
-	var annotations map[string]string
 	var dependencies = map[string][]string{}
-
-	switch res.Head.Kind {
+	var path []string
+	var err error
+	switch res.GroupVersionKind.Kind {
 	case "Deployment":
-		deployment, err := resourceutil.GetAppsv1DeploymentFromObject(res.Info.Object)
-		if err != nil {
-			fmt.Printf("resource %s: %s", res.Name, err.Error())
-		}
-		dependencies = resourceutil.GetPodsDependencies(deployment.Spec.Template.Spec)
-		if deployment.Spec.Template.Annotations == nil {
-			deployment.Spec.Template.Annotations = make(map[string]string)
-		}
-		res.Info.Object = deployment
-		annotations = deployment.Spec.Template.Annotations
+		path = []string{"spec", "template", "spec"}
 	case "CronJob":
-		cronJob, err := resourceutil.GetBatchapiv1beta1CronJobFromObject(res.Info.Object)
-		if err != nil {
-			fmt.Printf("resource %s: %s", res.Name, err.Error())
-		}
-		dependencies = resourceutil.GetPodsDependencies(cronJob.Spec.JobTemplate.Spec.Template.Spec)
-		if cronJob.Spec.JobTemplate.Spec.Template.Annotations == nil {
-			cronJob.Spec.JobTemplate.Spec.Template.Annotations = make(map[string]string)
-		}
-		res.Info.Object = cronJob
-		annotations = cronJob.Spec.JobTemplate.Spec.Template.Annotations
+		path = []string{"spec", "jobTemplate", "spec", "template", "spec"}
 	}
+	unstrPodSpec, _, err := unstructured.NestedMap(res.Object.Object, path...)
+	if err != nil {
+		return err
+	}
+	var podSpec corev1.PodSpec
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstrPodSpec, &podSpec)
+	if err != nil {
+		return err
+	}
+	dependencies = resourceutil.GetPodsDependencies(podSpec)
 
 	// NOTE: ConfigMaps and Secrets that are used as depedency for the resource but do not exist
 	// in the resource files provided are ignored and no annotation is created for them.
@@ -121,49 +148,51 @@ func insertDependencies(res *resourceutil.Resource, configMapMap map[string]stri
 		fmt.Printf("can not convert checksumMap to json: %s", err.Error())
 	}
 
-	annotations[resourceutil.GetMiaAnnotation(dependenciesChecksum)] = fmt.Sprintf("%s", jsonCheckSumMap)
-	return nil
+	switch res.GroupVersionKind.Kind {
+	case "Deployment":
+		path = []string{"spec", "template", "metadata", "annotations"}
+	case "CronJob":
+		path = []string{"spec", "jobTemplate", "spec", "template", "metadata", "annotations"}
+	}
+	currentAnnotations, found, err := unstructured.NestedStringMap(res.Object.Object,
+		path...)
+	if err != nil {
+		return err
+	}
+	if !found {
+		currentAnnotations = make(map[string]string)
+	}
+	currentAnnotations[resourceutil.GetMiaAnnotation(dependenciesChecksum)] = string(jsonCheckSumMap)
+	return unstructured.SetNestedStringMap(res.Object.Object,
+		currentAnnotations,
+		path...)
 }
 
 func ensureDeployAll(res *resourceutil.Resource, currentTime time.Time) error {
-	var annotations map[string]string
-
-	// Handle only Deployment and CronJob because:
-	// "Secret" and "ConfigMap" is unnecessary and "Job" is immutable after created.
-	switch res.Head.Kind {
+	var path []string
+	switch res.GroupVersionKind.Kind {
 	case "Deployment":
-		deployment, err := resourceutil.GetAppsv1DeploymentFromObject(res.Info.Object)
-		if err != nil {
-			return fmt.Errorf("resource %s: %s", res.Name, err.Error())
-		}
-		if deployment.Spec.Template.Annotations == nil {
-			deployment.Spec.Template.Annotations = make(map[string]string)
-		}
-		res.Info.Object = deployment
-		annotations = deployment.Spec.Template.Annotations
+		path = []string{"spec", "template", "metadata", "annotations"}
 	case "CronJob":
-		cronJob, err := resourceutil.GetBatchapiv1beta1CronJobFromObject(res.Info.Object)
-		if err != nil {
-			return fmt.Errorf("resource %s: %s", res.Name, err.Error())
-		}
-		if cronJob.Spec.JobTemplate.Spec.Template.Annotations == nil {
-			cronJob.Spec.JobTemplate.Spec.Template.Annotations = make(map[string]string)
-		}
-		res.Info.Object = cronJob
-		annotations = cronJob.Spec.JobTemplate.Spec.Template.Annotations
+		path = []string{"spec", "jobTemplate", "spec", "template", "metadata", "annotations"}
 	}
-	annotations[resourceutil.GetMiaAnnotation(deployChecksum)] = resourceutil.GetChecksum([]byte(currentTime.Format(time.RFC3339)))
-	return nil
+	currentAnnotations, found, err := unstructured.NestedStringMap(res.Object.Object, path...)
+	if err != nil {
+		return err
+	}
+	if !found {
+		currentAnnotations = make(map[string]string)
+	}
+	currentAnnotations[resourceutil.GetMiaAnnotation(deployChecksum)] = resourceutil.GetChecksum([]byte(currentTime.Format(time.RFC3339)))
+	return unstructured.SetNestedStringMap(res.Object.Object, currentAnnotations, path...)
 }
 
 // cleanup removes the resources no longer deployed by `mlp` and updates
 // the secret in the cluster with the updated set of resources
-func cleanup(opts *utils.Options, resources []resourceutil.Resource) error {
+func cleanup(clients *k8sClients, namespace string, resources []resourceutil.Resource) error {
 	actual := makeResourceMap(resources)
 
-	builder := resourceutil.NewBuilder(opts.Config)
-
-	old, err := getOldResourceMap(builder, opts.Namespace)
+	old, err := getOldResourceMap(clients, namespace)
 	if err != nil {
 		return err
 	}
@@ -173,23 +202,22 @@ func cleanup(opts *utils.Options, resources []resourceutil.Resource) error {
 		deleteMap := deletedResources(actual, old)
 
 		for _, resourceGroup := range deleteMap {
-			builder := resourceutil.NewBuilder(opts.Config)
-			err = prune(builder, opts.Namespace, resourceGroup)
+			err = prune(clients, namespace, resourceGroup)
 			if err != nil {
 				return err
 			}
 		}
 	}
-	_, err = updateResourceSecret(builder, opts.Namespace, actual)
+	err = updateResourceSecret(clients.dynamic, namespace, actual)
 	return err
 }
 
-func updateResourceSecret(infoGen resourceutil.InfoGenerator, namespace string, resources map[string]*ResourceList) (*apiv1.Secret, error) {
+func updateResourceSecret(dynamic dynamic.Interface, namespace string, resources map[string]*ResourceList) error {
 	secretContent, err := json.Marshal(resources)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	secret := &apiv1.Secret{
+	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      resourceSecretName,
 			Namespace: namespace,
@@ -198,77 +226,92 @@ func updateResourceSecret(infoGen resourceutil.InfoGenerator, namespace string, 
 		Data:     map[string][]byte{"resources": secretContent},
 	}
 
-	buf, err := yaml.Marshal(secret)
-
+	unstr, err := fromRuntimeObjtoUnstruct(secret, secret.GroupVersionKind())
 	if err != nil {
-		return nil, err
-	}
-
-	secretInfo, err := infoGen.FromStream(bytes.NewBuffer(buf))
-
-	if err != nil {
-		return nil, err
-	}
-
-	helper := infoGen.NewHelper(secretInfo[0].Client, secretInfo[0].Mapping)
-
-	if _, err = helper.Create(namespace, false, secretInfo[0].Object); err != nil {
-		if apierrors.IsAlreadyExists(err) {
-			_, err = helper.Replace(namespace, resourceSecretName, true, secretInfo[0].Object)
-
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-	return secret, nil
-}
-
-// prune resources no longer managed by `mlp`
-func prune(infoGen resourceutil.InfoGenerator, namespace string, resourceGroup *ResourceList) error {
-
-	infos, err := infoGen.FromNames(namespace, resourceGroup.Mapping.Resource, resourceGroup.Resources)
-
-	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 
-	for _, objectInfo := range infos {
-		fmt.Printf("deleting: %v %v\n", resourceGroup.Kind, objectInfo.Name)
+	if _, err = dynamic.Resource(gvrSecrets).
+		Namespace(unstr.GetNamespace()).
+		Create(context.Background(), unstr, metav1.CreateOptions{}); err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			_, err = dynamic.Resource(gvrSecrets).
+				Namespace(unstr.GetNamespace()).
+				Update(context.Background(),
+					unstr,
+					metav1.UpdateOptions{})
+			if err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+	return nil
+}
 
-		objMeta, err := meta.Accessor(objectInfo.Object)
+func prune(clients *k8sClients, namespace string, resourceGroup *ResourceList) error {
+
+	for _, res := range resourceGroup.Resources {
+		fmt.Printf("Deleting: %v %v\n", resourceGroup.Gvk.Kind, res)
+
+		gvr, err := resourceutil.FromGVKtoGVR(clients.discovery, *resourceGroup.Gvk)
 		if err != nil {
 			return err
 		}
-
+		onClusterObj, err := clients.dynamic.Resource(gvr).Namespace(namespace).
+			Get(context.Background(), res, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				fmt.Printf("already not present on cluster\n")
+				continue
+			} else {
+				return err
+			}
+		}
 		// delete the object only if the resource has the managed by MIA label
-		if objMeta.GetLabels()[resourceutil.ManagedByLabel] != resourceutil.ManagedByMia {
+		if onClusterObj.GetLabels()[resourceutil.ManagedByLabel] != resourceutil.ManagedByMia {
 			continue
 		}
-
-		helper := infoGen.NewHelper(objectInfo.Client, objectInfo.Mapping)
-
-		_, err = helper.Delete(objectInfo.Namespace, objectInfo.Name)
+		err = clients.dynamic.Resource(gvr).Namespace(namespace).
+			Delete(context.Background(), res, metav1.DeleteOptions{})
 
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
 	}
-
 	return nil
 }
 
-func deploy(builder resourceutil.InfoGenerator, namespace string, resources []resourceutil.Resource, deployConfig utils.DeployConfig) error {
-	// Check that the namespace exists
-	if deployConfig.EnsureNamespace {
-		if err := ensureNamespaceExistence(builder, namespace); err != nil {
+func deploy(clients *k8sClients, namespace string, resources []resourceutil.Resource, deployConfig utils.DeployConfig) error {
+
+	// for each resource ensure namespace if a namespace is not passed to mlp ensure namespace in the resource, gives error
+	// on no namespace passed to mlp and no namespace in yaml
+	// The namespace given to mlp overrides yaml namespace
+	for _, res := range resources {
+		if namespace == "" {
+			resourceNamespace := res.Object.GetNamespace()
+			if resourceNamespace != "" && deployConfig.EnsureNamespace {
+				if err := ensureNamespaceExistence(clients, resourceNamespace); err != nil {
+					return err
+				}
+			} else if resourceNamespace == "" {
+				return errors.New(fmt.Sprintf("no namespace passed and no namespace in resource: %s %s", res.GroupVersionKind.Kind, res.Object.GetName()))
+			}
+		} else {
+			res.Object.SetNamespace(namespace)
+		}
+	}
+
+	if namespace != "" && deployConfig.EnsureNamespace {
+		if err := ensureNamespaceExistence(clients, namespace); err != nil {
 			return err
 		}
 	}
 
 	// apply the resources
 	for _, res := range resources {
-		err := apply(builder, res, deployConfig)
+		err := apply(clients, res, deployConfig)
 		if err != nil {
 			return err
 		}
@@ -276,72 +319,39 @@ func deploy(builder resourceutil.InfoGenerator, namespace string, resources []re
 	return nil
 }
 
-func ensureNamespaceExistence(infoGen resourceutil.InfoGenerator, namespace string) error {
-	ns := &apiv1.Namespace{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "Namespace",
+func ensureNamespaceExistence(clients *k8sClients, namespace string) error {
+	ns := &unstructured.Unstructured{}
+	ns.SetUnstructuredContent(map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Namespace",
+		"metadata": map[string]interface{}{
+			"name": namespace,
 		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: namespace,
-		},
-	}
+	})
 
-	buf, err := yaml.Marshal(ns)
-
-	if err != nil {
-		return err
-	}
-	namespaceInfo, err := infoGen.FromStream(bytes.NewBuffer(buf))
-
-	if err != nil {
+	fmt.Printf("Creating namespace %s\n", namespace)
+	if _, err := clients.dynamic.Resource(gvrNamespaces).Create(context.Background(), ns, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
 
-	helper := infoGen.NewHelper(namespaceInfo[0].Client, namespaceInfo[0].Mapping)
-
-	if _, err := helper.Create(namespace, false, namespaceInfo[0].Object); err != nil && !apierrors.IsAlreadyExists(err) {
-		return err
-	}
-
-	return err
+	return nil
 }
 
-func createJobFromCronjob(infoGen resourceutil.InfoGenerator, res resourceutil.Resource) (*batchapiv1.Job, error) {
-	cronJobMetadata, err := meta.Accessor(res.Info.Object)
+func createJobFromCronjob(k8sClient dynamic.Interface, res *unstructured.Unstructured) (string, error) {
+
+	var cronjobObj batchv1beta1.CronJob
+	err := runtime.DefaultUnstructuredConverter.
+		FromUnstructured(res.Object, &cronjobObj)
 	if err != nil {
-		return nil, err
+		return "", fmt.Errorf("error in conversion to Cronjob")
 	}
-
-	uncastVersionedObj, err := scheme.Scheme.ConvertToVersion(res.Info.Object, batchapiv1beta1.SchemeGroupVersion)
-	if err != nil {
-		return nil, err
-	}
-	cronjobObj, ok := uncastVersionedObj.(*batchapiv1beta1.CronJob)
-	if !ok {
-		return nil, fmt.Errorf("Error in conversion to Cronjob")
-	}
-
-	// TODO useless if OwnerReferences are not used
-	// cronUUID := uuid.NewUUID()
-
-	// // use the old UID if the cron already exists
-	// if oldCron, err := client.BatchV1beta1().CronJobs(options.Namespace).Get(context.TODO(), cronJobMetadata.GetName(), metav1.GetOptions{}); err == nil {
-	// 	cronUUID = oldCron.GetUID()
-	// }
-
-	// if err != nil && !apierrors.IsNotFound(err) {
-	// 	return nil, err
-	// }
-
-	// cronjobObj.SetUID(cronUUID)
 	annotations := make(map[string]string)
 	annotations["cronjob.kubernetes.io/instantiate"] = "manual"
-	job := &batchapiv1.Job{
-		TypeMeta: metav1.TypeMeta{APIVersion: batchapiv1.SchemeGroupVersion.String(), Kind: "Job"},
+	job := &batchv1.Job{
+		TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "Job"},
 		ObjectMeta: metav1.ObjectMeta{
 			// Use this instead of Name field to avoid name conflicts
-			GenerateName: cronJobMetadata.GetName() + "-",
+			GenerateName: res.GetName() + "-",
 			Annotations:  annotations,
 			Labels:       cronjobObj.Spec.JobTemplate.Labels,
 
@@ -351,7 +361,7 @@ func createJobFromCronjob(infoGen resourceutil.InfoGenerator, res resourceutil.R
 			//
 			// OwnerReferences: []metav1.OwnerReference{
 			// 	{
-			// 		APIVersion: batchapiv1beta1.SchemeGroupVersion.String(),
+			// 		APIVersion: batchv1beta1.SchemeGroupVersion.String(),
 			// 		Kind:       cronjobObj.Kind,
 			// 		Name:       cronjobObj.GetName(),
 			// 		UID:        cronjobObj.GetUID(),
@@ -361,70 +371,86 @@ func createJobFromCronjob(infoGen resourceutil.InfoGenerator, res resourceutil.R
 		Spec: cronjobObj.Spec.JobTemplate.Spec,
 	}
 
-	buf, err := yaml.Marshal(job)
+	fmt.Printf("Creating job from cronjob: %s\n", res.GetName())
 
+	unstrCurrentObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&job)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	jobInfo, err := infoGen.FromStream(bytes.NewBuffer(buf))
-
+	jobCreated, err := k8sClient.Resource(gvrJobs).
+		Namespace(res.GetNamespace()).
+		Create(context.Background(),
+			&unstructured.Unstructured{
+				Object: unstrCurrentObj,
+			},
+			metav1.CreateOptions{})
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	helper := infoGen.NewHelper(jobInfo[0].Client, jobInfo[0].Mapping)
-
-	fmt.Printf("Creating job from cronjob: %s\n", res.Name)
-
-	if _, err := helper.Create(res.Namespace, false, jobInfo[0].Object); err != nil {
-		return nil, err
-	}
-
-	return job, nil
+	return jobCreated.GetName(), nil
 }
 
-func apply(infoGen resourceutil.InfoGenerator, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
+func apply(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
 
-	var (
-		currentObj runtime.Object
-		err        error
-	)
+	gvr, err := resourceutil.FromGVKtoGVR(clients.discovery, res.Object.GroupVersionKind())
+	if err != nil {
+		return err
+	}
 
-	helper := infoGen.NewHelper(res.Info.Client, res.Info.Mapping)
-
-	if currentObj, err = helper.Get(res.Info.Namespace, res.Info.Name); err != nil {
+	var onClusterObj *unstructured.Unstructured
+	if onClusterObj, err = clients.dynamic.Resource(gvr).
+		Namespace(res.Object.GetNamespace()).
+		Get(context.Background(), res.Object.GetName(), metav1.GetOptions{}); err != nil {
 		// create the resource only if it is not present in the cluster
 		if apierrors.IsNotFound(err) {
-			fmt.Printf("Creating %s: %s\n", res.Head.Kind, res.Name)
+			fmt.Printf("Creating %s: %s\n", res.Object.GetKind(), res.Object.GetName())
 
 			// creates kubectl.kubernetes.io/last-applied-configuration annotation
 			// inside the resource except for Secrets and ConfigMaps
-			if res.Head.Kind != "Secret" && res.Head.Kind != "ConfigMap" {
-				if err = util.CreateApplyAnnotation(res.Info.Object, unstructured.UnstructuredJSONScheme); err != nil {
+			if res.Object.GetKind() != "Secret" && res.Object.GetKind() != "ConfigMap" {
+				orignAnn := res.Object.GetAnnotations()
+				if orignAnn == nil {
+					orignAnn = make(map[string]string)
+				}
+				objJson, err := res.Object.MarshalJSON()
+				if err != nil {
 					return err
 				}
+				orignAnn[corev1.LastAppliedConfigAnnotation] = string(objJson)
+				res.Object.SetAnnotations(orignAnn)
 			}
 
-			if err = cronJobAutoCreate(infoGen, res); err != nil {
+			if err = cronJobAutoCreate(clients.dynamic, &res.Object); err != nil {
 				return err
 			}
 
-			_, err = helper.Create(res.Info.Namespace, false, res.Info.Object)
+			_, err = clients.dynamic.Resource(gvr).
+				Namespace(res.Object.GetNamespace()).
+				Create(context.Background(),
+					&res.Object,
+					metav1.CreateOptions{})
 		}
 		return err
 	}
-	// Do not modify the resource if the annotation is set to `once`
-	if res.Head.Metadata.Annotations[resourceutil.GetMiaAnnotation("deploy")] != "once" {
+
+	// Do not modify the resource if is already present on cluster and the annotation is set to "once"
+	if res.Object.GetAnnotations()[resourceutil.GetMiaAnnotation("deploy")] != "once" {
 
 		// Replace only if it is a Secret or configmap otherwise patch the resource
-		if res.Head.Kind == "Secret" || res.Head.Kind == "ConfigMap" {
-			fmt.Printf("Replacing %s: %s\n", res.Head.Kind, res.Info.Name)
-			_, err = helper.Replace(res.Info.Namespace, res.Info.Name, true, res.Info.Object)
+		if res.Object.GetKind() == "Secret" || res.Object.GetKind() == "ConfigMap" {
+			fmt.Printf("Replacing %s: %s\n", res.Object.GetKind(), res.Object.GetName())
+
+			_, err = clients.dynamic.Resource(gvr).
+				Namespace(res.Object.GetNamespace()).
+				Update(context.Background(),
+					&res.Object,
+					metav1.UpdateOptions{})
 
 		} else {
 
-			fmt.Printf("Updating %s: %s\n", res.Head.Kind, res.Info.Name)
+			fmt.Printf("Updating %s: %s\n", res.Object.GetKind(), res.Object.GetName())
 
 			if deployConfig.DeployType == smartDeploy {
 				isNotUsingSemver, err := resourceutil.IsNotUsingSemver(&res)
@@ -437,26 +463,29 @@ func apply(infoGen resourceutil.InfoGenerator, res resourceutil.Resource, deploy
 						return errors.Wrap(err, "failed ensure deploy all on resource not using semver")
 					}
 				} else {
-					if err = ensureSmartDeploy(infoGen, currentObj, &res); err != nil {
+					if err = ensureSmartDeploy(onClusterObj, &res); err != nil {
 						return errors.Wrap(err, "failed smart deploy ensure")
 					}
 				}
 			}
 
-			if res.Head.Kind == "CronJob" {
-				if err := checkIfCreateJob(infoGen, currentObj, res); err != nil {
+			if res.Object.GetKind() == "CronJob" {
+				if err := checkIfCreateJob(clients.dynamic, onClusterObj, res); err != nil {
 					return errors.Wrap(err, "failed check if create job")
 				}
 			}
 
-			patch, patchType, err := createPatch(currentObj, res)
+			patch, patchType, err := createPatch(*onClusterObj, res)
 
 			// create the patch
 			if err != nil {
 				return errors.Wrap(err, "failed to create patch")
 			}
 
-			if _, err := helper.Patch(res.Info.Namespace, res.Info.Name, patchType, patch, nil); err != nil {
+			if _, err := clients.dynamic.Resource(gvr).
+				Namespace(res.Object.GetNamespace()).
+				Patch(context.Background(),
+					res.Object.GetName(), patchType, patch, metav1.PatchOptions{}); err != nil {
 				return errors.Wrap(err, "failed to patch")
 			}
 		}
@@ -469,28 +498,38 @@ func apply(infoGen resourceutil.InfoGenerator, res resourceutil.Resource, deploy
 // The function performs a Three Way Merge Patch with the last applied configuration written in the
 // object annotation, the actual resource state deployed inside the cluster and the desired state after
 // the update.
-func createPatch(currentObj runtime.Object, target resourceutil.Resource) ([]byte, types.PatchType, error) {
-
+func createPatch(currentObj unstructured.Unstructured, target resourceutil.Resource) ([]byte, types.PatchType, error) {
 	// Get the config in the annotation
-	original, err := util.GetOriginalConfiguration(currentObj)
-	if err != nil {
-		return nil, types.StrategicMergePatchType, errors.Wrap(err, "serializing original configuration")
-	}
+	original := currentObj.GetAnnotations()[corev1.LastAppliedConfigAnnotation]
 
 	// Get the desired configuration
-	desired, err := util.GetModifiedConfiguration(target.Info.Object, true, unstructured.UnstructuredJSONScheme)
-	if err != nil {
-		return nil, types.StrategicMergePatchType, errors.Wrap(err, "serializing target configuration")
+	obj := target.Object.DeepCopy()
+	objAnn := obj.GetAnnotations()
+	_, found := objAnn[corev1.LastAppliedConfigAnnotation]
+	if found {
+		delete(objAnn, corev1.LastAppliedConfigAnnotation)
+		obj.SetAnnotations(objAnn)
+	} else {
+		objAnn = make(map[string]string)
 	}
-
+	objEncoded, err := obj.MarshalJSON()
+	if err != nil {
+		return nil, types.StrategicMergePatchType, err
+	}
+	objAnn[corev1.LastAppliedConfigAnnotation] = string(objEncoded)
+	obj.SetAnnotations(objAnn)
+	desired, err := obj.MarshalJSON()
+	if err != nil {
+		return nil, types.StrategicMergePatchType, err
+	}
 	// Get the resource in the cluster
-	current, err := json.Marshal(currentObj)
+	current, err := currentObj.MarshalJSON()
 	if err != nil {
 		return nil, types.StrategicMergePatchType, errors.Wrap(err, "serializing live configuration")
 	}
 
 	// Get the resource scheme
-	versionedObject, err := scheme.Scheme.New(target.Info.Mapping.GroupVersionKind)
+	versionedObject, err := scheme.Scheme.New(*target.GroupVersionKind)
 
 	// use a three way json merge if the resource is a CRD
 	if runtime.IsNotRegisteredError(err) {
@@ -498,9 +537,10 @@ func createPatch(currentObj runtime.Object, target resourceutil.Resource) ([]byt
 		patchType := types.MergePatchType
 		preconditions := []mergepatch.PreconditionFunc{mergepatch.RequireKeyUnchanged("apiVersion"),
 			mergepatch.RequireKeyUnchanged("kind"), mergepatch.RequireMetadataKeyUnchanged("name")}
-		patch, err := jsonmergepatch.CreateThreeWayJSONMergePatch(original, desired, current, preconditions...)
-
+		patch, err := jsonmergepatch.CreateThreeWayJSONMergePatch([]byte(original), desired, current, preconditions...)
 		return patch, patchType, err
+	} else if err != nil {
+		return nil, types.StrategicMergePatchType, err
 	}
 
 	patchMeta, err := strategicpatch.NewPatchMetaFromStruct(versionedObject)
@@ -508,73 +548,62 @@ func createPatch(currentObj runtime.Object, target resourceutil.Resource) ([]byt
 		return nil, types.StrategicMergePatchType, errors.Wrap(err, "unable to create patch metadata from object")
 	}
 
-	patch, err := strategicpatch.CreateThreeWayMergePatch(original, desired, current, patchMeta, true)
+	patch, err := strategicpatch.CreateThreeWayMergePatch([]byte(original), desired, current, patchMeta, true)
 	return patch, types.StrategicMergePatchType, err
 }
 
 // EnsureSmartDeploy merge, if present, the "mia-platform.eu/deploy-checksum" annotation from the Kubernetes cluster
 // into the target Resource that is going to be released.
-func ensureSmartDeploy(infoGen resourceutil.InfoGenerator, currentObj runtime.Object, target *resourceutil.Resource) error {
-	switch target.Head.Kind {
+func ensureSmartDeploy(onClusterResource *unstructured.Unstructured, target *resourceutil.Resource) error {
+	var path []string
+	switch target.GroupVersionKind.Kind {
 	case "Deployment":
-		currentDeployment, err := resourceutil.GetAppsv1DeploymentFromObject(currentObj)
-		if err != nil {
-			return fmt.Errorf("current resource %s: %s", target.Name, err.Error())
-		}
-
-		desiredDeployment, err := resourceutil.GetAppsv1DeploymentFromObject(target.Info.Object)
-		if err != nil {
-			return fmt.Errorf("target resource %s: %s", target.Name, err.Error())
-		}
-
-		currentAnnotation := currentDeployment.Spec.Template.Annotations
-		if currentAnnotation != nil && currentAnnotation[resourceutil.GetMiaAnnotation(deployChecksum)] != "" {
-			if desiredDeployment.Spec.Template.Annotations == nil {
-				desiredDeployment.Spec.Template.Annotations = make(map[string]string)
-			}
-
-			desiredDeployment.Spec.Template.Annotations[resourceutil.GetMiaAnnotation(deployChecksum)] = currentAnnotation[resourceutil.GetMiaAnnotation(deployChecksum)]
-			target.Info.Object = desiredDeployment
-		}
+		path = []string{"spec", "template", "metadata", "annotations"}
 	case "CronJob":
-		currentCronJob, err := resourceutil.GetBatchapiv1beta1CronJobFromObject(currentObj)
-		if err != nil {
-			return fmt.Errorf("current resource %s: %s", target.Name, err.Error())
-		}
+		path = []string{"spec", "jobTemplate", "spec", "template", "metadata", "annotations"}
+	}
 
-		desiredCronJob, err := resourceutil.GetBatchapiv1beta1CronJobFromObject(target.Info.Object)
-		if err != nil {
-			return fmt.Errorf("target resource %s: %s", target.Name, err.Error())
-		}
+	currentAnn, found, err := unstructured.NestedStringMap(onClusterResource.Object, path...)
+	if err != nil {
+		return err
+	}
+	if !found {
+		currentAnn = make(map[string]string)
+	}
 
-		currentAnnotation := currentCronJob.Spec.JobTemplate.Spec.Template.Annotations
-		if currentAnnotation != nil && currentAnnotation[resourceutil.GetMiaAnnotation(deployChecksum)] != "" {
-			if desiredCronJob.Spec.JobTemplate.Spec.Template.Annotations == nil {
-				desiredCronJob.Spec.JobTemplate.Spec.Template.Annotations = make(map[string]string)
-			}
-			desiredCronJob.Spec.JobTemplate.Spec.Template.Annotations[resourceutil.GetMiaAnnotation(deployChecksum)] = currentAnnotation[resourceutil.GetMiaAnnotation(deployChecksum)]
-			target.Info.Object = desiredCronJob
-		}
+	targetAnn, found, err := unstructured.NestedStringMap(target.Object.Object, path...)
+	if err != nil {
+		return err
+	}
+	if !found {
+		targetAnn = make(map[string]string)
+	}
+	targetAnn[resourceutil.GetMiaAnnotation(deployChecksum)] = currentAnn[resourceutil.GetMiaAnnotation(deployChecksum)]
+	err = unstructured.SetNestedStringMap(target.Object.Object, targetAnn, path...)
+	if err != nil {
+		return err
 	}
 
 	return nil
 }
 
-func checkIfCreateJob(infoGen resourceutil.InfoGenerator, currentObj runtime.Object, target resourceutil.Resource) error {
-	// Get the config in the annotation
-	original, err := util.GetOriginalConfiguration(currentObj)
-	if err != nil {
-		return errors.Wrap(err, "serializing original configuration")
-	}
+func checkIfCreateJob(k8sClient dynamic.Interface, currentObj *unstructured.Unstructured, target resourceutil.Resource) error {
+	original := currentObj.GetAnnotations()[corev1.LastAppliedConfigAnnotation]
 
-	// Get the desired configuration
-	desired, err := util.GetModifiedConfiguration(target.Info.Object, false, unstructured.UnstructuredJSONScheme)
+	obj := target.Object.DeepCopy()
+	objAnn := obj.GetAnnotations()
+	_, found := objAnn[corev1.LastAppliedConfigAnnotation]
+	if found {
+		delete(objAnn, corev1.LastAppliedConfigAnnotation)
+		obj.SetAnnotations(objAnn)
+	}
+	desired, err := obj.MarshalJSON()
 	if err != nil {
 		return errors.Wrap(err, "serializing target configuration")
 	}
 
-	if !bytes.Equal(original, desired) {
-		if err := cronJobAutoCreate(infoGen, target); err != nil {
+	if !bytes.Equal([]byte(original), desired) {
+		if err := cronJobAutoCreate(k8sClient, &target.Object); err != nil {
 			return errors.Wrap(err, "failed on cronJobAutoCreate")
 		}
 	}
@@ -582,16 +611,16 @@ func checkIfCreateJob(infoGen resourceutil.InfoGenerator, currentObj runtime.Obj
 }
 
 // Create a Job from every CronJob having the mia-platform.eu/autocreate annotation set to true
-func cronJobAutoCreate(infoGen resourceutil.InfoGenerator, res resourceutil.Resource) error {
-	if res.Head.Kind != "CronJob" {
+func cronJobAutoCreate(k8sClient dynamic.Interface, res *unstructured.Unstructured) error {
+	if res.GetKind() != "CronJob" {
 		return nil
 	}
-	val, ok := res.Head.Metadata.Annotations[resourceutil.GetMiaAnnotation("autocreate")]
+	val, ok := res.GetAnnotations()[resourceutil.GetMiaAnnotation("autocreate")]
 	if !ok || val != "true" {
 		return nil
 	}
 
-	if _, err := createJobFromCronjob(infoGen, res); err != nil {
+	if _, err := createJobFromCronjob(k8sClient, res); err != nil {
 		return err
 	}
 	return nil

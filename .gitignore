@@ -113,5 +113,5 @@ $RECYCLE.BIN/
 
 
 # Custom Rules
-mlp
+bin/*
 # End of Custom Rules

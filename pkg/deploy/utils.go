@@ -1,18 +1,33 @@
+// Copyright 2020 Mia srl
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package deploy
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
+	"strings"
 
 	"git.tools.mia-platform.eu/platform/devops/deploy/pkg/resourceutil"
-	apiv1 "k8s.io/api/core/v1"
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubectl/pkg/scheme"
-	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -20,12 +35,20 @@ const (
 	resourceField      = "resources"
 )
 
+var (
+	gvrSecrets         = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}
+	gvrNamespaces      = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"}
+	gvrConfigMaps      = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"}
+	gvrDeployments     = schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
+	gvrJobs            = schema.GroupVersionResource{Group: batchv1.SchemeGroupVersion.Group, Version: batchv1.SchemeGroupVersion.Version, Resource: "jobs"}
+	gvrV1beta1Cronjobs = schema.GroupVersionResource{Group: "batch", Version: "v1beta1", Resource: "cronjobs"}
+)
+
 // ResourceList is the base block used to build the secret containing
 // the resources deployed in the cluster.
 type ResourceList struct {
-	Kind      string `json:"kind"`
-	Mapping   schema.GroupVersionResource
-	Resources []string `json:"resources"`
+	Gvk       *schema.GroupVersionKind `json:"kind"`
+	Resources []string                 `json:"resources"`
 }
 
 // makeResourceMap groups the resources list by kind and embeds them in a `ResourceList` struct
@@ -33,45 +56,54 @@ func makeResourceMap(resources []resourceutil.Resource) map[string]*ResourceList
 	res := make(map[string]*ResourceList)
 
 	for _, r := range resources {
-		if _, ok := res[r.Head.Kind]; !ok {
-			res[r.Head.Kind] = &ResourceList{
-				Kind:      r.Head.Kind,
-				Mapping:   r.Info.ResourceMapping().Resource,
+		if _, ok := res[r.GroupVersionKind.Kind]; !ok {
+			res[r.GroupVersionKind.Kind] = &ResourceList{
+				Gvk:       r.GroupVersionKind,
 				Resources: []string{},
 			}
 		}
-		res[r.Head.Kind].Resources = append(res[r.Head.Kind].Resources, r.Name)
+		res[r.GroupVersionKind.Kind].Resources = append(res[r.GroupVersionKind.Kind].Resources, r.Object.GetName())
 	}
 
 	return res
 }
 
+// Resources secrets created with helper/builer version of mlp is incompatible with newer versions
+// this function convert old format in the new one
+func convertSecretFormat(resources []byte) (map[string]*ResourceList, error) {
+
+	type oldResourceList struct {
+		Kind      string `json:"kind"`
+		Mapping   schema.GroupVersionResource
+		Resources []string `json:"resources"`
+	}
+
+	oldres := make(map[string]*oldResourceList)
+	err := json.Unmarshal(resources, &oldres)
+	if err != nil {
+		return nil, err
+	}
+
+	res := make(map[string]*ResourceList)
+
+	for k, v := range oldres {
+		res[k] = &ResourceList{
+			Gvk: &schema.GroupVersionKind{
+				Group:   v.Mapping.Group,
+				Version: v.Mapping.Version,
+				Kind:    k,
+			},
+			Resources: v.Resources}
+	}
+	return res, nil
+}
+
 // getOldResourceMap fetches the last set of resources deployed into the namespace from
 // `resourceSecretName` secret.
-func getOldResourceMap(infoGen resourceutil.InfoGenerator, namespace string) (map[string]*ResourceList, error) {
-	secret := &apiv1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      resourceSecretName,
-			Namespace: namespace,
-		},
-		TypeMeta: metav1.TypeMeta{Kind: "Secret", APIVersion: "v1"},
-	}
-
-	buf, err := yaml.Marshal(secret)
-
-	if err != nil {
-		return nil, err
-	}
-
-	secretInfo, err := infoGen.FromStream(bytes.NewBuffer(buf))
-
-	if err != nil {
-		return nil, err
-	}
-
-	helper := infoGen.NewHelper(secretInfo[0].Client, secretInfo[0].Mapping)
-
-	remoteObject, err := helper.Get(namespace, resourceSecretName)
+func getOldResourceMap(clients *k8sClients, namespace string) (map[string]*ResourceList, error) {
+	var secret corev1.Secret
+	secretUnstr, err := clients.dynamic.Resource(gvrSecrets).
+		Namespace(namespace).Get(context.Background(), resourceSecretName, metav1.GetOptions{})
 
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -80,25 +112,26 @@ func getOldResourceMap(infoGen resourceutil.InfoGenerator, namespace string) (ma
 		return nil, err
 	}
 
-	uncastVersionedObj, err := scheme.Scheme.ConvertToVersion(remoteObject, apiv1.SchemeGroupVersion)
+	err = runtime.DefaultUnstructuredConverter.
+		FromUnstructured(secretUnstr.Object, &secret)
 	if err != nil {
 		return nil, err
-	}
-	remoteSecret, ok := uncastVersionedObj.(*apiv1.Secret)
-	if !ok {
-		return nil, fmt.Errorf("Error in conversion to Cronjob")
 	}
 
 	res := make(map[string]*ResourceList)
 
-	err = json.Unmarshal(remoteSecret.Data[resourceField], &res)
-
+	resources := secret.Data[resourceField]
+	if strings.Contains(string(resources), "\"Mapping\":{") {
+		res, err = convertSecretFormat(resources)
+	} else {
+		err = json.Unmarshal(resources, &res)
+	}
 	if err != nil {
 		return nil, err
 	}
 
 	if len(res) == 0 {
-		return nil, errors.New("Resource field is empty")
+		return nil, errors.New("resource field is empty")
 	}
 
 	return res, nil
@@ -113,8 +146,7 @@ func deletedResources(actual, old map[string]*ResourceList) map[string]*Resource
 	for key := range old {
 		if _, ok := res[key]; !ok {
 			res[key] = &ResourceList{
-				Kind:    old[key].Kind,
-				Mapping: old[key].Mapping,
+				Gvk: old[key].Gvk,
 			}
 		}
 
@@ -156,4 +188,17 @@ func contains(res []string, s string) bool {
 		}
 	}
 	return false
+}
+
+// convert runtime object to unstructured.Unstructured
+func fromRuntimeObjtoUnstruct(obj runtime.Object, gvk schema.GroupVersionKind) (*unstructured.Unstructured, error) {
+	currentObj := &unstructured.Unstructured{}
+	currentObj.SetGroupVersionKind(gvk)
+	interfCurrentObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&obj)
+	if err != nil {
+		return nil, err
+	}
+	return &unstructured.Unstructured{
+		Object: interfCurrentObj,
+	}, nil
 }
