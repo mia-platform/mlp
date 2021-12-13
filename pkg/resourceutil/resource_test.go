@@ -1,218 +1,78 @@
+// Copyright 2020 Mia srl
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package resourceutil
 
 import (
+	"fmt"
 	"path/filepath"
 	"testing"
 
-	"git.tools.mia-platform.eu/platform/devops/deploy/internal/utils"
 	"github.com/stretchr/testify/require"
-	appsv1 "k8s.io/api/apps/v1"
-	apiv1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/resource"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func TestNewResource(t *testing.T) {
+const testdata = "testdata/"
+
+func TestNewResources(t *testing.T) {
 	t.Run("Read a valid kubernetes resource", func(t *testing.T) {
 		filePath := filepath.Join(testdata, "kubernetesersource.yaml")
-
-		actual, err := NewResource(filePath)
-		expectedMetadata := struct {
-			Name        string            `json:"name"`
-			Annotations map[string]string `json:"annotations"`
-		}{
-			Name: "literal",
-		}
-		expected := &Resource{
-			Filepath: filePath,
-			Name:     "literal",
-			Head: ResourceHead{
-				GroupVersion: "v1",
-				Kind:         "ConfigMap",
-				Metadata:     &expectedMetadata,
-			},
-		}
-		require.Nil(t, err, "Reading a valid k8s file err must be nil")
-		require.Equal(t, actual, expected, "Resource read from file must be equal to expected")
-	})
-
-	t.Run("Read an invalid kubernetes resource", func(t *testing.T) {
-		filePath := filepath.Join(testdata, "notarresource.yaml")
-
-		resource, err := NewResource(filePath)
-		require.Nil(t, resource, "Reading an invalid k8s file resource must be nil")
-		require.NotNil(t, err, "Reading an invalid k8s file resource an error must be returned")
-	})
-}
-
-func TestMakeInfo(t *testing.T) {
-
-	cf := &apiv1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "ConfigMap",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "literal",
-		},
-		Data: map[string]string{
-			"dueKey": "deuValue",
-			"unaKey": "unValue",
-		},
-	}
-
-	t.Run("File with two resources", func(t *testing.T) {
-		b := NewFakeBuilder()
-		_, err := MakeInfo(b, "default", "testdata/tworesources.yaml")
-
-		require.EqualError(t, err, "Multiple objects in single yaml file currently not supported")
-	})
-
-	t.Run("resource built with correct namespace", func(t *testing.T) {
-		b := NewFakeBuilder()
-		b.AddResources([]runtime.Object{cf}, false)
-		info, err := MakeInfo(b, "default", "testdata/kubernetesersource.yaml")
+		actual, err := NewResources(filePath, "default")
 		require.Nil(t, err)
-		require.Equal(t, "default", info.Namespace, "The resource namespace must be the one passed as parameter")
+		expected := map[string]interface{}{"apiVersion": "v1", "data": map[string]interface{}{"dueKey": "deuValue", "unaKey": "unValue"}, "kind": "ConfigMap", "metadata": map[string]interface{}{"name": "literal", "namespace": "default"}}
+		require.Nil(t, err, "Reading a valid k8s file err must be nil")
+		require.Equal(t, len(actual), 1, "1 Resource")
+		require.Equal(t, actual[0].GroupVersionKind.Kind, "ConfigMap")
+		require.EqualValues(t, expected, actual[0].Object.Object, "confimap on disk different")
+	})
+	t.Run("Read 2 valid kubernetes resource", func(t *testing.T) {
+		filePath := filepath.Join(testdata, "tworesources.yaml")
+		actual, err := NewResources(filePath, "default")
+		expected1 := map[string]interface{}{"apiVersion": "v1", "data": map[string]interface{}{"dueKey": "deuValue", "unaKey": "unValue"}, "kind": "ConfigMap", "metadata": map[string]interface{}{"name": "literal", "namespace": "default"}}
+		expected2 := map[string]interface{}{"apiVersion": "v1", "data": map[string]interface{}{"dueKey": "deuValue2", "unaKey": "unValue2"}, "kind": "ConfigMap", "metadata": map[string]interface{}{"name": "literal2", "namespace": "default"}}
+		require.Nil(t, err, "Reading two valid k8s file err must be nil")
+		require.Equal(t, len(actual), 2, "2 Resource")
+		require.Equal(t, actual[0].GroupVersionKind.Kind, "ConfigMap")
+		require.Equal(t, actual[1].GroupVersionKind.Kind, "ConfigMap")
+		require.EqualValues(t, expected1, actual[0].Object.Object, "confimap 1 on disk different")
+		require.EqualValues(t, expected2, actual[1].Object.Object, "confimap 2 on disk different")
+	})
+	t.Run("Read not standard resource", func(t *testing.T) {
+		filePath := filepath.Join(testdata, "non-standard-resource.yaml")
+		actual, err := NewResources(filePath, "default")
+		expected := map[string]interface{}{"apiVersion": "traefik.containo.us/v1alpha1", "kind": "IngressRoute", "metadata": map[string]interface{}{"name": "ingressroute1", "namespace": "default"}, "spec": map[string]interface{}{"entryPoints": []interface{}{"websecure"}, "routes": []interface{}{}}}
+		require.Nil(t, err, "Reading non standard k8s file err must be nil")
+		require.Equal(t, len(actual), 1, "1 Resource")
+		require.EqualValues(t, expected, actual[0].Object.Object, "even a crd is unstructurable")
+	})
+	t.Run("Read an invalid kubernetes resource", func(t *testing.T) {
+		filePath := filepath.Join(testdata, "invalidresource.yaml")
+		_, err := NewResources(filePath, "default")
+		require.EqualError(t, err, "error converting YAML to JSON: yaml: line 3: could not find expected ':'")
 	})
 }
 
-func TestMergeLabels(t *testing.T) {
-
-	testcases := []struct {
-		description string
-		message     string
-		expected    map[string]string
-		current     map[string]string
-		changes     map[string]string
-	}{
-		{
-			description: "Update value in map",
-			message:     "The value should be updated with the one contained in changes map",
-			expected: map[string]string{
-				"foo": "foo",
-				"bar": "bar",
-			},
-
-			current: map[string]string{
-				"foo": "foo",
-				"bar": "foo",
-			},
-
-			changes: map[string]string{
-				"bar": "bar",
-			},
-		},
-		{
-			description: "Add new key value in map",
-			message:     "The new key value should be present in the new map",
-			expected: map[string]string{
-				"foo":    "foo",
-				"bar":    "bar",
-				"foobar": "foo",
-			},
-
-			current: map[string]string{
-				"foo": "foo",
-				"bar": "bar",
-			},
-
-			changes: map[string]string{
-				"foobar": "foo",
-			},
-		},
+func TestMakeResources(t *testing.T) {
+	filePath := []string{
+		filepath.Join(testdata, "kubernetesersource.yaml"),
+		filepath.Join(testdata, "tworesources.yaml"),
 	}
 
-	for _, tt := range testcases {
-		t.Run(tt.description, func(t *testing.T) {
-			actual := mergeLabels(tt.current, tt.changes)
-			require.Equal(t, tt.expected, actual, tt.message)
-		})
-	}
-}
-
-func TestUpdateLabels(t *testing.T) {
-
-	testcases := []struct {
-		description string
-		message     string
-		expected    map[string]string
-		current     runtime.Object
-		changes     map[string]string
-	}{
-		{
-			description: "Add label to an object",
-			message:     "The updated object labels should contain the new key value",
-			expected: map[string]string{
-				"foo": "foo",
-				"bar": "bar",
-			},
-
-			current: &appsv1.Deployment{
-				TypeMeta: metav1.TypeMeta{APIVersion: appsv1.SchemeGroupVersion.String(), Kind: "Deployment"},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "bar",
-				},
-			},
-
-			changes: map[string]string{
-				ManagedByLabel: ManagedByMia,
-			},
-		},
-	}
-
-	for _, tt := range testcases {
-		t.Run(tt.description, func(t *testing.T) {
-			err := updateLabels(tt.current, tt.changes)
-			require.Nil(t, err)
-			labels, err := accessor.Labels(tt.current)
-			require.Nil(t, err)
-			require.Equal(t, labels[ManagedByLabel], ManagedByMia, tt.message)
-		})
-	}
-}
-
-func TestMakeResource(t *testing.T) {
-	filePath := filepath.Join(testdata, "kubernetesersource.yaml")
-
-	cf := &apiv1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "ConfigMap",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "literal",
-		},
-		Data: map[string]string{
-			"dueKey": "deuValue",
-			"unaKey": "unValue",
-		},
-	}
-
-	builder := NewFakeBuilder()
-	builder.AddResources([]runtime.Object{cf}, false)
-
-	head := ResourceHead{
-		GroupVersion: cf.APIVersion,
-		Kind:         cf.Kind,
-	}
-
-	resource, err := MakeResource(builder, "bar", filePath)
+	actual, err := MakeResources(filePath, "default")
 	require.Nil(t, err)
-	require.Equal(t, filePath, resource.Filepath, "the paths should coincide")
-	require.Equal(t, "bar", resource.Namespace, "the namespaces should coincide")
-	require.Equal(t, cf.Name, resource.Name, "the names should coincide")
-	require.Equal(t, head.Kind, resource.Head.Kind, "the kinds should coincide")
-	require.Equal(t, head.GroupVersion, resource.Head.GroupVersion, "the groupversions should coincide")
-
-	objMeta, err := meta.Accessor(resource.Info.Object)
-	require.Nil(t, err)
-
-	require.Equal(t, ManagedByMia, objMeta.GetLabels()[ManagedByLabel], "should contain the managed by MIA label")
+	require.Equal(t, len(actual), 3, "3 Resource")
 }
 
 func TestGetKeysFromMap(t *testing.T) {
@@ -289,234 +149,84 @@ func TestGetChecksum(t *testing.T) {
 }
 
 func TestMapSecretAndConfigMap(t *testing.T) {
-
-	infoDeployment := &resource.Info{
-		Object: &appsv1.Deployment{
-			TypeMeta:   metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
-			ObjectMeta: metav1.ObjectMeta{},
-			Spec: appsv1.DeploymentSpec{
-				Template: v1.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{},
-				},
-			},
-		},
+	filePath := []string{
+		filepath.Join(testdata, "kubernetesersource.yaml"),
+		filepath.Join(testdata, "tworesources.yaml"),
+		filepath.Join(testdata, "secretresource.yaml"),
 	}
 
-	infoConfigMap := &resource.Info{
-		Object: &apiv1.ConfigMap{
-			TypeMeta: metav1.TypeMeta{Kind: "ConfigMap", APIVersion: "v1"},
-			Data:     map[string]string{"name": "name1", "time": "2"},
-		},
-	}
+	resources, err := MakeResources(filePath, "default")
+	require.Nil(t, err)
 
-	infoBinaryConfigMap := &resource.Info{
-		Object: &apiv1.ConfigMap{
-			TypeMeta:   metav1.TypeMeta{Kind: "ConfigMap", APIVersion: "v1"},
-			BinaryData: map[string][]byte{"binName": []byte("name")},
-		},
-	}
-
-	infoSecret := &resource.Info{
-		Object: &apiv1.Secret{
-			TypeMeta:   metav1.TypeMeta{Kind: "Secret", APIVersion: "v1"},
-			StringData: map[string]string{"name": "secret"},
-		},
-	}
-
-	infoBinarySecret := &resource.Info{
-		Object: &apiv1.Secret{
-			TypeMeta: metav1.TypeMeta{Kind: "Secret", APIVersion: "v1"},
-			Data:     map[string][]byte{"binSecret": []byte("name")},
-		},
-	}
-
-	testcases := []struct {
-		description          string
-		input                []Resource
-		expectedConfigMapMap map[string]string
-		expectedSecretMap    map[string]string
-	}{
-		{
-			description: "Single configMap",
-			input: []Resource{
-				{
-					Name: "configmap-name",
-					Head: ResourceHead{Kind: "ConfigMap"},
-					Info: infoConfigMap,
-				},
-			},
-			expectedConfigMapMap: map[string]string{
-				"configmap-name":      "6168737a06d058976783116253e72c93cf9c37735664cc9ab91d1939ad4a5c65",
-				"configmap-name-name": "9367417d63903350aeb7e092bca792263d4fd82d4912252e014e073a8931b4c1",
-				"configmap-name-time": "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35",
-			},
-			expectedSecretMap: map[string]string{},
-		},
-		{
-			description: "Single binary configMap",
-			input: []Resource{
-				{
-					Name: "bin-configmap-name",
-					Head: ResourceHead{Kind: "ConfigMap"},
-					Info: infoBinaryConfigMap,
-				},
-			},
-			expectedConfigMapMap: map[string]string{
-				"bin-configmap-name":         "cb7b618f5015758718976fff957ffca0513fd898a809c65ce4db3a8a325d6335",
-				"bin-configmap-name-binName": "82a3537ff0dbce7eec35d69edc3a189ee6f17d82f353a553f9aa96cb0be3ce89",
-			},
-			expectedSecretMap: map[string]string{},
-		},
-		{
-			description: "Single secret",
-			input: []Resource{
-				{
-					Name: "secret-name",
-					Head: ResourceHead{Kind: "Secret"},
-					Info: infoSecret,
-				},
-			},
-			expectedConfigMapMap: map[string]string{},
-			expectedSecretMap: map[string]string{
-				"secret-name":      "4622a7d32da26554ec12fa8cbf0fabe6a8f7ae67d0a8a99f50c1110137ab6e5e",
-				"secret-name-name": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
-			},
-		},
-		{
-			description: "Single binary secret",
-			input: []Resource{
-				{
-					Name: "bin-secret-name",
-					Head: ResourceHead{Kind: "Secret"},
-					Info: infoBinarySecret,
-				},
-			},
-			expectedConfigMapMap: map[string]string{},
-			expectedSecretMap: map[string]string{
-				"bin-secret-name":           "243cad3263de13111fb003737ab3caf8fc8162ec671eb34f82949a381af1e693",
-				"bin-secret-name-binSecret": "82a3537ff0dbce7eec35d69edc3a189ee6f17d82f353a553f9aa96cb0be3ce89",
-			},
-		},
-		{
-			description: "Single deployment",
-			input: []Resource{
-				{
-					Name: "deployment-name",
-					Head: ResourceHead{Kind: "Deployment"},
-					Info: infoDeployment,
-				},
-			},
-			expectedConfigMapMap: map[string]string{},
-			expectedSecretMap:    map[string]string{},
-		},
-		{
-			description: "With some resources",
-			input: []Resource{
-				{
-					Name: "deployment-name",
-					Head: ResourceHead{Kind: "Deployment"},
-					Info: infoDeployment,
-				},
-				{
-					Name: "secret-name",
-					Head: ResourceHead{Kind: "Secret"},
-					Info: infoSecret,
-				},
-				{
-					Name: "configmap-name",
-					Head: ResourceHead{Kind: "ConfigMap"},
-					Info: infoConfigMap,
-				},
-				{
-					Name: "bin-secret-name",
-					Head: ResourceHead{Kind: "Secret"},
-					Info: infoBinarySecret,
-				},
-				{
-					Name: "bin-configmap-name",
-					Head: ResourceHead{Kind: "ConfigMap"},
-					Info: infoBinaryConfigMap,
-				},
-			},
-			expectedConfigMapMap: map[string]string{
-				"configmap-name":             "6168737a06d058976783116253e72c93cf9c37735664cc9ab91d1939ad4a5c65",
-				"configmap-name-name":        "9367417d63903350aeb7e092bca792263d4fd82d4912252e014e073a8931b4c1",
-				"configmap-name-time":        "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35",
-				"bin-configmap-name":         "cb7b618f5015758718976fff957ffca0513fd898a809c65ce4db3a8a325d6335",
-				"bin-configmap-name-binName": "82a3537ff0dbce7eec35d69edc3a189ee6f17d82f353a553f9aa96cb0be3ce89",
-			},
-			expectedSecretMap: map[string]string{
-				"secret-name":               "4622a7d32da26554ec12fa8cbf0fabe6a8f7ae67d0a8a99f50c1110137ab6e5e",
-				"secret-name-name":          "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
-				"bin-secret-name":           "243cad3263de13111fb003737ab3caf8fc8162ec671eb34f82949a381af1e693",
-				"bin-secret-name-binSecret": "82a3537ff0dbce7eec35d69edc3a189ee6f17d82f353a553f9aa96cb0be3ce89",
-			},
-		},
-	}
-
-	for _, tt := range testcases {
-		t.Run(tt.description, func(t *testing.T) {
-			cfmMap, secMap, err := MapSecretAndConfigMap(tt.input)
-			require.Nil(t, err)
-			require.Equal(t, tt.expectedConfigMapMap, cfmMap)
-			require.Equal(t, tt.expectedSecretMap, secMap)
-		})
-	}
+	map1, map2, err := MapSecretAndConfigMap(resources)
+	require.Nil(t, err)
+	require.Equal(t, map1, map[string]string{
+		"literal":         "d9f8c57ed416d3d8775c0850f0122f7bc777864c231b0416d86509c0dfdfea9c",
+		"literal-dueKey":  "89b0beacc9f0db0c9d3a535703ceb257a028c45097b572e11383fb04521766a7",
+		"literal-unaKey":  "c2525d273c01748e32af2cedba700f68c45031b12de45a6cdc8f4cb7cf21f72b",
+		"literal2":        "3f1f8218f370ac0726cb97fb82c0b5ec302b84be2fc8ac6db52286c361f4af4b",
+		"literal2-dueKey": "3982db497aefc74d6fb97a2a4b8dd729073c82735a9eafc0bbe5485b2fe653f8",
+		"literal2-unaKey": "da8a5ae64a6172ad008d793f0885cb003d3d5eeaf349bcea39871aa78e3ab982"},
+		"configmap map")
+	require.Equal(t, map2, map[string]string{
+		"opaque":      "7522c25ea135fa86f47443a90b2c154a5c6266b3b83c3104e43d898a9ad11881",
+		"opaque-key1": "232e1000c4504e432a09d6d74d5bba9a27533354c9872fdcd1934b42876c0faa",
+	}, "secret map")
 }
 
 func TestGetPodsDependencies(t *testing.T) {
 
-	secretVolume := apiv1.Volume{
-		VolumeSource: apiv1.VolumeSource{
-			Secret: &apiv1.SecretVolumeSource{
+	secretVolume := corev1.Volume{
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
 				SecretName: "secret",
 			},
 		},
 	}
 
-	secretVolume2 := apiv1.Volume{
-		VolumeSource: apiv1.VolumeSource{
-			Secret: &apiv1.SecretVolumeSource{
+	secretVolume2 := corev1.Volume{
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
 				SecretName: "secret2",
 			},
 		},
 	}
 
-	configMapVolume := apiv1.Volume{
-		VolumeSource: apiv1.VolumeSource{
-			ConfigMap: &apiv1.ConfigMapVolumeSource{
-				LocalObjectReference: apiv1.LocalObjectReference{
+	configMapVolume := corev1.Volume{
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
 					Name: "configMap",
 				},
 			},
 		},
 	}
 
-	configMapVolume2 := apiv1.Volume{
-		VolumeSource: apiv1.VolumeSource{
-			ConfigMap: &apiv1.ConfigMapVolumeSource{
-				LocalObjectReference: apiv1.LocalObjectReference{
+	configMapVolume2 := corev1.Volume{
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
 					Name: "configMap2",
 				},
 			},
 		},
 	}
 
-	containerWithEnv := apiv1.Container{
-		Env: []apiv1.EnvVar{
+	containerWithEnv := corev1.Container{
+		Env: []corev1.EnvVar{
 			{
-				ValueFrom: &apiv1.EnvVarSource{
-					ConfigMapKeyRef: &apiv1.ConfigMapKeySelector{
-						LocalObjectReference: apiv1.LocalObjectReference{
+				ValueFrom: &corev1.EnvVarSource{
+					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
 							Name: "env-config-map",
 						},
 					},
 				},
 			},
 			{
-				ValueFrom: &apiv1.EnvVarSource{
-					SecretKeyRef: &apiv1.SecretKeySelector{
-						LocalObjectReference: apiv1.LocalObjectReference{
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
 							Name: "env-secret",
 						},
 					},
@@ -525,21 +235,21 @@ func TestGetPodsDependencies(t *testing.T) {
 		},
 	}
 
-	containerWithRedundantName := apiv1.Container{
-		Env: []apiv1.EnvVar{
+	containerWithRedundantName := corev1.Container{
+		Env: []corev1.EnvVar{
 			{
-				ValueFrom: &apiv1.EnvVarSource{
-					ConfigMapKeyRef: &apiv1.ConfigMapKeySelector{
-						LocalObjectReference: apiv1.LocalObjectReference{
+				ValueFrom: &corev1.EnvVarSource{
+					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
 							Name: "configMap",
 						},
 					},
 				},
 			},
 			{
-				ValueFrom: &apiv1.EnvVarSource{
-					SecretKeyRef: &apiv1.SecretKeySelector{
-						LocalObjectReference: apiv1.LocalObjectReference{
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
 							Name: "secret",
 						},
 					},
@@ -548,12 +258,12 @@ func TestGetPodsDependencies(t *testing.T) {
 		},
 	}
 
-	containerWithKeys := apiv1.Container{
-		Env: []apiv1.EnvVar{
+	containerWithKeys := corev1.Container{
+		Env: []corev1.EnvVar{
 			{
-				ValueFrom: &apiv1.EnvVarSource{
-					ConfigMapKeyRef: &apiv1.ConfigMapKeySelector{
-						LocalObjectReference: apiv1.LocalObjectReference{
+				ValueFrom: &corev1.EnvVarSource{
+					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
 							Name: "configMapWithKey",
 						},
 						Key: "configMapKey",
@@ -561,9 +271,9 @@ func TestGetPodsDependencies(t *testing.T) {
 				},
 			},
 			{
-				ValueFrom: &apiv1.EnvVarSource{
-					SecretKeyRef: &apiv1.SecretKeySelector{
-						LocalObjectReference: apiv1.LocalObjectReference{
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
 							Name: "secretWithKey",
 						},
 						Key: "secretKey",
@@ -573,12 +283,12 @@ func TestGetPodsDependencies(t *testing.T) {
 		},
 	}
 
-	containerWithKeysButVolumeConflicts := apiv1.Container{
-		Env: []apiv1.EnvVar{
+	containerWithKeysButVolumeConflicts := corev1.Container{
+		Env: []corev1.EnvVar{
 			{
-				ValueFrom: &apiv1.EnvVarSource{
-					ConfigMapKeyRef: &apiv1.ConfigMapKeySelector{
-						LocalObjectReference: apiv1.LocalObjectReference{
+				ValueFrom: &corev1.EnvVarSource{
+					ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
 							Name: "configMap",
 						},
 						Key: "configMapKey",
@@ -586,9 +296,9 @@ func TestGetPodsDependencies(t *testing.T) {
 				},
 			},
 			{
-				ValueFrom: &apiv1.EnvVarSource{
-					SecretKeyRef: &apiv1.SecretKeySelector{
-						LocalObjectReference: apiv1.LocalObjectReference{
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
 							Name: "secret",
 						},
 						Key: "secretKey",
@@ -600,13 +310,13 @@ func TestGetPodsDependencies(t *testing.T) {
 
 	testcases := []struct {
 		description string
-		input       apiv1.PodSpec
+		input       corev1.PodSpec
 		expected    map[string][]string
 	}{
 		{
 			description: "with Volume one secret",
-			input: apiv1.PodSpec{
-				Volumes: []apiv1.Volume{
+			input: corev1.PodSpec{
+				Volumes: []corev1.Volume{
 					secretVolume,
 				},
 			},
@@ -617,8 +327,8 @@ func TestGetPodsDependencies(t *testing.T) {
 		},
 		{
 			description: "with Volume one configmap",
-			input: apiv1.PodSpec{
-				Volumes: []apiv1.Volume{
+			input: corev1.PodSpec{
+				Volumes: []corev1.Volume{
 					configMapVolume,
 				},
 			},
@@ -629,8 +339,8 @@ func TestGetPodsDependencies(t *testing.T) {
 		},
 		{
 			description: "with Volume one configmap and one secret",
-			input: apiv1.PodSpec{
-				Volumes: []apiv1.Volume{
+			input: corev1.PodSpec{
+				Volumes: []corev1.Volume{
 					configMapVolume,
 					secretVolume,
 				},
@@ -642,8 +352,8 @@ func TestGetPodsDependencies(t *testing.T) {
 		},
 		{
 			description: "with Volume two configmaps and two secrets",
-			input: apiv1.PodSpec{
-				Volumes: []apiv1.Volume{
+			input: corev1.PodSpec{
+				Volumes: []corev1.Volume{
 					configMapVolume,
 					configMapVolume2,
 					secretVolume,
@@ -657,8 +367,8 @@ func TestGetPodsDependencies(t *testing.T) {
 		},
 		{
 			description: "with Containers one secret and one configmap",
-			input: apiv1.PodSpec{
-				Containers: []apiv1.Container{
+			input: corev1.PodSpec{
+				Containers: []corev1.Container{
 					containerWithEnv,
 				},
 			},
@@ -669,12 +379,12 @@ func TestGetPodsDependencies(t *testing.T) {
 		},
 		{
 			description: "with Containers and Volumes",
-			input: apiv1.PodSpec{
-				Containers: []apiv1.Container{
+			input: corev1.PodSpec{
+				Containers: []corev1.Container{
 					containerWithEnv,
 					containerWithRedundantName,
 				},
-				Volumes: []apiv1.Volume{
+				Volumes: []corev1.Volume{
 					configMapVolume,
 					configMapVolume2,
 					secretVolume,
@@ -688,8 +398,8 @@ func TestGetPodsDependencies(t *testing.T) {
 		},
 		{
 			description: "with Containers having keys",
-			input: apiv1.PodSpec{
-				Containers: []apiv1.Container{
+			input: corev1.PodSpec{
+				Containers: []corev1.Container{
 					containerWithEnv,
 					containerWithKeys,
 				},
@@ -701,11 +411,11 @@ func TestGetPodsDependencies(t *testing.T) {
 		},
 		{
 			description: "with Containers having keys but volume already mount all",
-			input: apiv1.PodSpec{
-				Containers: []apiv1.Container{
+			input: corev1.PodSpec{
+				Containers: []corev1.Container{
 					containerWithKeysButVolumeConflicts,
 				},
-				Volumes: []apiv1.Volume{
+				Volumes: []corev1.Volume{
 					configMapVolume,
 					secretVolume,
 				},
@@ -730,56 +440,66 @@ func TestGetPodsDependencies(t *testing.T) {
 func TestIsNotUsingSemver(t *testing.T) {
 	testcases := []struct {
 		description string
-		input       []v1.Container
+		input       []interface{}
 		expected    bool
 	}{
 		{
+
 			description: "following semver",
-			input: []v1.Container{
-				GetContainer("test:1.0.0"),
-			},
-			expected: false,
+			input:       []interface{}{map[string]interface{}{"image": "test:1.0.0"}},
+			expected:    false,
 		},
 		{
 			description: "not following semver",
-			input: []v1.Container{
-				GetContainer("test:latest"),
-			},
-			expected: true,
+			input:       []interface{}{map[string]interface{}{"image": "test:latest"}},
+			expected:    true,
 		},
 		{
 			description: "all following semver",
-			input: []v1.Container{
-				GetContainer("test:1.0.0"),
-				GetContainer("test:1.0.0-alpha"),
-				GetContainer("test:1.0.0+20130313144700"),
-				GetContainer("test:1.0.0-beta+exp.sha.5114f85"),
-			},
+			input: []interface{}{map[string]interface{}{"image": "test:1.0.0"},
+				map[string]interface{}{"image": "test:1.0.0-alpha"},
+				map[string]interface{}{"image": "test:1.0.0+20130313144700"},
+				map[string]interface{}{"image": "test:1.0.0-beta+exp.sha.5114f85"}},
 			expected: false,
 		},
 		{
 			description: "one not following semver",
-			input: []v1.Container{
-				GetContainer("test:1.0.0"),
-				GetContainer("test:1.0.0-alpha"),
-				GetContainer("test:1.0.0+20130313144700"),
-				GetContainer("test:tag1"),
+			input: []interface{}{map[string]interface{}{"image": "test:1.0.0"},
+				map[string]interface{}{"image": "test:1.0.0-alpha"},
+				map[string]interface{}{"image": "test:1.0.0+20130313144700"},
+				map[string]interface{}{"image": "test:tag1"},
 			},
 			expected: true,
 		},
 	}
 
 	for _, tt := range testcases {
-		t.Run(tt.description, func(t *testing.T) {
-			targetObject, err := NewResource("../deploy/testdata/test-deployment.yaml")
-			utils.CheckError(err)
-
-			podSpec := GetPodSpec(nil, &tt.input)
-
-			targetObject.Info = GetDeploymentResource(targetObject, nil, &podSpec)
-			boolRes, err := IsNotUsingSemver(targetObject)
-			require.Nil(t, err)
-			require.Equal(t, tt.expected, boolRes)
-		})
+		types := []struct {
+			typ            string
+			path           string
+			containersPath []string
+		}{
+			{
+				typ:            "deployments",
+				path:           "../deploy/testdata/test-deployment.yaml",
+				containersPath: []string{"spec", "template", "spec", "containers"},
+			},
+			{
+				typ:            "cronjobs",
+				path:           "../deploy/testdata/cronjob-test.cronjob.yml",
+				containersPath: []string{"spec", "jobTemplate", "spec", "template", "spec", "containers"},
+			},
+		}
+		for _, typ := range types {
+			t.Run(fmt.Sprintf("%s - %s", typ.typ, tt.description), func(t *testing.T) {
+				targetObject, err := NewResources(typ.path, "default")
+				require.Nil(t, err)
+				err = unstructured.SetNestedField(targetObject[0].Object.Object, tt.input, typ.containersPath...)
+				require.Nil(t, err)
+				boolRes, err := IsNotUsingSemver(&targetObject[0])
+				require.Nil(t, err)
+				require.Equal(t, tt.expected, boolRes)
+			})
+		}
 	}
 }

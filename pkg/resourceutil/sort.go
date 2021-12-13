@@ -62,8 +62,8 @@ func SortResourcesByKind(resources []Resource, ordering resourceOrder) []Resourc
 
 	orderingMap := convertOrderingInMap(ordering)
 	sort.SliceStable(resources, func(i, j int) bool {
-		kindOfA := resources[i].Head.Kind
-		kindOfB := resources[j].Head.Kind
+		kindOfA := resources[i].GroupVersionKind.Kind
+		kindOfB := resources[j].GroupVersionKind.Kind
 
 		aValue, foundA := orderingMap[kindOfA]
 		bValue, foundB := orderingMap[kindOfB]

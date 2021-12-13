@@ -1,425 +1,213 @@
+// Copyright 2020 Mia srl
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package deploy
 
 import (
+	"context"
+
 	"testing"
 	"time"
 
-	"git.tools.mia-platform.eu/platform/devops/deploy/internal/utils"
 	"git.tools.mia-platform.eu/platform/devops/deploy/pkg/resourceutil"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
-	batchapiv1 "k8s.io/api/batch/v1"
-	batchapiv1beta1 "k8s.io/api/batch/v1beta1"
-	apiv1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
+	batchv1 "k8s.io/api/batch/v1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/cli-runtime/pkg/resource"
+	fakediscovery "k8s.io/client-go/discovery/fake"
+	dynamicFake "k8s.io/client-go/dynamic/fake"
+	fakeclientset "k8s.io/client-go/kubernetes/fake"
 )
-
-func TestApply(t *testing.T) {
-
-	deployConfig := utils.DeployConfig{
-		DeployType:              deployAll,
-		ForceDeployWhenNoSemver: true,
-	}
-
-	t.Run("Create and patch deployment", func(t *testing.T) {
-		deployment, err := resourceutil.NewResource("testdata/test-deployment.yaml")
-		utils.CheckError(err)
-		deployment.Info = resourceutil.GetDeploymentResource(deployment, nil, nil)
-
-		builder := resourceutil.NewFakeBuilder()
-		require.Nil(t, err)
-
-		err = apply(builder, *deployment, deployConfig)
-		require.Nil(t, err)
-		require.True(t, builder.Helper.CreateCalled)
-		require.False(t, builder.Helper.ReplaceCalled)
-		require.False(t, builder.Helper.PatchCalled)
-
-		err = apply(builder, *deployment, deployConfig)
-		require.Nil(t, err)
-		require.False(t, builder.Helper.CreateCalled)
-		require.False(t, builder.Helper.ReplaceCalled)
-		require.True(t, builder.Helper.PatchCalled)
-	})
-
-	t.Run("Create and replace secret", func(t *testing.T) {
-		secret, err := resourceutil.NewResource("testdata/opaque.secret.yaml")
-		utils.CheckError(err)
-
-		secretType := apiv1.SecretTypeOpaque
-		secret.Info = resourceutil.GetSecretResource(secret, &secretType)
-
-		builder := resourceutil.NewFakeBuilder()
-		require.Nil(t, err)
-
-		err = apply(builder, *secret, deployConfig)
-		require.Nil(t, err)
-		require.True(t, builder.Helper.CreateCalled)
-		require.False(t, builder.Helper.ReplaceCalled)
-		require.False(t, builder.Helper.PatchCalled)
-		err = apply(builder, *secret, deployConfig)
-		require.Nil(t, err)
-		require.False(t, builder.Helper.CreateCalled)
-		require.True(t, builder.Helper.ReplaceCalled)
-		require.False(t, builder.Helper.PatchCalled)
-	})
-
-	t.Run("Create a secret and not replace it", func(t *testing.T) {
-
-		secret, err := resourceutil.NewResource("testdata/tls.secret.yaml")
-		utils.CheckError(err)
-
-		secretType := apiv1.SecretTypeTLS
-		secret.Info = resourceutil.GetSecretResource(secret, &secretType)
-
-		builder := resourceutil.NewFakeBuilder()
-		require.Nil(t, err)
-
-		err = apply(builder, *secret, deployConfig)
-		require.Nil(t, err)
-		require.True(t, builder.Helper.CreateCalled)
-		require.False(t, builder.Helper.ReplaceCalled)
-		require.False(t, builder.Helper.PatchCalled)
-		err = apply(builder, *secret, deployConfig)
-		require.Nil(t, err)
-		require.False(t, builder.Helper.CreateCalled)
-		require.False(t, builder.Helper.ReplaceCalled)
-		require.False(t, builder.Helper.PatchCalled)
-	})
-}
-
-func TestSemVerIntegration(t *testing.T) {
-	newDeployConfig := utils.DeployConfig{
-		DeployType:              smartDeploy,
-		ForceDeployWhenNoSemver: true,
-	}
-
-	t.Run("SmartDeploy not following semver", func(t *testing.T) {
-		deployment, err := resourceutil.NewResource("testdata/test-deployment.yaml")
-		utils.CheckError(err)
-		podSpec := resourceutil.GetPodSpec(nil, &[]v1.Container{
-			resourceutil.GetContainer("test:latest"),
-		})
-		deployment.Info = resourceutil.GetDeploymentResource(deployment, nil, &podSpec)
-		builder := resourceutil.NewFakeBuilder()
-		require.Nil(t, err)
-
-		err = apply(builder, *deployment, newDeployConfig)
-		require.Nil(t, err)
-		require.True(t, builder.Helper.CreateCalled)
-		require.False(t, builder.Helper.ReplaceCalled)
-		require.False(t, builder.Helper.PatchCalled)
-
-		err = apply(builder, *deployment, newDeployConfig)
-		require.Nil(t, err)
-		require.False(t, builder.Helper.CreateCalled)
-		require.False(t, builder.Helper.ReplaceCalled)
-		require.True(t, builder.Helper.PatchCalled)
-
-		newDeployment, _ := deployment.Info.Object.(*appsv1.Deployment)
-		annotations := newDeployment.Spec.Template.ObjectMeta.Annotations
-		require.Equal(t, "", annotations["not-exist-annotation"])
-		require.NotEqual(t, "", annotations[resourceutil.GetMiaAnnotation(deployChecksum)])
-	})
-
-	t.Run("SmartDeploy following semver without original", func(t *testing.T) {
-		deployment, err := resourceutil.NewResource("testdata/test-deployment.yaml")
-		utils.CheckError(err)
-		podSpec := resourceutil.GetPodSpec(nil, &[]v1.Container{
-			resourceutil.GetContainer("test:1.0.0"),
-		})
-		deployment.Info = resourceutil.GetDeploymentResource(deployment, nil, &podSpec)
-		builder := resourceutil.NewFakeBuilder()
-		require.Nil(t, err)
-
-		err = apply(builder, *deployment, newDeployConfig)
-		require.Nil(t, err)
-		require.True(t, builder.Helper.CreateCalled)
-		require.False(t, builder.Helper.ReplaceCalled)
-		require.False(t, builder.Helper.PatchCalled)
-
-		err = apply(builder, *deployment, newDeployConfig)
-		require.Nil(t, err)
-		require.False(t, builder.Helper.CreateCalled)
-		require.False(t, builder.Helper.ReplaceCalled)
-		require.True(t, builder.Helper.PatchCalled)
-
-		newDeployment, _ := deployment.Info.Object.(*appsv1.Deployment)
-		annotations := newDeployment.Spec.Template.ObjectMeta.Annotations
-		require.Equal(t, "", annotations["not-exist-annotation"])
-		require.Equal(t, "", annotations[resourceutil.GetMiaAnnotation(deployChecksum)])
-	})
-}
-
-func TestAutoCreateIntegration(t *testing.T) {
-	deployConfig := utils.DeployConfig{
-		DeployType:              smartDeploy,
-		ForceDeployWhenNoSemver: true,
-	}
-
-	t.Run("Smart Deploy - Deployment ", func(t *testing.T) {
-		deployment, err := resourceutil.NewResource("testdata/test-deployment.yaml")
-		utils.CheckError(err)
-
-		builder := resourceutil.NewFakeBuilder()
-
-		annotations := map[string]string{"test1": "test1"}
-		deployment.Info = resourceutil.GetDeploymentResource(deployment, annotations, nil)
-
-		err = builder.AddResources([]runtime.Object{deployment.Info.Object}, true)
-		require.Nil(t, err)
-		err = apply(builder, *deployment, deployConfig)
-
-		require.Nil(t, err)
-		require.False(t, builder.Helper.CreateCalled)
-	})
-
-	t.Run("Smart Deploy - CronJobs with updates", func(t *testing.T) {
-		cronJob, err := resourceutil.NewResource("testdata/cronjob-test.cronjob.yml")
-		utils.CheckError(err)
-		annotations := map[string]string{
-			"kubectl.kubernetes.io/last-applied-configuration": "{\"kind\":\"CronJob\",\"apiVersion\":\"batch/v1beta1\",\"metadata\":{\"name\":\"hello\",\"creationTimestamp\":null, \"annotations\": {\"injectedAnn\":\"checksum\"}},\"spec\":{\"schedule\":\"\",\"jobTemplate\":{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"template\":{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":null}}}}},\"status\":{}}\n",
-		}
-		cronJob.Info = &resource.Info{
-			Object: &batchapiv1beta1.CronJob{
-				TypeMeta: metav1.TypeMeta{APIVersion: "batch/v1beta1", Kind: "CronJob"},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        cronJob.Name,
-					Namespace:   cronJob.Namespace,
-					Annotations: annotations,
-				},
-			},
-			Namespace: cronJob.Namespace,
-			Name:      cronJob.Name,
-			Mapping:   &meta.RESTMapping{GroupVersionKind: schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}},
-		}
-
-		builder := resourceutil.NewFakeBuilder()
-		cronJobToTest := &batchapiv1beta1.CronJob{
-			TypeMeta: metav1.TypeMeta{APIVersion: "batch/v1beta1", Kind: "CronJob"},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "fill first element of array",
-				Namespace: cronJob.Namespace,
-			},
-		}
-
-		err = builder.AddResources([]runtime.Object{cronJobToTest}, false)
-		require.Nil(t, err)
-
-		err = builder.AddResources([]runtime.Object{cronJob.Info.Object}, true)
-		require.Nil(t, err)
-
-		err = apply(builder, *cronJob, deployConfig)
-
-		require.Nil(t, err)
-		require.True(t, builder.Helper.CreateCalled)
-	})
-
-	t.Run("Smart Deploy - CronJobs without updates", func(t *testing.T) {
-		cronJob, err := resourceutil.NewResource("testdata/cronjob-test.cronjob.yml")
-		utils.CheckError(err)
-		annotations := map[string]string{
-			"kubectl.kubernetes.io/last-applied-configuration": "{\"kind\":\"CronJob\",\"apiVersion\":\"batch/v1beta1\",\"metadata\":{\"name\":\"hello\",\"creationTimestamp\":null},\"spec\":{\"schedule\":\"\",\"jobTemplate\":{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"template\":{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":null}}}}},\"status\":{}}\n",
-		}
-		cronJob.Info = &resource.Info{
-			Object: &batchapiv1beta1.CronJob{
-				TypeMeta: metav1.TypeMeta{APIVersion: "batch/v1beta1", Kind: "CronJob"},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        cronJob.Name,
-					Namespace:   cronJob.Namespace,
-					Annotations: annotations,
-				},
-			},
-			Namespace: cronJob.Namespace,
-			Name:      cronJob.Name,
-			Mapping:   &meta.RESTMapping{GroupVersionKind: schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}},
-		}
-
-		builder := resourceutil.NewFakeBuilder()
-		cronJobToTest := &batchapiv1beta1.CronJob{
-			TypeMeta: metav1.TypeMeta{APIVersion: "batch/v1beta1", Kind: "CronJob"},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "fill first element of array",
-				Namespace: cronJob.Namespace,
-			},
-		}
-
-		err = builder.AddResources([]runtime.Object{cronJobToTest}, false)
-		require.Nil(t, err)
-
-		err = builder.AddResources([]runtime.Object{cronJob.Info.Object}, true)
-		require.Nil(t, err)
-
-		err = apply(builder, *cronJob, deployConfig)
-
-		require.Nil(t, err)
-		require.False(t, builder.Helper.CreateCalled)
-	})
-
-	t.Run("Deploy All - Always create new job", func(t *testing.T) {
-		cronJob, err := resourceutil.NewResource("testdata/cronjob-test.cronjob.yml")
-		cronJob.Name = "existing job"
-		utils.CheckError(err)
-		annotations := map[string]string{}
-		cronJob.Info = resourceutil.GetCronJobResource(cronJob, annotations, nil)
-
-		builder := resourceutil.NewFakeBuilder()
-		job := &batchapiv1.Job{
-			TypeMeta: metav1.TypeMeta{APIVersion: batchapiv1.SchemeGroupVersion.String(), Kind: "Job"},
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "new job",
-				Annotations: map[string]string{
-					"cronjob.kubernetes.io/instantiate": "manual",
-				},
-			},
-		}
-
-		job2 := &batchapiv1.Job{
-			TypeMeta: metav1.TypeMeta{APIVersion: batchapiv1.SchemeGroupVersion.String(), Kind: "Job"},
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "existing job",
-				Annotations: map[string]string{
-					"cronjob.kubernetes.io/instantiate": "manual",
-				},
-			},
-		}
-		err = builder.AddResources([]runtime.Object{job}, false)
-		require.Nil(t, err)
-
-		err = builder.AddResources([]runtime.Object{job2}, true)
-		require.Nil(t, err)
-
-		newDeployConfig := utils.DeployConfig{
-			DeployType:              deployAll,
-			ForceDeployWhenNoSemver: true,
-		}
-		err = apply(builder, *cronJob, newDeployConfig)
-		require.Nil(t, err)
-		require.True(t, builder.Helper.CreateCalled)
-	})
-}
 
 func TestEnsureNamespaceExistance(t *testing.T) {
 	t.Run("Ensure Namespace existance", func(t *testing.T) {
 		namespaceName := "foo"
-		namespace := &apiv1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{Name: namespaceName},
-			TypeMeta:   metav1.TypeMeta{Kind: "Namespace", APIVersion: "v1"},
-		}
-		builder := resourceutil.NewFakeBuilder()
+		scheme := runtime.NewScheme()
+		_ = corev1.AddToScheme(scheme)
+		dynamicClient := dynamicFake.NewSimpleDynamicClient(scheme)
+		clients := k8sClients{dynamic: dynamicClient}
 
-		// This will be returned in FromStream()
-		err := builder.AddResources([]runtime.Object{namespace}, false)
+		err := ensureNamespaceExistence(&clients, namespaceName)
+		require.Nil(t, err, "No errors when namespace does not exists")
+
+		_, err = dynamicClient.Resource(gvrNamespaces).
+			Get(context.Background(), namespaceName, metav1.GetOptions{})
 		require.Nil(t, err)
 
-		err = ensureNamespaceExistence(builder, namespaceName)
-		require.Nil(t, err, "No errors when namespace is created")
-		require.True(t, builder.Helper.CreateCalled)
-		require.Len(t, builder.Helper.ClusterObjs, 1)
-		require.Equal(t, namespace, builder.Helper.ClusterObjs[0].GetObject())
-
-		err = ensureNamespaceExistence(builder, namespaceName)
+		err = ensureNamespaceExistence(&clients, namespaceName)
 		require.Nil(t, err, "No errors when namespace already exists")
-		require.True(t, builder.Helper.CreateCalled)
-		require.Len(t, builder.Helper.ClusterObjs, 1)
-		require.Equal(t, namespace, builder.Helper.ClusterObjs[0].GetObject())
+		_, err = dynamicClient.Resource(gvrNamespaces).
+			Get(context.Background(), namespaceName, metav1.GetOptions{})
+		require.Nil(t, err)
 	})
 }
 
-func TestCreateJobFromCronJob(t *testing.T) {
-	cron, err := resourceutil.NewResource("testdata/cronjob-test.cronjob.yml")
-	utils.CheckError(err)
-	cron.Info = resourceutil.GetCronJobResource(cron, nil, nil)
+func TestCheckIfCreateJob(t *testing.T) {
+	cronjob, err := resourceutil.NewResources("testdata/cronjob-test.cronjob.yml", "default")
+	require.Nil(t, err)
+	scheme := runtime.NewScheme()
+	_ = corev1.AddToScheme(scheme)
+	_ = batchv1.AddToScheme(scheme)
 
-	expected := &batchapiv1.Job{
-		TypeMeta: metav1.TypeMeta{APIVersion: batchapiv1.SchemeGroupVersion.String(), Kind: "Job"},
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: cron.Name + "-",
-			Annotations: map[string]string{
-				"cronjob.kubernetes.io/instantiate": "manual",
+	t.Run("without last-applied", func(t *testing.T) {
+		dynamicClient := dynamicFake.NewSimpleDynamicClient(scheme)
+		err := checkIfCreateJob(dynamicClient, &cronjob[0].Object, cronjob[0])
+		require.Nil(t, err)
+	})
+	t.Run("same last-applied", func(t *testing.T) {
+		cronjob[0].Object.SetAnnotations(map[string]string{
+			"kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"batch/v1beta1\",\"kind\":\"CronJob\",\"metadata\":{\"annotations\":{\"mia-platform.eu/autocreate\":\"true\"},\"name\":\"hello\",\"namespace\":\"default\"},\"spec\":{\"jobTemplate\":{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"args\":[\"/bin/sh\",\"-c\",\"date; sleep 120\"],\"image\":\"busybox\",\"name\":\"hello\"}],\"restartPolicy\":\"OnFailure\"}}}},\"schedule\":\"*/5 * * * *\"}}\n",
+			"mia-platform.eu/autocreate":                       "true",
+		})
+		dynamicClient := dynamicFake.NewSimpleDynamicClient(scheme)
+		err = checkIfCreateJob(dynamicClient, &cronjob[0].Object, cronjob[0])
+		require.Nil(t, err)
+	})
+	t.Run("different last-applied", func(t *testing.T) {
+		obj := cronjob[0].Object.DeepCopy()
+		obj.SetAnnotations(map[string]string{
+			"kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"batch/v1beta1\",\"kind\":\"CronJob\",\"metadata\":{\"annotations\":{\"mia-platform.eu/autocreate\":\"true\"},\"name\":\"hello\",\"namespace\":\"default\"},\"spec\":{\"jobTemplate\":{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"args\":[\"/bin/sh\",\"-c\",\"date; sleep 2\"],\"image\":\"busybox\",\"name\":\"hello\"}],\"restartPolicy\":\"OnFailure\"}}}},\"schedule\":\"*/5 * * * *\"}}\n",
+		})
+		dynamicClient := dynamicFake.NewSimpleDynamicClient(scheme)
+		err = checkIfCreateJob(dynamicClient, obj, cronjob[0])
+		require.Nil(t, err)
+		list, err := dynamicClient.Resource(gvrJobs).
+			Namespace("default").List(context.Background(), metav1.ListOptions{})
+		require.Nil(t, err)
+		require.Equal(t, 1, len(list.Items))
+	})
+
+}
+
+func TestCronJobAutoCreate(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = corev1.AddToScheme(scheme)
+	_ = batchv1.AddToScheme(scheme)
+
+	testcases := []struct {
+		description string
+		setup       func(obj *unstructured.Unstructured)
+		expected    int
+	}{
+		{
+			description: "autocreate true",
+			expected:    1,
+			setup: func(obj *unstructured.Unstructured) {
+				obj.SetAnnotations(map[string]string{
+					"mia-platform.eu/autocreate": "true",
+				})
+			},
+		},
+		{
+			description: "autocreate false",
+			expected:    0,
+			setup: func(obj *unstructured.Unstructured) {
+				obj.SetAnnotations(map[string]string{
+					"mia-platform.eu/autocreate": "false",
+				})
+			},
+		},
+		{
+			description: "no annotation",
+			expected:    0,
+			setup: func(obj *unstructured.Unstructured) {
+				obj.SetAnnotations(map[string]string{})
 			},
 		},
 	}
 
-	builder := resourceutil.NewFakeBuilder()
+	for _, tt := range testcases {
+		t.Run(tt.description, func(t *testing.T) {
+			cronjob, err := resourceutil.NewResources("testdata/cronjob-test.cronjob.yml", "default")
+			require.Nil(t, err)
+			tt.setup(&cronjob[0].Object)
+			dynamicClient := dynamicFake.NewSimpleDynamicClient(scheme)
+			err = cronJobAutoCreate(dynamicClient, &cronjob[0].Object)
+			require.Nil(t, err)
+			list, err := dynamicClient.Resource(gvrJobs).
+				Namespace("default").List(context.Background(), metav1.ListOptions{})
+			require.Nil(t, err)
+			require.Equal(t, tt.expected, len(list.Items))
+		})
+	}
+}
 
-	// This will be returned in FromStream()
-	err = builder.AddResources([]runtime.Object{expected}, false)
+func TestCreateJobFromCronJob(t *testing.T) {
+	cron, err := resourceutil.NewResources("testdata/cronjob-test.cronjob.yml", "default")
 	require.Nil(t, err)
+	expected := map[string]interface{}{"apiVersion": "batch/v1", "kind": "Job", "metadata": map[string]interface{}{"annotations": map[string]interface{}{"cronjob.kubernetes.io/instantiate": "manual"}, "creationTimestamp": interface{}(nil), "generateName": "hello-", "namespace": "default"}, "spec": map[string]interface{}{"template": map[string]interface{}{"metadata": map[string]interface{}{"creationTimestamp": interface{}(nil)}, "spec": map[string]interface{}{"containers": []interface{}{map[string]interface{}{"args": []interface{}{"/bin/sh", "-c", "date; sleep 120"}, "image": "busybox", "name": "hello", "resources": map[string]interface{}{}}}, "restartPolicy": "OnFailure"}}}, "status": map[string]interface{}{}}
 
-	job, err := createJobFromCronjob(builder, *cron)
+	scheme := runtime.NewScheme()
+	_ = corev1.AddToScheme(scheme)
+	_ = batchv1.AddToScheme(scheme)
+
+	dynamicClient := dynamicFake.NewSimpleDynamicClient(scheme)
+
+	jobName, err := createJobFromCronjob(dynamicClient, &cron[0].Object)
 	require.Nil(t, err)
-	require.True(t, builder.Helper.CreateCalled)
-	require.Equal(t, expected.TypeMeta, job.TypeMeta)
-	require.Equal(t, expected.ObjectMeta.Annotations, job.ObjectMeta.Annotations)
-	require.Contains(t, job.ObjectMeta.GenerateName, cron.Name)
+	actual, err := dynamicClient.Resource(gvrJobs).
+		Namespace("default").
+		Get(context.Background(), jobName, metav1.GetOptions{})
+	require.Nil(t, err)
+	require.Equal(t, expected, actual.Object)
 }
 
 func TestCreatePatch(t *testing.T) {
 	t.Run("Pass the same object should produce empty patch", func(t *testing.T) {
-		deployment, err := resourceutil.NewResource("testdata/test-deployment.yaml")
-		utils.CheckError(err)
-		deployment.Info = &resource.Info{
-			Object: &appsv1.Deployment{
-				TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      deployment.Name,
-					Namespace: deployment.Namespace,
-					Annotations: map[string]string{
-						"kubectl.kubernetes.io/last-applied-configuration": "{\"kind\":\"Deployment\",\"apiVersion\":\"apps/v1\",\"metadata\":{\"name\":\"test-deployment\",\"creationTimestamp\":null},\"spec\":{\"selector\":null,\"template\":{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":null}},\"strategy\":{}},\"status\":{}}\n",
-					},
-				},
-			},
-			Namespace: deployment.Namespace,
-			Name:      deployment.Name,
-			Mapping:   &meta.RESTMapping{GroupVersionKind: schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}},
-		}
+		deployment, err := resourceutil.NewResources("testdata/test-deployment.yaml", "default")
+		require.Nil(t, err)
 
-		patch, patchType, err := createPatch(deployment.Info.Object, *deployment)
-		require.Equal(t, []byte(`{}`), patch, "patch should be empty")
+		deployment[0].Object.SetAnnotations(map[string]string{
+			"kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"apps/v1\",\"kind\":\"Deployment\",\"metadata\":{\"annotations\":{},\"creationTimestamp\":null,\"labels\":{\"app\":\"test-deployment\"},\"name\":\"test-deployment\",\"namespace\":\"default\"},\"spec\":{\"replicas\":1,\"selector\":{\"matchLabels\":{\"app\":\"test-deployment\"}},\"strategy\":{},\"template\":{\"metadata\":{\"creationTimestamp\":null,\"labels\":{\"app\":\"test-deployment\"}},\"spec\":{\"containers\":[{\"image\":\"nginx\",\"name\":\"nginx\",\"resources\":{}}]}}},\"status\":{}}\n"},
+		)
+
+		patch, patchType, err := createPatch(deployment[0].Object, deployment[0])
+		require.Equal(t, "{}", string(patch), "patch should be empty")
 		require.Equal(t, patchType, types.StrategicMergePatchType)
 		require.Nil(t, err)
 	})
 
-	t.Run("change resource name", func(t *testing.T) {
-		deployment, err := resourceutil.NewResource("testdata/test-deployment.yaml")
-		utils.CheckError(err)
-		deploymentObject := &appsv1.Deployment{
-			TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      deployment.Name,
-				Namespace: deployment.Namespace,
-				Annotations: map[string]string{
-					"kubectl.kubernetes.io/last-applied-configuration": "{\"kind\":\"Deployment\",\"apiVersion\":\"apps/v1\",\"metadata\":{\"name\":\"test-deployment\",\"creationTimestamp\":null},\"spec\":{\"selector\":null,\"template\":{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":null}},\"strategy\":{}},\"status\":{}}\n",
-				},
-			},
-		}
-		deployment.Info = &resource.Info{
-			Object:    deploymentObject,
-			Namespace: deployment.Namespace,
-			Name:      deployment.Name,
-			Mapping:   &meta.RESTMapping{GroupVersionKind: schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}},
-		}
+	t.Run("change replicas", func(t *testing.T) {
+		deployment, err := resourceutil.NewResources("testdata/test-deployment.yaml", "default")
+		require.Nil(t, err)
 
-		var oldDeploy appsv1.Deployment
-		deploymentObject.DeepCopyInto(&oldDeploy)
-		oldDeploy.ObjectMeta.Name = "foo"
-		patch, patchType, err := createPatch(&oldDeploy, *deployment)
-		require.Equal(t, []byte(`{"metadata":{"name":"test-deployment"}}`), patch, "patch should contain the new resource name")
+		deployment[0].Object.SetAnnotations(map[string]string{
+			"kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"apps/v1\",\"kind\":\"Deployment\",\"metadata\":{\"annotations\":{},\"creationTimestamp\":null,\"labels\":{\"app\":\"test-deployment\"},\"name\":\"test-deployment\",\"namespace\":\"default\"},\"spec\":{\"replicas\":1,\"selector\":{\"matchLabels\":{\"app\":\"test-deployment\"}},\"strategy\":{},\"template\":{\"metadata\":{\"creationTimestamp\":null,\"labels\":{\"app\":\"test-deployment\"}},\"spec\":{\"containers\":[{\"image\":\"nginx\",\"name\":\"nginx\",\"resources\":{}}]}}},\"status\":{}}\n"},
+		)
+
+		oldDeploy := deployment[0].Object.DeepCopy()
+		err = unstructured.SetNestedField(oldDeploy.Object, "2",
+			"spec", "replicas")
+		require.Nil(t, err)
+		t.Logf("oldobj: %s\n", oldDeploy.Object)
+		patch, patchType, err := createPatch(*oldDeploy, deployment[0])
+		require.Equal(t, "{\"spec\":{\"replicas\":1}}", string(patch), "patch should contain the new resource name")
 		require.Equal(t, patchType, types.StrategicMergePatchType)
 		require.Nil(t, err)
 	})
 }
 
 func TestUpdateResourceSecret(t *testing.T) {
-	secret := &apiv1.Secret{
-		Data: map[string][]byte{"resources": []byte(`{"CronJob":{"kind":"CronJob","Mapping":{"Group":"batch","Version":"v1beta1","Resource":"cronjobs"},"resources":["bar"]}}`)},
+	expected := corev1.Secret{
+		Data: map[string][]byte{"resources": []byte(`{"CronJob":{"kind":{"Group":"batch","Version":"v1beta1","Kind":"CronJob"},"resources":["bar"]}}`)},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      resourceSecretName,
 			Namespace: "foo",
@@ -428,58 +216,84 @@ func TestUpdateResourceSecret(t *testing.T) {
 	}
 
 	resources := map[string]*ResourceList{
-		"CronJob": &ResourceList{
-			Kind: "CronJob",
-			Mapping: schema.GroupVersionResource{
-				Group:    "batch",
-				Version:  "v1beta1",
-				Resource: "cronjobs",
-			},
+		"CronJob": {
+			Gvk:       &schema.GroupVersionKind{Group: "batch", Version: "v1beta1", Kind: "CronJob"},
 			Resources: []string{"bar"},
 		},
 	}
+	scheme := runtime.NewScheme()
+	_ = corev1.AddToScheme(scheme)
 
 	t.Run("Create resource-deployed secret for the first time", func(t *testing.T) {
-		builder := resourceutil.NewFakeBuilder()
-		err := builder.AddResources([]runtime.Object{secret}, false)
+		dynamicClient := dynamicFake.NewSimpleDynamicClient(scheme)
+		err := updateResourceSecret(dynamicClient, "foo", resources)
 		require.Nil(t, err)
-
-		newSecret, err := updateResourceSecret(builder, "foo", resources)
+		var actual corev1.Secret
+		expUnstr, err := dynamicClient.Resource(gvrSecrets).
+			Namespace("foo").
+			Get(context.Background(), resourceSecretName, metav1.GetOptions{})
 		require.Nil(t, err)
-		require.True(t, builder.Helper.CreateCalled)
-		require.False(t, builder.Helper.ReplaceCalled)
-		require.False(t, builder.Helper.PatchCalled)
-		require.Equal(t, secret, newSecret)
+		runtime.DefaultUnstructuredConverter.FromUnstructured(expUnstr.Object, &actual)
+		require.Equal(t, string(expected.Data["resources"]), string(actual.Data["resources"]))
 	})
-	t.Run("Create resource-deployed secret for the first time", func(t *testing.T) {
-		builder := resourceutil.NewFakeBuilder()
-		err := builder.AddResources([]runtime.Object{secret}, true)
-		require.Nil(t, err)
+	t.Run("Update resource-deployed", func(t *testing.T) {
+		existingSecret := &corev1.Secret{
+			Data: map[string][]byte{"resources": []byte(`{"CronJob":{"kind":{"Group":"batch","Version":"v1beta1","Kind":"CronJob"},"resources":["foo", "sss"]}}`)},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      resourceSecretName,
+				Namespace: "foo",
+			},
+			TypeMeta: metav1.TypeMeta{Kind: "Secret", APIVersion: "v1"},
+		}
+		dynamicClient := dynamicFake.NewSimpleDynamicClient(scheme, existingSecret)
 
-		newSecret, err := updateResourceSecret(builder, "foo", resources)
+		err := updateResourceSecret(dynamicClient, "foo", resources)
 		require.Nil(t, err)
-		require.True(t, builder.Helper.CreateCalled)
-		require.True(t, builder.Helper.ReplaceCalled)
-		require.False(t, builder.Helper.PatchCalled)
-		require.Equal(t, secret, newSecret)
+		var actual corev1.Secret
+		expUnstr, err := dynamicClient.Resource(gvrSecrets).
+			Namespace("foo").
+			Get(context.Background(), resourceSecretName, metav1.GetOptions{})
+		require.Nil(t, err)
+		runtime.DefaultUnstructuredConverter.FromUnstructured(expUnstr.Object, &actual)
+		require.Equal(t, string(expected.Data["resources"]), string(actual.Data["resources"]))
 	})
 }
 
 func TestPrune(t *testing.T) {
 	deleteList := &ResourceList{
-		Kind: "Secret",
-		Mapping: schema.GroupVersionResource{
-			Group:    "",
-			Version:  "v1",
-			Resource: "secrets",
+		Gvk:       &schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Secret"},
+		Resources: []string{"foo"},
+	}
+	scheme := runtime.NewScheme()
+	_ = corev1.AddToScheme(scheme)
+	client := fakeclientset.NewSimpleClientset()
+	fakeDiscovery, ok := client.Discovery().(*fakediscovery.FakeDiscovery)
+	if !ok {
+		t.Fatalf("couldn't convert Discovery() to *FakeDiscovery")
+	}
+	fakeDiscovery.Fake.Resources = []*metav1.APIResourceList{
+		{
+			GroupVersion: "v1",
+			APIResources: []metav1.APIResource{
+				{
+					Kind: "Secret",
+					Name: "secrets",
+				},
+			},
 		},
-		Resources: []string{
-			"foo",
+		{
+			GroupVersion: "batch/v1beta1",
+			APIResources: []metav1.APIResource{
+				{
+					Kind: "CronJob",
+					Name: "cronjobs",
+				},
+			},
 		},
 	}
 
 	t.Run("Prune resource containing label", func(t *testing.T) {
-		toPrune := &apiv1.Secret{
+		toPrune := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "foo",
 				Namespace: "bar",
@@ -489,57 +303,58 @@ func TestPrune(t *testing.T) {
 			},
 			TypeMeta: metav1.TypeMeta{Kind: "Secret", APIVersion: "v1"},
 		}
+		dynamicClient := dynamicFake.NewSimpleDynamicClient(scheme, toPrune)
 
-		builder := resourceutil.NewFakeBuilder()
-		err := builder.AddResources([]runtime.Object{toPrune}, true)
+		clients := k8sClients{
+			dynamic:   dynamicClient,
+			discovery: fakeDiscovery,
+		}
+		obj, err := dynamicClient.Resource(gvrSecrets).Namespace("bar").
+			Get(context.Background(), "foo", metav1.GetOptions{})
+		t.Logf("err: %s", obj)
 		require.Nil(t, err)
 
-		err = prune(builder, "bar", deleteList)
+		err = prune(&clients, "bar", deleteList)
 		require.Nil(t, err)
-		require.True(t, builder.Helper.DeleteCalled, "the resource should be deleted")
-		require.Equal(t, 0, len(builder.Helper.ClusterObjs), "the cluster should be empty")
 
+		_, err = dynamicClient.Resource(gvrSecrets).Namespace("bar").
+			Get(context.Background(), "foo", metav1.GetOptions{})
+		require.Equal(t, true, apierrors.IsNotFound(err))
 	})
 
 	t.Run("Don't prune resource without label", func(t *testing.T) {
-		toPrune := &apiv1.Secret{
+		toPrune := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "foo",
 				Namespace: "bar",
 			},
 			TypeMeta: metav1.TypeMeta{Kind: "Secret", APIVersion: "v1"},
 		}
+		dynamicClient := dynamicFake.NewSimpleDynamicClient(scheme, toPrune)
 
-		builder := resourceutil.NewFakeBuilder()
-		err := builder.AddResources([]runtime.Object{toPrune}, true)
+		clients := k8sClients{
+			dynamic:   dynamicClient,
+			discovery: fakeDiscovery,
+		}
+
+		err := prune(&clients, "bar", deleteList)
 		require.Nil(t, err)
-
-		err = prune(builder, "bar", deleteList)
-		require.Nil(t, err)
-		require.False(t, builder.Helper.DeleteCalled, "the resource should not be deleted")
-		require.Equal(t, toPrune, builder.Helper.ClusterObjs[0].GetObject(), "the cluster still contains the resource")
-
+		_, err = dynamicClient.Resource(gvrSecrets).Namespace("bar").
+			Get(context.Background(), "foo", metav1.GetOptions{})
+		require.Equal(t, false, apierrors.IsNotFound(err))
 	})
 
 	t.Run("Skip non existing resource", func(t *testing.T) {
-		toPrune := &apiv1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "other-name",
-				Namespace: "bar",
-			},
-			TypeMeta: metav1.TypeMeta{Kind: "Secret", APIVersion: "v1"},
+		dynamicClient := dynamicFake.NewSimpleDynamicClient(scheme)
+		clients := k8sClients{
+			dynamic:   dynamicClient,
+			discovery: fakeDiscovery,
 		}
-
-		builder := resourceutil.NewFakeBuilder()
-		err := builder.AddResources([]runtime.Object{toPrune}, true)
+		err := prune(&clients, "bar", deleteList)
 		require.Nil(t, err)
-
-		resourceCount := len(builder.Helper.ClusterObjs)
-		err = prune(builder, "bar", deleteList)
-		require.Nil(t, err)
-		require.False(t, builder.Helper.DeleteCalled, "No resources should be pruned")
-		require.Equal(t, resourceCount, len(builder.Helper.ClusterObjs), "the cluster should contain the same resources after the prune of a non existing resource")
-
+		_, err = dynamicClient.Resource(gvrSecrets).Namespace("bar").
+			Get(context.Background(), "foo", metav1.GetOptions{})
+		require.Equal(t, true, apierrors.IsNotFound(err))
 	})
 }
 
@@ -549,106 +364,48 @@ func TestEnsureDeployAll(t *testing.T) {
 	expectedCheckSum := "6ab733c74e26e73bca78aa9c4c9db62664f339d9eefac51dd503c9ff0cf0c329"
 
 	t.Run("Add deployment annotation", func(t *testing.T) {
-		deployment, err := resourceutil.NewResource("testdata/test-deployment.yaml")
-		utils.CheckError(err)
-		annotations := map[string]string{}
-		deployment.Info = resourceutil.GetDeploymentResource(deployment, annotations, nil)
-
-		err = ensureDeployAll(deployment, mockTime)
-
-		newDeployment, _ := deployment.Info.Object.(*appsv1.Deployment)
-		annotations = newDeployment.Spec.Template.ObjectMeta.Annotations
+		deployment, err := resourceutil.NewResources("testdata/test-deployment.yaml", "default")
 		require.Nil(t, err)
-		require.Equal(t, map[string]string{resourceutil.GetMiaAnnotation(deployChecksum): expectedCheckSum}, annotations)
-	})
-
-	t.Run("Deployment without meta", func(t *testing.T) {
-		deployment, err := resourceutil.NewResource("testdata/test-deployment.yaml")
-		utils.CheckError(err)
-		deployment.Info = resourceutil.GetDeploymentResource(deployment, nil, nil)
-
-		err = ensureDeployAll(deployment, mockTime)
-		newDeployment, _ := deployment.Info.Object.(*appsv1.Deployment)
-		annotations := newDeployment.Spec.Template.ObjectMeta.Annotations
+		err = ensureDeployAll(&deployment[0], mockTime)
 		require.Nil(t, err)
-		require.Equal(t, map[string]string{resourceutil.GetMiaAnnotation(deployChecksum): expectedCheckSum}, annotations)
+
+		var dep appsv1.Deployment
+		err = runtime.DefaultUnstructuredConverter.
+			FromUnstructured(deployment[0].Object.Object, &dep)
+		require.Nil(t, err)
+		require.Equal(t, map[string]string{resourceutil.GetMiaAnnotation(deployChecksum): expectedCheckSum}, dep.Spec.Template.ObjectMeta.Annotations)
 	})
 
 	t.Run("Add cronJob annotation", func(t *testing.T) {
-		cronJob, err := resourceutil.NewResource("testdata/cronjob-test.cronjob.yml")
-		utils.CheckError(err)
-
-		annotations := map[string]string{}
-		cronJob.Info = resourceutil.GetCronJobResource(cronJob, annotations, nil)
-
-		err = ensureDeployAll(cronJob, mockTime)
-
-		newCronJob, _ := cronJob.Info.Object.(*batchapiv1beta1.CronJob)
-		annotations = newCronJob.Spec.JobTemplate.Spec.Template.ObjectMeta.Annotations
+		cronJob, err := resourceutil.NewResources("testdata/cronjob-test.cronjob.yml", "default")
 		require.Nil(t, err)
-		require.Equal(t, map[string]string{resourceutil.GetMiaAnnotation(deployChecksum): expectedCheckSum}, annotations)
-	})
 
-	t.Run("CronJob without ObjectMeta", func(t *testing.T) {
-		cronJob, err := resourceutil.NewResource("testdata/cronjob-test.cronjob.yml")
-		utils.CheckError(err)
-
-		cronJob.Info = resourceutil.GetCronJobResource(cronJob, nil, nil)
-
-		err = ensureDeployAll(cronJob, mockTime)
-
-		newCronJob, _ := cronJob.Info.Object.(*batchapiv1beta1.CronJob)
-		annotations := newCronJob.Spec.JobTemplate.Spec.Template.ObjectMeta.Annotations
+		err = ensureDeployAll(&cronJob[0], mockTime)
 		require.Nil(t, err)
-		require.Equal(t, map[string]string{resourceutil.GetMiaAnnotation(deployChecksum): expectedCheckSum}, annotations)
-	})
-
-	t.Run("Reject cronjob misplaced with deployment", func(t *testing.T) {
-		cronJob, err := resourceutil.NewResource("testdata/cronjob-test.cronjob.yml")
-		utils.CheckError(err)
-
-		cronJob.Info = resourceutil.GetDeploymentResource(cronJob, nil, nil)
-		err = ensureDeployAll(cronJob, mockTime)
-
-		require.Equal(t, "resource hello: not a valid cronJob", err.Error())
-	})
-}
-
-func TestPrepareResources(t *testing.T) {
-	mockTime := time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
-	expectedCheckSum := "6ab733c74e26e73bca78aa9c4c9db62664f339d9eefac51dd503c9ff0cf0c329"
-
-	t.Run("With deploy all and a single resource", func(t *testing.T) {
-		deployment, err := resourceutil.NewResource("testdata/test-deployment.yaml")
-		utils.CheckError(err)
-
-		resources := make([]resourceutil.Resource, 1)
-		annotations := map[string]string{}
-		deployment.Info = resourceutil.GetDeploymentResource(deployment, annotations, nil)
-
-		resources[0] = *deployment
-
-		err = prepareResources(deployAll, resources, mockTime)
-
-		newDeployment, _ := resources[0].Info.Object.(*appsv1.Deployment)
-		annotations = newDeployment.Spec.Template.ObjectMeta.Annotations
+		var cronj batchv1beta1.CronJob
+		err = runtime.DefaultUnstructuredConverter.
+			FromUnstructured(cronJob[0].Object.Object, &cronj)
 		require.Nil(t, err)
-		require.Equal(t, expectedCheckSum, annotations[resourceutil.GetMiaAnnotation(deployChecksum)])
+		require.Equal(t, map[string]string{resourceutil.GetMiaAnnotation(deployChecksum): expectedCheckSum}, cronj.Spec.JobTemplate.Spec.Template.ObjectMeta.Annotations)
 	})
-
-	t.Run("With deploy all and a secret", func(t *testing.T) {
-		secret, err := resourceutil.NewResource("testdata/opaque.secret.yaml")
-		utils.CheckError(err)
-
-		secretType := apiv1.SecretTypeOpaque
-		secret.Info = resourceutil.GetSecretResource(secret, &secretType)
-		resources := make([]resourceutil.Resource, 1)
-
-		resources[0] = *secret
-
-		err = prepareResources(deployAll, resources, mockTime)
-
+	t.Run("Keep existing annotations", func(t *testing.T) {
+		// testing only deployment because annotation accessing method is the same
+		deployment, err := resourceutil.NewResources("testdata/test-deployment.yaml", "default")
 		require.Nil(t, err)
+		unstructured.SetNestedStringMap(deployment[0].Object.Object, map[string]string{
+			"existing-key": "value1",
+		},
+			"spec", "template", "metadata", "annotations")
+		err = ensureDeployAll(&deployment[0], mockTime)
+		require.Nil(t, err)
+		var dep appsv1.Deployment
+		err = runtime.DefaultUnstructuredConverter.
+			FromUnstructured(deployment[0].Object.Object, &dep)
+		require.Nil(t, err)
+		require.Equal(t, map[string]string{
+			resourceutil.GetMiaAnnotation(deployChecksum): expectedCheckSum,
+			"existing-key": "value1",
+		}, dep.Spec.Template.ObjectMeta.Annotations)
 	})
 }
 
@@ -656,133 +413,100 @@ func TestEnsureSmartDeploy(t *testing.T) {
 	expectedCheckSum := "6ab733c74e26e73bca78aa9c4c9db62664f339d9eefac51dd503c9ff0cf0c329"
 
 	t.Run("Add deployment deploy/checksum annotation", func(t *testing.T) {
-		targetObject, err := resourceutil.NewResource("testdata/test-deployment.yaml")
-		builder := resourceutil.NewFakeBuilder()
-
-		utils.CheckError(err)
-
-		annotations := map[string]string{}
-		targetObject.Info = resourceutil.GetDeploymentResource(targetObject, annotations, nil)
-
-		annotations = map[string]string{resourceutil.GetMiaAnnotation(deployChecksum): expectedCheckSum}
-		currentObject := resourceutil.GetDeploymentResource(targetObject, annotations, nil).Object
-
-		err = ensureSmartDeploy(builder, currentObject, targetObject)
-
-		newTargetObject, _ := targetObject.Info.Object.(*appsv1.Deployment)
-		annotations = newTargetObject.Spec.Template.ObjectMeta.Annotations
+		targetObject, err := resourceutil.NewResources("testdata/test-deployment.yaml", "default")
 		require.Nil(t, err)
-		require.Equal(t, map[string]string{resourceutil.GetMiaAnnotation(deployChecksum): expectedCheckSum}, annotations)
+		currentObj := targetObject[0].Object.DeepCopy()
+		unstructured.SetNestedStringMap(currentObj.Object, map[string]string{
+			"mia-platform.eu/deploy-checksum": expectedCheckSum,
+			"test":                            "test",
+		}, "spec", "template", "metadata", "annotations")
+		t.Logf("targetObj: %s\n", currentObj.Object)
+		err = ensureSmartDeploy(currentObj, &targetObject[0])
+		require.Nil(t, err)
+		targetAnn, _, err := unstructured.NestedStringMap(targetObject[0].Object.Object,
+			"spec", "template", "metadata", "annotations")
+		require.Nil(t, err)
+		require.Equal(t, targetAnn["mia-platform.eu/deploy-checksum"], expectedCheckSum)
 	})
 
 	t.Run("Add deployment without deploy/checksum annotation", func(t *testing.T) {
-		targetObject, err := resourceutil.NewResource("testdata/test-deployment.yaml")
-		builder := resourceutil.NewFakeBuilder()
-
-		utils.CheckError(err)
-
-		annotations := map[string]string{"test": "test"}
-		targetObject.Info = resourceutil.GetDeploymentResource(targetObject, annotations, nil)
-		currentObject := resourceutil.GetDeploymentResource(targetObject, nil, nil).Object
-
-		err = ensureSmartDeploy(builder, currentObject, targetObject)
-
-		newTargetObject, _ := targetObject.Info.Object.(*appsv1.Deployment)
-		annotations = newTargetObject.Spec.Template.ObjectMeta.Annotations
+		targetObject, err := resourceutil.NewResources("testdata/test-deployment.yaml", "default")
 		require.Nil(t, err)
-		require.Equal(t, map[string]string{"test": "test"}, annotations)
+		currentObj := targetObject[0].Object.DeepCopy()
+		err =
+			unstructured.SetNestedStringMap(targetObject[0].Object.Object, map[string]string{
+				"test": "test",
+			}, "spec", "template", "annotations")
+		require.Nil(t, err)
+
+		err = ensureSmartDeploy(currentObj, &targetObject[0])
+		require.Nil(t, err)
+
+		targetAnn, _, err := unstructured.NestedStringMap(targetObject[0].Object.Object,
+			"spec", "template", "annotations")
+		require.Nil(t, err)
+		require.Equal(t, "test", targetAnn["test"])
 	})
 
 	t.Run("Add cronjob deploy/checksum annotation", func(t *testing.T) {
-		targetObject, err := resourceutil.NewResource("testdata/cronjob-test.cronjob.yml")
-		utils.CheckError(err)
-
-		builder := resourceutil.NewFakeBuilder()
-		job := &batchapiv1.Job{
-			TypeMeta: metav1.TypeMeta{APIVersion: batchapiv1.SchemeGroupVersion.String(), Kind: "Job"},
-			ObjectMeta: metav1.ObjectMeta{
-				Name: targetObject.Name,
-				Annotations: map[string]string{
-					"cronjob.kubernetes.io/instantiate": "manual",
-				},
-			},
-		}
-		err = builder.AddResources([]runtime.Object{job}, false)
-		utils.CheckError(err)
-
-		annotations := map[string]string{}
-		targetObject.Info = resourceutil.GetCronJobResource(targetObject, annotations, nil)
-
-		annotations = map[string]string{resourceutil.GetMiaAnnotation(deployChecksum): expectedCheckSum}
-		currentObject := resourceutil.GetCronJobResource(targetObject, annotations, nil).Object
-
-		err = ensureSmartDeploy(builder, currentObject, targetObject)
-
-		newTargetObject, _ := targetObject.Info.Object.(*batchapiv1beta1.CronJob)
-		annotations = newTargetObject.Spec.JobTemplate.Spec.Template.ObjectMeta.Annotations
+		targetObject, err := resourceutil.NewResources("testdata/cronjob-test.cronjob.yml", "default")
 		require.Nil(t, err)
-		require.Equal(t, map[string]string{resourceutil.GetMiaAnnotation(deployChecksum): expectedCheckSum}, annotations)
-	})
+		currentObj := targetObject[0].Object.DeepCopy()
+		unstructured.SetNestedStringMap(currentObj.Object, map[string]string{
+			"mia-platform.eu/deploy-checksum": expectedCheckSum,
+			"test":                            "test",
+		}, "spec", "jobTemplate", "spec", "template", "metadata", "annotations")
+		t.Logf("targetObj: %s\n", currentObj.Object)
+		err = ensureSmartDeploy(currentObj, &targetObject[0])
 
-	t.Run("Pass default annotation", func(t *testing.T) {
-		targetObject, err := resourceutil.NewResource("testdata/test-deployment.yaml")
-		builder := resourceutil.NewFakeBuilder()
-
-		utils.CheckError(err)
-		annotations := map[string]string{"test1": "test1"}
-		targetObject.Info = resourceutil.GetDeploymentResource(targetObject, annotations, nil)
-		annotations = map[string]string{resourceutil.GetMiaAnnotation(deployChecksum): expectedCheckSum}
-		currentObject := resourceutil.GetDeploymentResource(targetObject, annotations, nil).Object
-
-		err = ensureSmartDeploy(builder, currentObject, targetObject)
-
-		newTargetObject, _ := targetObject.Info.Object.(*appsv1.Deployment)
-		annotations = newTargetObject.Spec.Template.ObjectMeta.Annotations
 		require.Nil(t, err)
-		require.Equal(t, map[string]string{resourceutil.GetMiaAnnotation(deployChecksum): expectedCheckSum, "test1": "test1"}, annotations)
+		targetAnn, _, err := unstructured.NestedStringMap(targetObject[0].Object.Object,
+			"spec", "jobTemplate", "spec", "template", "metadata", "annotations")
+		require.Nil(t, err)
+		require.Equal(t, targetAnn["mia-platform.eu/deploy-checksum"], expectedCheckSum)
 	})
 }
 
 func TestInsertDependencies(t *testing.T) {
 	var configMapMap = map[string]string{"configMap1": "aaa", "configMap2": "bbb", "configMapLongLoongLoooooooooooooooooooooooooooooooooooooooooooooong": "eee"}
 	var secretMap = map[string]string{"secret1": "ccc", "secret2": "ddd"}
-	testVolumes := []v1.Volume{
+	testVolumes := []corev1.Volume{
 		{
-			VolumeSource: apiv1.VolumeSource{
-				Secret: &apiv1.SecretVolumeSource{
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
 					SecretName: "secret1",
 				},
 			},
 		},
 		{
-			VolumeSource: apiv1.VolumeSource{
-				Secret: &apiv1.SecretVolumeSource{
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
 					SecretName: "secret2",
 				},
 			},
 		},
 		{
-			VolumeSource: apiv1.VolumeSource{
-				ConfigMap: &apiv1.ConfigMapVolumeSource{
-					LocalObjectReference: apiv1.LocalObjectReference{
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
 						Name: "configMap1",
 					},
 				},
 			},
 		},
 		{
-			VolumeSource: apiv1.VolumeSource{
-				ConfigMap: &apiv1.ConfigMapVolumeSource{
-					LocalObjectReference: apiv1.LocalObjectReference{
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
 						Name: "configMap2",
 					},
 				},
 			},
 		},
 		{
-			VolumeSource: apiv1.VolumeSource{
-				ConfigMap: &apiv1.ConfigMapVolumeSource{
-					LocalObjectReference: apiv1.LocalObjectReference{
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
 						Name: "configMapLongLoongLoooooooooooooooooooooooooooooooooooooooooooooong",
 					},
 				},
@@ -791,70 +515,52 @@ func TestInsertDependencies(t *testing.T) {
 	}
 
 	t.Run("Test Deployment", func(t *testing.T) {
-		deployment, err := resourceutil.NewResource("testdata/test-deployment.yaml")
+		deploymentRes, err := resourceutil.NewResources("testdata/test-deployment.yaml", "default")
 		require.Nil(t, err)
-		podSpec := resourceutil.GetPodSpec(&testVolumes, nil)
-		deployment.Info = resourceutil.GetDeploymentResource(deployment, nil, &podSpec)
+		var deployment appsv1.Deployment
+		err = runtime.DefaultUnstructuredConverter.
+			FromUnstructured(deploymentRes[0].Object.Object, &deployment)
+		require.Nil(t, err)
 
-		err = insertDependencies(deployment, configMapMap, secretMap)
+		podSpec := resourceutil.GetPodSpec(&testVolumes, nil)
+		deployment.Spec.Template.Spec = podSpec
+
+		unstr, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&deployment)
 		require.Nil(t, err)
-		newDeployment, _ := deployment.Info.Object.(*appsv1.Deployment)
-		annotations := newDeployment.Spec.Template.ObjectMeta.Annotations
+		deploymentRes[0].Object.Object = unstr
+
+		err = insertDependencies(&deploymentRes[0], configMapMap, secretMap)
 		require.Nil(t, err)
-		require.Equal(t, map[string]string{
-			resourceutil.GetMiaAnnotation(dependenciesChecksum): "{\"configMap1-configmap\":\"aaa\",\"configMap2-configmap\":\"bbb\",\"configMapLongLoongLoooooooooooooooooooooooooooooooooooooooooooooong-configmap\":\"eee\",\"secret1-secret\":\"ccc\",\"secret2-secret\":\"ddd\"}",
-		}, annotations)
+		expected := "{\"configMap1-configmap\":\"aaa\",\"configMap2-configmap\":\"bbb\",\"configMapLongLoongLoooooooooooooooooooooooooooooooooooooooooooooong-configmap\":\"eee\",\"secret1-secret\":\"ccc\",\"secret2-secret\":\"ddd\"}"
+		currentAnnotations, found, err := unstructured.NestedStringMap(deploymentRes[0].Object.Object,
+			"spec", "template", "metadata", "annotations")
+
+		require.Nil(t, err)
+		require.True(t, found)
+		require.Equal(t, expected, currentAnnotations[resourceutil.GetMiaAnnotation(dependenciesChecksum)])
 	})
 
 	t.Run("Test CronJob", func(t *testing.T) {
-		cronJob, err := resourceutil.NewResource("testdata/cronjob-test.cronjob.yml")
+		cronJobRes, err := resourceutil.NewResources("testdata/cronjob-test.cronjob.yml", "default")
+		require.Nil(t, err)
+		var cronJob batchv1beta1.CronJob
+		err = runtime.DefaultUnstructuredConverter.
+			FromUnstructured(cronJobRes[0].Object.Object, &cronJob)
 		require.Nil(t, err)
 		podSpec := resourceutil.GetPodSpec(&testVolumes, nil)
-		cronJob.Info = resourceutil.GetCronJobResource(cronJob, nil, &podSpec)
+		cronJob.Spec.JobTemplate.Spec.Template.Spec = podSpec
 
-		err = insertDependencies(cronJob, configMapMap, secretMap)
+		unstr, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&cronJob)
 		require.Nil(t, err)
+		cronJobRes[0].Object.Object = unstr
 
-		newCronJob, _ := cronJob.Info.Object.(*batchapiv1beta1.CronJob)
-		annotations := newCronJob.Spec.JobTemplate.Spec.Template.ObjectMeta.Annotations
+		err = insertDependencies(&cronJobRes[0], configMapMap, secretMap)
 		require.Nil(t, err)
-		require.Equal(t, map[string]string{
-			resourceutil.GetMiaAnnotation(dependenciesChecksum): "{\"configMap1-configmap\":\"aaa\",\"configMap2-configmap\":\"bbb\",\"configMapLongLoongLoooooooooooooooooooooooooooooooooooooooooooooong-configmap\":\"eee\",\"secret1-secret\":\"ccc\",\"secret2-secret\":\"ddd\"}",
-		}, annotations)
-	})
-}
-
-func TestDeploy(t *testing.T) {
-	t.Run("does not ensure namespace existence if flag is set to false", func(t *testing.T) {
-		builder := resourceutil.NewFakeBuilder()
-		namespaceName := "foo"
-
-		err := builder.AddResources(nil, false)
+		expected := "{\"configMap1-configmap\":\"aaa\",\"configMap2-configmap\":\"bbb\",\"configMapLongLoongLoooooooooooooooooooooooooooooooooooooooooooooong-configmap\":\"eee\",\"secret1-secret\":\"ccc\",\"secret2-secret\":\"ddd\"}"
+		currentAnnotations, found, err := unstructured.NestedStringMap(cronJobRes[0].Object.Object,
+			"spec", "jobTemplate", "spec", "template", "metadata", "annotations")
 		require.Nil(t, err)
-
-		err = deploy(builder, namespaceName, nil, utils.DeployConfig{
-			EnsureNamespace: false,
-		})
-		require.Nil(t, err)
-		require.False(t, builder.Helper.CreateCalled)
-	})
-
-	t.Run("ensure namespace existence if flag is set to true", func(t *testing.T) {
-		builder := resourceutil.NewFakeBuilder()
-		namespaceName := "foo"
-		namespace := &apiv1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{Name: namespaceName},
-			TypeMeta:   metav1.TypeMeta{Kind: "Namespace", APIVersion: "v1"},
-		}
-
-		err := builder.AddResources([]runtime.Object{namespace}, false)
-		require.Nil(t, err)
-
-		err = deploy(builder, namespaceName, nil, utils.DeployConfig{
-			EnsureNamespace: true,
-		})
-		require.Nil(t, err)
-		require.True(t, builder.Helper.CreateCalled)
-		require.Equal(t, namespace, builder.Helper.ClusterObjs[0].GetObject())
+		require.True(t, found)
+		require.Equal(t, expected, currentAnnotations[resourceutil.GetMiaAnnotation(dependenciesChecksum)])
 	})
 }
