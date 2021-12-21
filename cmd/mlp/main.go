@@ -56,6 +56,8 @@ func main() {
 	cli.InterpolateSubcommand(rootCmd, options)
 	cli.DeploySubcommand(rootCmd, options)
 	cli.GenerateSubcommand(rootCmd, options)
+	cli.KustomizeSubcommand(rootCmd)
+	cli.HydrateSubcommand(rootCmd)
 
 	expandedArgs := []string{}
 	if len(os.Args) > 0 {
