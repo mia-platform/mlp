@@ -50,6 +50,10 @@ type Options struct {
 	User                  string
 }
 
+const (
+	StdinToken string = "-"
+)
+
 // fs return the file system to use by default (override it for tests)
 var fs = &afero.Afero{Fs: afero.NewOsFs()}
 
@@ -62,6 +66,10 @@ func CheckError(err error) {
 
 // ExtractYAMLFiles return array of YAML filenames from array of files and directories
 func ExtractYAMLFiles(paths []string) ([]string, error) {
+	if len(paths) == 1 && paths[0] == StdinToken {
+		return []string{StdinToken}, nil
+	}
+
 	fileNames := []string{}
 
 	// Extract files from directories
