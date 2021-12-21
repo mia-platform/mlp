@@ -1,5 +1,5 @@
 ################### Build mlp ####################
-FROM golang:1.16.10 AS mlp
+FROM golang:1.16.10 AS builder
 
 WORKDIR /build
 
@@ -22,22 +22,6 @@ RUN GOOS=linux \
     -ldflags="${GO_LDFLAGS}" \
     -o "mlp" ./cmd/mlp
 
-############ Install Helm and kubectl ############
-
-FROM alpine:3.14 AS tools
-
-ENV K8S_VERSION="v1.20.2"
-ENV HELM_VERSION="v3.5.2"
-
-WORKDIR /build
-
-RUN wget https://storage.googleapis.com/kubernetes-release/release/${K8S_VERSION}/bin/linux/amd64/kubectl && \
-  wget https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz && \
-  tar xf helm-${HELM_VERSION}-linux-amd64.tar.gz \
-  && mv linux-amd64/helm . \
-  && rm -fr linux-amd64 helm-${HELM_VERSION}-linux-amd64.tar.gz && \
-  chmod +x kubectl helm
-
 ################## Create image ##################
 
 FROM alpine:3.14
@@ -47,9 +31,9 @@ LABEL maintainer="C.E.C.O.M <operations@mia-platform.eu>" \
       eu.mia-platform.url="https://www.mia-platform.eu" \
       eu.mia-platform.version="3"
 
-RUN apk add --no-cache make curl
+COPY --from=builder /build/mlp /usr/local/bin/
 
-COPY --from=tools /build/* /usr/local/bin/
-COPY --from=mlp /build/mlp /usr/local/bin/
+# Use an unprivileged user.
+USER 1000
 
 CMD ["mlp"]

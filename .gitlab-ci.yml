@@ -7,7 +7,7 @@ default:
   image: golang:1.16.10
 
 variables:
-  IMAGE_NAME: tools/kubectl
+  IMAGE_NAME: tools/mlp
 
 test:
   parallel:
