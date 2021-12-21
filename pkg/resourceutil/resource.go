@@ -19,6 +19,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"strings"
 
 	"git.tools.mia-platform.eu/platform/devops/deploy/internal/utils"
@@ -68,8 +70,14 @@ func FromGVKtoGVR(discoveryClient discovery.DiscoveryInterface, gvk schema.Group
 // support multiple documents inside a single file
 func NewResources(filepath, namespace string) ([]Resource, error) {
 	var resources []Resource
+	var stream []byte
+	var err error
 
-	stream, err := utils.ReadFile(filepath)
+	if filepath == utils.StdinToken {
+		stream, err = ioutil.ReadAll(os.Stdin)
+	} else {
+		stream, err = utils.ReadFile(filepath)
+	}
 	if err != nil {
 		return nil, err
 	}
