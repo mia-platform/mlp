@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    mia-platform.eu/version: 8.4.0
+  labels:
+    app: test-nginx
+    app.kubernetes.io/component: custom
+    app.kubernetes.io/managed-by: mia-platform
+    app.kubernetes.io/name: test-nginx
+    app.kubernetes.io/part-of: test-mlp-kustomize-2
+    app.kubernetes.io/version: latest
+    mia-platform.eu/stage: 'DEV'
+    mia-platform.eu/tenant: kustomize-tenant
+  name: test-nginx
+spec:
+  ports:
+  - name: http
+    nodePort: null
+    port: 80
+    protocol: TCP
+    targetPort: 3000
+  selector:
+    app: test-nginx
+  type: ClusterIP
