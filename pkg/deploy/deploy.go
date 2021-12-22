@@ -452,7 +452,7 @@ func apply(clients *k8sClients, res resourceutil.Resource, deployConfig utils.De
 
 			fmt.Printf("Updating %s: %s\n", res.Object.GetKind(), res.Object.GetName())
 
-			if deployConfig.DeployType == smartDeploy {
+			if deployConfig.DeployType == smartDeploy && (res.Object.GetKind() == "CronJob" || res.Object.GetKind() == "Deployment") {
 				isNotUsingSemver, err := resourceutil.IsNotUsingSemver(&res)
 				if err != nil {
 					return errors.Wrap(err, "failed semver check")
