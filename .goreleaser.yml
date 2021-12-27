@@ -1,0 +1,64 @@
+project_name: mlp
+before:
+  hooks:
+    - go mod download
+    - go generate ./...
+release:
+  prerelease: false
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - 386
+      - amd64
+      - arm64
+      - arm
+    goarm:
+      - 7
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X github.com/mia-platform/mlp/internal/cli.Version={{.Version}} -X github.com/mia-platform/mlp/internal/cli.BuildDate={{.Date}}
+signs:
+  - artifacts: none
+
+archives:
+  - name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    replacements:
+      darwin: Darwin
+      linux: Linux
+      windows: Windows
+      bit: Arm
+      bitv6: Arm6
+      bitv7: Arm7
+      386: i386
+      amd64: x86_64
+checksum:
+  name_template: "checksums.txt"
+snapshot:
+  name_template: "{{ .Tag }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+
+# Homebrews
+brews:
+  - name: mlp
+    tap:
+      owner: mia-platform
+      name: homebrew-tap
+    commit_author:
+      name: bot-targa
+      email: github@mia-platform.eu
+    folder: Formula
+    homepage: https://mia-platform.eu
+    description: mlp is a CLI used to interpolate and deploy resource on Kubernetes
+    test: |
+      system "mlp --help"
