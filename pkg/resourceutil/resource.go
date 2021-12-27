@@ -23,8 +23,8 @@ import (
 	"os"
 	"strings"
 
-	"git.tools.mia-platform.eu/platform/devops/deploy/internal/utils"
 	"github.com/Masterminds/semver"
+	"github.com/mia-platform/mlp/internal/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"

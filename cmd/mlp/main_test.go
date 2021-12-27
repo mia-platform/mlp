@@ -17,7 +17,7 @@ package main
 import (
 	"testing"
 
-	"git.tools.mia-platform.eu/platform/devops/deploy/internal/cli"
+	"github.com/mia-platform/mlp/internal/cli"
 	"github.com/stretchr/testify/require"
 )
 

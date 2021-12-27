@@ -22,8 +22,8 @@ ifndef CGO_LDFLAGS
     export CGO_LDFLAGS := $(LDFLAGS)
 endif
 
-GO_LDFLAGS := -X git.tools.mia-platform.eu/platform/devops/deploy/internal/cli.Version=$(MLP_VERSION) $(GO_LDFLAGS)
-GO_LDFLAGS := -X git.tools.mia-platform.eu/platform/devops/deploy/internal/cli.BuildDate=$(BUILD_DATE) $(GO_LDFLAGS)
+GO_LDFLAGS := -X github.com/mia-platform/mlp/internal/cli.Version=$(MLP_VERSION) $(GO_LDFLAGS)
+GO_LDFLAGS := -X github.com/mia-platform/mlp/internal/cli.BuildDate=$(BUILD_DATE) $(GO_LDFLAGS)
 
 .PHONY: all build test clean
 

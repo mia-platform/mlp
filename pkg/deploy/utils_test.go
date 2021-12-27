@@ -18,7 +18,7 @@ import (
 	"reflect"
 	"testing"
 
-	"git.tools.mia-platform.eu/platform/devops/deploy/pkg/resourceutil"
+	"github.com/mia-platform/mlp/pkg/resourceutil"
 	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"

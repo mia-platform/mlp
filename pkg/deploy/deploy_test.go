@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"git.tools.mia-platform.eu/platform/devops/deploy/pkg/resourceutil"
+	"github.com/mia-platform/mlp/pkg/resourceutil"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"

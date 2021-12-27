@@ -17,7 +17,7 @@ package cli
 import (
 	"os"
 
-	"git.tools.mia-platform.eu/platform/devops/deploy/internal/utils"
+	"github.com/mia-platform/mlp/internal/utils"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )

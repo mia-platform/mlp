@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"path"
 
-	"git.tools.mia-platform.eu/platform/devops/deploy/internal/utils"
-	"git.tools.mia-platform.eu/platform/devops/deploy/pkg/interpolate"
-	"git.tools.mia-platform.eu/platform/devops/deploy/pkg/resourceutil"
 	"github.com/google/go-cmp/cmp"
+	"github.com/mia-platform/mlp/internal/utils"
+	"github.com/mia-platform/mlp/pkg/interpolate"
+	"github.com/mia-platform/mlp/pkg/resourceutil"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"

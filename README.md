@@ -64,7 +64,7 @@ Note that `mlp` suppose that the output directory already exists so it needs to 
 Partecipation to the project is governed by the [Code of Conduct](./CODE_OF_CONDUCT.md) and you can read
 how you can improve the project in the [Contributing](./CONTRIBUTING.md) guidelines.
 
-[pipeline-svg]: https://git.tools.mia-platform.eu/platform/devops/deploy/badges/master/pipeline.svg
-[pipeline-link]: https://git.tools.mia-platform.eu/platform/devops/deploy/-/commits/master
+[pipeline-svg]: https://github.com/mia-platform/mlp/badges/master/pipeline.svg
+[pipeline-link]: https://github.com/mia-platform/mlp/-/commits/master
 [go-svg]: https://img.shields.io/badge/Go-1.15-blue
 [go-link]: https://golang.org (Go is an open source programming language that makes it easy to build simple, reliable, and efficient software.)

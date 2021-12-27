@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"time"
 
-	"git.tools.mia-platform.eu/platform/devops/deploy/internal/utils"
-	"git.tools.mia-platform.eu/platform/devops/deploy/pkg/resourceutil"
+	"github.com/mia-platform/mlp/internal/utils"
+	"github.com/mia-platform/mlp/pkg/resourceutil"
 	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"

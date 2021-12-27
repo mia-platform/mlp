@@ -1,4 +1,4 @@
-module git.tools.mia-platform.eu/platform/devops/deploy
+module github.com/mia-platform/mlp
 
 go 1.16
 

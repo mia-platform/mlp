@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"os"
 
-	"git.tools.mia-platform.eu/platform/devops/deploy/pkg/kustomize"
+	"github.com/mia-platform/mlp/pkg/kustomize"
 	"github.com/spf13/cobra"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"

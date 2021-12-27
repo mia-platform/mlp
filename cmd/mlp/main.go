@@ -20,8 +20,8 @@ import (
 	"os"
 	"runtime"
 
-	"git.tools.mia-platform.eu/platform/devops/deploy/internal/cli"
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/mia-platform/mlp/internal/cli"
 	"github.com/spf13/cobra"
 )
 

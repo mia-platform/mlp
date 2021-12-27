@@ -14,7 +14,7 @@ ARG date=""
 
 COPY . .
 
-ENV GO_LDFLAGS="-w -s -X git.tools.mia-platform.eu/platform/devops/deploy/internal/cli.BuildDate=${date} -X git.tools.mia-platform.eu/platform/devops/deploy/internal/cli.Version=${version}"
+ENV GO_LDFLAGS="-w -s -X github.com/mia-platform/mlp/internal/cli.BuildDate=${date} -X github.com/mia-platform/mlp/internal/cli.Version=${version}"
 RUN GOOS=linux \
     CGO_ENABLED=0 \
     GOARCH=amd64 \

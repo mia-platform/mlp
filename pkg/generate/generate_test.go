@@ -18,7 +18,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"git.tools.mia-platform.eu/platform/devops/deploy/internal/utils"
+	"github.com/mia-platform/mlp/internal/utils"
 	"github.com/stretchr/testify/require"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

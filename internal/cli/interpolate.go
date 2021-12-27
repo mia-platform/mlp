@@ -15,8 +15,8 @@
 package cli
 
 import (
-	"git.tools.mia-platform.eu/platform/devops/deploy/internal/utils"
-	"git.tools.mia-platform.eu/platform/devops/deploy/pkg/interpolate"
+	"github.com/mia-platform/mlp/internal/utils"
+	"github.com/mia-platform/mlp/pkg/interpolate"
 	"github.com/spf13/cobra"
 )
 

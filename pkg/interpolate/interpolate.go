@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"strings"
 
-	"git.tools.mia-platform.eu/platform/devops/deploy/internal/utils"
+	"github.com/mia-platform/mlp/internal/utils"
 )
 
 const asciiDoubleQuote = "&#34;"
