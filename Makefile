@@ -27,7 +27,7 @@ GO_LDFLAGS := -X github.com/mia-platform/mlp/internal/cli.BuildDate=$(BUILD_DATE
 
 .PHONY: all build test clean
 
-all: clean coverage build
+all: build
 
 ENVTEST = $(shell pwd)/bin/setup-envtest
 envtest: ## Download envtest-setup locally if necessary.
@@ -53,7 +53,10 @@ build: $(BUILD_FILES)
 fmt: ## Run go fmt against code.
 	go fmt ./...
 
-test: envtest fmt
+vet: ## Run go vet against code.
+	go vet ./...
+
+test: fmt vet envtest
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./... -coverprofile cover.out
 
 coverage: test

@@ -6,7 +6,8 @@ before:
 release:
   prerelease: false
 builds:
-  - env:
+  - main: ./cmd/mlp/main.go
+    env:
       - CGO_ENABLED=0
     goos:
       - linux
