@@ -2,9 +2,9 @@
 
 # Mlp
 
-[![Go Report Card][go-report-svg]][go-report-card]
-[![Build Status][github-actions-svg]][github-actions]
-[![Coverage Status][coverage-badge]][coverage]
+[![Go Report Card](https://goreportcard.com/badge/github.com/mia-platform/mlp)](https://goreportcard.com/report/github.com/mia-platform/mlp)
+[![Test Build Docker image and Release](https://github.com/mia-platform/mlp/actions/workflows/test-build-docker-release.yml/badge.svg)](https://github.com/mia-platform/mlp/actions/workflows/test-build-docker-release.yml)
+[![codecov](https://codecov.io/gh/mia-platform/mlp/branch/main/graph/badge.svg)](https://codecov.io/gh/mia-platform/mlp)
 
 </div>
 
