@@ -57,6 +57,12 @@ func Run(inputPaths []string, deployConfig utils.DeployConfig, opts *utils.Optio
 	restConfig, err := opts.Config.ToRESTConfig()
 	utils.CheckError(err)
 
+	// The following two options manage client-side throttling to decrease pressure on api-server
+	// Kubectl sets 300 bursts 50.0 QPS:
+	// https://github.com/kubernetes/kubectl/blob/0862c57c87184432986c85674a237737dabc53fa/pkg/cmd/cmd.go#L92
+	restConfig.QPS = 250.0
+	restConfig.Burst = 800
+
 	clients := &k8sClients{
 		dynamic:   dynamic.NewForConfigOrDie(restConfig),
 		discovery: discovery.NewDiscoveryClientForConfigOrDie(restConfig),
