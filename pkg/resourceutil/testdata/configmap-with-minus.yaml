@@ -5,6 +5,7 @@ metadata:
   name: configmap
 data:
   key1: aaaa---dldl
-  key1: aaaa---
+  key2: aaaa---
   a.json: '{"key":"\n---\nfoo\nbar\n---\n"}'
+  b.json: "{\"key\":\"\n---\nfoo\nbar\n---\n\"}"
 ---
