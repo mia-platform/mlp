@@ -65,14 +65,33 @@ func TestNewResources(t *testing.T) {
 }
 
 func TestMakeResources(t *testing.T) {
-	filePath := []string{
-		filepath.Join(testdata, "kubernetesersource.yaml"),
-		filepath.Join(testdata, "tworesources.yaml"),
+	testCases := []struct {
+		desc       string
+		inputFiles []string
+		expected   int
+	}{
+		{
+			desc:       "3 valid resources in 2 files",
+			inputFiles: []string{"kubernetesersource.yaml", "tworesources.yaml"},
+			expected:   3,
+		},
+		{
+			desc:       "resource with ---",
+			inputFiles: []string{"configmap-with-minus.yaml"},
+			expected:   1,
+		},
 	}
-
-	actual, err := MakeResources(filePath, "default")
-	require.Nil(t, err)
-	require.Equal(t, len(actual), 3, "3 Resource")
+	for _, tC := range testCases {
+		t.Run(tC.desc, func(t *testing.T) {
+			var filePath []string
+			for _, v := range tC.inputFiles {
+				filePath = append(filePath, filepath.Join(testdata, v))
+			}
+			actual, err := MakeResources(filePath, "default")
+			require.Nil(t, err)
+			require.Equal(t, tC.expected, len(actual))
+		})
+	}
 }
 
 func TestGetKeysFromMap(t *testing.T) {
