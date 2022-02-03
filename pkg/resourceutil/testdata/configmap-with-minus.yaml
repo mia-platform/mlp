@@ -6,4 +6,5 @@ metadata:
 data:
   key1: aaaa---dldl
   key1: aaaa---
+  a.json: '{"key":"\n---\nfoo\nbar\n---\n"}'
 ---
