@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - improve error message when convert resource from yaml to json
+- fix: splitting error on --- inside file
 
 ## [1.0.1] - 2022-02-03
 

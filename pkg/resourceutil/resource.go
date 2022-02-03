@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/Masterminds/semver"
@@ -82,7 +83,10 @@ func NewResources(filepath, namespace string) ([]Resource, error) {
 		return nil, err
 	}
 
-	for _, resourceYAML := range strings.Split(string(stream), "---") {
+	// split resources on --- yaml document delimiter
+	re := regexp.MustCompile(`\n---\n`)
+	for _, resourceYAML := range re.Split(string(stream), -1) {
+
 		if len(resourceYAML) == 0 {
 			continue
 		}
