@@ -83,14 +83,13 @@ func NewResources(filepath, namespace string) ([]Resource, error) {
 	}
 
 	for _, resourceYAML := range strings.Split(string(stream), "---") {
-
 		if len(resourceYAML) == 0 {
 			continue
 		}
 
 		u := unstructured.Unstructured{Object: map[string]interface{}{}}
 		if err := k8syaml.Unmarshal([]byte(resourceYAML), &u.Object); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("resource %s: %s", filepath, err)
 		}
 		gvk := u.GroupVersionKind()
 		u.SetNamespace(namespace)
