@@ -282,3 +282,18 @@ ZZZZZZZZZZZZZZZZZZZZZZZZZZ
 	require.Nil(t, err)
 	require.Equal(t, string(expout), string(out))
 }
+
+func TestConvertReplicas(t *testing.T) {
+	os.Setenv("MY_REPLICAS", `4`)
+	defer os.Unsetenv("MY_REPLICAS")
+
+	in, err := ioutil.ReadFile("testdata/deployment_tointerpolate.yaml")
+	require.NoError(t, err)
+
+	expout, err := ioutil.ReadFile("testdata/deployment_interpolated.yaml")
+	require.NoError(t, err)
+
+	out, err := Interpolate(in, prefixes, re)
+	require.Nil(t, err)
+	require.Equal(t, string(expout), string(out))
+}
