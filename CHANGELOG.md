@@ -7,10 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2022-02-07
+
 ### Added
 
 - improve error message when convert resource from yaml to json
 - fix: splitting error on --- inside file
+
+### Changed
+
+- set QPS and burst for request to 500
 
 ## [1.0.1] - 2022-02-03
 
@@ -82,6 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial Release 🎉🎉🎉
 
-[Unreleased]: https://github.com/mia-platform/mlp/-/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/mia-platform/mlp/-/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/mia-platform/mlp/-/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/mia-platform/mlp/-/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/mia-platform/mlp/-/compare/v1.0.0
