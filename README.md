@@ -1,6 +1,6 @@
 <div align="center">
 
-# Mlp
+# mlp
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/mia-platform/mlp)](https://goreportcard.com/report/github.com/mia-platform/mlp)
 [![Test Build Docker image and Release](https://github.com/mia-platform/mlp/actions/workflows/test-build-docker-release.yml/badge.svg)](https://github.com/mia-platform/mlp/actions/workflows/test-build-docker-release.yml)
