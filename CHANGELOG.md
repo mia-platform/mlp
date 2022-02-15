@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- support arm arch
+- run image as the root user
+
 ## [1.0.2] - 2022-02-07
 
 ### Added
