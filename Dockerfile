@@ -1,5 +1,5 @@
 ################### Build mlp ####################
-FROM golang:1.16.10 AS builder
+FROM golang:1.16.14 AS builder
 
 WORKDIR /build
 
@@ -24,7 +24,7 @@ RUN GOOS=linux \
 
 ################## Create image ##################
 
-FROM alpine:3.14
+FROM alpine:3.15
 
 LABEL maintainer="C.E.C.O.M <operations@mia-platform.eu>" \
       name="Image for console deployments" \
@@ -32,8 +32,5 @@ LABEL maintainer="C.E.C.O.M <operations@mia-platform.eu>" \
       eu.mia-platform.version="3"
 
 COPY --from=builder /build/mlp /usr/local/bin/
-
-# Use an unprivileged user.
-USER 1000
 
 CMD ["mlp"]
