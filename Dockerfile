@@ -33,7 +33,4 @@ LABEL maintainer="C.E.C.O.M <operations@mia-platform.eu>" \
 
 COPY --from=builder /build/mlp /usr/local/bin/
 
-# Use an unprivileged user.
-USER 1000
-
 CMD ["mlp"]
