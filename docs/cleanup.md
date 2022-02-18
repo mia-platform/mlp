@@ -1,4 +1,0 @@
-# `cleanup` Command
-
-TODO
-
