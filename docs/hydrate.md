@@ -1,4 +1,4 @@
-# `hydrate` Command
+# hydrate Command
 
 The `hydrate` subcommand is an helper to fill kustomization.yml with resources and patches. It wraps the kustomization command:  
 `kustomize edit add resource <file.yml>` and `kustomize edit add patch --path <file.yml>`.

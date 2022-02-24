@@ -1,4 +1,4 @@
-# `options` Command
+# options Command
 
 List all the general flags that can be used with all the other subcommand.
 
