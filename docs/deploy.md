@@ -1,4 +1,4 @@
-# `deploy` Command
+# deploy Command
 
 The `deploy` command deploys the specified files in a given namespace of a Kubernetes cluster.
 

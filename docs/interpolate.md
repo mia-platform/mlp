@@ -1,4 +1,4 @@
-# `interpolate` Command
+# interpolate Command
 
 The `interpolate` command performs the interpolation of the specified files with the corresponding environment variables.
 
