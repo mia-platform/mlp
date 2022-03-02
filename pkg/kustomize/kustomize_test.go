@@ -141,3 +141,29 @@ func TestExecAdd(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckPresence(t *testing.T) {
+	testCases := []struct {
+		desc          string
+		expected      []string
+		input         []string
+		kustomization string
+	}{
+		{
+			desc:          "some res in kustomization.yaml",
+			expected:      []string{"res-not-present.yaml"},
+			input:         []string{"resource1.service.yaml", "res-not-present.yaml"},
+			kustomization: "apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\npatches:\n- path: deployment1.PATCH.yml\nresources:\n- resource1.service.yaml",
+		},
+	}
+	for _, tC := range testCases {
+		t.Run(tC.desc, func(t *testing.T) {
+			fsys := filesys.MakeFsInMemory()
+			err := fsys.WriteFile("kustomization.yaml", []byte(tC.kustomization))
+			require.Nil(t, err)
+			actual, err := checkPresence(tC.input, fsys)
+			require.Nil(t, err)
+			require.Equal(t, tC.expected, actual)
+		})
+	}
+}
