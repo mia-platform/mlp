@@ -52,7 +52,7 @@ func findFiles(fs afero.Fs, overlay string) (map[fileType][]string, error) {
 		return nil, err
 	}
 
-	r, err := regexp.Compile(`\.patch\.ya?ml$`)
+	r, err := regexp.Compile(`(^|\.)patch\.ya?ml$`)
 	if err != nil {
 		return nil, err
 	}

@@ -79,6 +79,14 @@ func TestFindFiles(t *testing.T) {
 				Patch: {"myresource.patch.yaml", "myresource.patch.yml"},
 			},
 		},
+		{
+			desc:  "only patch.yaml",
+			input: []string{"patch.yaml", "patch.yml", "aaapatch.yaml", "aaapatch.yml"},
+			expected: map[fileType][]string{
+				Patch:    {"patch.yaml", "patch.yml"},
+				Resource: {"aaapatch.yaml", "aaapatch.yml"},
+			},
+		},
 	}
 	for _, tC := range testCases {
 		t.Run(tC.desc, func(t *testing.T) {
