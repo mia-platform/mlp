@@ -113,9 +113,10 @@ func TestExecAdd(t *testing.T) {
 	fsys := filesys.MakeFsOnDisk()
 
 	testCases := []struct {
-		desc  string
-		input map[fileType][]string
-		check func(*testing.T, filesys.ConfirmedDir)
+		desc      string
+		input     map[fileType][]string
+		check     func(*testing.T, filesys.ConfirmedDir)
+		kustomize string
 	}{
 		{
 			desc: "patch and resources",
@@ -128,6 +129,20 @@ func TestExecAdd(t *testing.T) {
 				require.Nil(t, err)
 				require.YAMLEq(t, "apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\npatches:\n- path: deployment1.PATCH.yml\nresources:\n- resource1.service.yaml", string(kustomization))
 			},
+			kustomize: "",
+		},
+		{
+			desc: "already present patch in kustomize.yaml",
+			input: map[fileType][]string{
+				Patch:    {"deployment1.PATCH.yml"},
+				Resource: {"resource1.service.yaml"},
+			},
+			check: func(t *testing.T, dir filesys.ConfirmedDir) {
+				kustomization, err := fsys.ReadFile(dir.Join(overlay + "kustomization.yaml"))
+				require.Nil(t, err)
+				require.YAMLEq(t, "apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\npatches:\n- path: deployment1.PATCH.yml\nresources:\n- resource1.service.yaml", string(kustomization))
+			},
+			kustomize: "apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\npatches:\n- path: deployment1.PATCH.yml\n",
 		},
 	}
 
@@ -135,6 +150,10 @@ func TestExecAdd(t *testing.T) {
 		t.Run(tC.desc, func(t *testing.T) {
 			dir := setup(t, fsys)
 			defer os.RemoveAll(dir.String())
+			if tC.kustomize != "" {
+				err := fsys.WriteFile(dir.Join(overlay+"kustomization.yaml"), []byte(tC.kustomize))
+				require.Nil(t, err)
+			}
 			err := execAdd(fsys, dir.Join(overlay), tC.input)
 			require.Nil(t, err)
 			tC.check(t, dir)
