@@ -15,6 +15,7 @@
 package kustomize
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -122,6 +123,9 @@ func filterPatchinKust(files []string, fsys filesys.FileSystem) ([]string, error
 	// we are in the current directory
 	fileCont, err := fsys.ReadFile("kustomization.yaml")
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return files, nil
+		}
 		return nil, fmt.Errorf("error reading kustomization.yaml")
 	}
 	for k, f := range files {
