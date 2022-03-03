@@ -15,6 +15,7 @@
 package kustomize
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -79,8 +80,6 @@ func findFiles(fs afero.Fs, overlay string) (map[fileType][]string, error) {
 
 // execute kustomize edit add command
 func execAdd(fsys filesys.FileSystem, path string, AllTypesFiles map[fileType][]string) error {
-	pvd := provider.NewDefaultDepProvider()
-
 	pwd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -97,15 +96,50 @@ func execAdd(fsys filesys.FileSystem, path string, AllTypesFiles map[fileType][]
 	// Resource: kustomize resource add resource f
 	for resType, files := range AllTypesFiles {
 		kustomizeCmd := resType.GetCommand()
-		for _, f := range files {
-			editCmd := edit.NewCmdEdit(
-				fsys, pvd.GetFieldValidator(), pvd.GetResourceFactory(), os.Stdout)
-			editCmd.SetArgs(append(kustomizeCmd, f))
-			err := editCmd.Execute()
+		if resType == Patch {
+			// Removes patches already present in kustomization.yaml
+			files, err = filterPatchFiles(files, fsys)
 			if err != nil {
 				return err
 			}
 		}
+		for _, f := range files {
+			err := executeCmd(f, kustomizeCmd, fsys)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func remove(s []string, i int) []string {
+	s[i] = s[len(s)-1]
+	return s[:len(s)-1]
+}
+
+func filterPatchFiles(files []string, fsys filesys.FileSystem) ([]string, error) {
+	// we are in the current directory
+	fileCont, err := fsys.ReadFile("kustomization.yaml")
+	if err != nil {
+		return nil, fmt.Errorf("error reading kustomization.yaml")
+	}
+	for k, f := range files {
+		if strings.Contains(string(fileCont), f) {
+			files = remove(files, k)
+		}
+	}
+	return files, nil
+}
+
+func executeCmd(file string, kustomizeCmd []string, fsys filesys.FileSystem) error {
+	pvd := provider.NewDefaultDepProvider()
+	editCmd := edit.NewCmdEdit(
+		fsys, pvd.GetFieldValidator(), pvd.GetResourceFactory(), os.Stdout)
+	editCmd.SetArgs(append(kustomizeCmd, file))
+	err := editCmd.Execute()
+	if err != nil {
+		return err
 	}
 	return nil
 }
