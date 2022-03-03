@@ -161,7 +161,7 @@ func TestExecAdd(t *testing.T) {
 	}
 }
 
-func TestFilterPatchinKust(t *testing.T) {
+func TestFilterPatchFiles(t *testing.T) {
 	testCases := []struct {
 		desc          string
 		expected      []string
@@ -180,7 +180,7 @@ func TestFilterPatchinKust(t *testing.T) {
 			fsys := filesys.MakeFsInMemory()
 			err := fsys.WriteFile("kustomization.yaml", []byte(tC.kustomization))
 			require.Nil(t, err)
-			actual, err := filterPatchinKust(tC.input, fsys)
+			actual, err := filterPatchFiles(tC.input, fsys)
 			require.Nil(t, err)
 			require.Equal(t, tC.expected, actual)
 		})

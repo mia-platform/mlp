@@ -98,7 +98,7 @@ func execAdd(fsys filesys.FileSystem, path string, AllTypesFiles map[fileType][]
 		kustomizeCmd := resType.GetCommand()
 		if resType == Patch {
 			// Removes patches already present in kustomization.yaml
-			files, err = filterPatchinKust(files, fsys)
+			files, err = filterPatchFiles(files, fsys)
 			if err != nil {
 				return err
 			}
@@ -118,7 +118,7 @@ func remove(s []string, i int) []string {
 	return s[:len(s)-1]
 }
 
-func filterPatchinKust(files []string, fsys filesys.FileSystem) ([]string, error) {
+func filterPatchFiles(files []string, fsys filesys.FileSystem) ([]string, error) {
 	// we are in the current directory
 	fileCont, err := fsys.ReadFile("kustomization.yaml")
 	if err != nil {
