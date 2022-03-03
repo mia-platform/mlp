@@ -180,7 +180,7 @@ func TestCheckPresence(t *testing.T) {
 			fsys := filesys.MakeFsInMemory()
 			err := fsys.WriteFile("kustomization.yaml", []byte(tC.kustomization))
 			require.Nil(t, err)
-			actual, err := checkPresence(tC.input, fsys)
+			actual, err := filterPatchinKust(tC.input, fsys)
 			require.Nil(t, err)
 			require.Equal(t, tC.expected, actual)
 		})
