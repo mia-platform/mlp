@@ -185,11 +185,4 @@ func TestFilterPatchinKust(t *testing.T) {
 			require.Equal(t, tC.expected, actual)
 		})
 	}
-	t.Run("kustomization.yaml not existing", func(t *testing.T) {
-		fsys := filesys.MakeFsInMemory()
-		actual, err := filterPatchinKust([]string{"res-not-present.yaml"}, fsys)
-		expected := []string{"res-not-present.yaml"}
-		require.Nil(t, err)
-		require.Equal(t, expected, actual)
-	})
 }
