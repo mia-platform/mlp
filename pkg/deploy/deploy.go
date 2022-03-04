@@ -577,6 +577,11 @@ func ensureSmartDeploy(onClusterResource *unstructured.Unstructured, target *res
 		currentAnn = make(map[string]string)
 	}
 
+	depChecksum, found := currentAnn[resourceutil.GetMiaAnnotation(deployChecksum)]
+	if !found {
+		return nil
+	}
+
 	targetAnn, found, err := unstructured.NestedStringMap(target.Object.Object, path...)
 	if err != nil {
 		return err
@@ -584,7 +589,7 @@ func ensureSmartDeploy(onClusterResource *unstructured.Unstructured, target *res
 	if !found {
 		targetAnn = make(map[string]string)
 	}
-	targetAnn[resourceutil.GetMiaAnnotation(deployChecksum)] = currentAnn[resourceutil.GetMiaAnnotation(deployChecksum)]
+	targetAnn[resourceutil.GetMiaAnnotation(deployChecksum)] = depChecksum
 	err = unstructured.SetNestedStringMap(target.Object.Object, targetAnn, path...)
 	if err != nil {
 		return err

@@ -161,7 +161,7 @@ var _ = Describe("deploy on mock kubernetes", func() {
 	Context("smart deploy", func() {
 		deployConfig := utils.DeployConfig{
 			DeployType:              smartDeploy,
-			ForceDeployWhenNoSemver: true,
+			ForceDeployWhenNoSemver: false,
 			EnsureNamespace:         true,
 		}
 		It("changes a pod annotation in deployment if configmap associated changes", func() {
@@ -169,6 +169,52 @@ var _ = Describe("deploy on mock kubernetes", func() {
 			Expect(err).NotTo(HaveOccurred())
 			err = doRun(clients, "test6", []string{"testdata/integration/smart-deploy/stage2"}, deployConfig, currentTime)
 			Expect(err).NotTo(HaveOccurred())
+		})
+		It("does not modify deployment/pods on same object apply", func() {
+			lastApplied := ""
+			for i := 0; i < 4; i++ {
+				err := doRun(clients, "test7", []string{"testdata/integration/smart-deploy/stage1"}, deployConfig, currentTime)
+				Expect(err).NotTo(HaveOccurred())
+				deployment, err := clients.dynamic.Resource(gvrDeployments).
+					Namespace("test7").
+					Get(context.Background(), "test-deployment", metav1.GetOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				if lastApplied == "" {
+					lastApplied = deployment.GetAnnotations()["kubectl.kubernetes.io/last-applied-configuration"]
+					continue
+				}
+				thisLastApplied := deployment.GetAnnotations()["kubectl.kubernetes.io/last-applied-configuration"]
+				Expect(lastApplied).Should(BeIdenticalTo(thisLastApplied))
+				lastApplied = thisLastApplied
+			}
+			deployAll := utils.DeployConfig{
+				DeployType:              deployAll,
+				ForceDeployWhenNoSemver: false,
+				EnsureNamespace:         true,
+			}
+
+			// Force deploy_all, lastapplied annotation should not be equals
+			err := doRun(clients, "test7", []string{"testdata/integration/smart-deploy/stage1"}, deployAll, currentTime)
+			Expect(err).NotTo(HaveOccurred())
+			deployment, err := clients.dynamic.Resource(gvrDeployments).
+				Namespace("test7").
+				Get(context.Background(), "test-deployment", metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			thisLastApplied := deployment.GetAnnotations()["kubectl.kubernetes.io/last-applied-configuration"]
+			Expect(lastApplied).ShouldNot(BeIdenticalTo(thisLastApplied))
+			lastApplied = thisLastApplied
+
+			// Another smart_deploy, should be identical to the previous
+			err = doRun(clients, "test7", []string{"testdata/integration/smart-deploy/stage1"}, deployConfig, currentTime)
+			Expect(err).NotTo(HaveOccurred())
+			deployment, err = clients.dynamic.Resource(gvrDeployments).
+				Namespace("test7").
+				Get(context.Background(), "test-deployment", metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			ann, _, _ := unstructured.NestedStringMap(deployment.Object, "spec", "template", "metadata", "annotations")
+			Expect(ann["mia-platform.eu/deploy-checksum"]).Should(Not(BeEmpty()))
+			thisLastApplied = deployment.GetAnnotations()["kubectl.kubernetes.io/last-applied-configuration"]
+			Expect(lastApplied).Should(BeIdenticalTo(thisLastApplied))
 		})
 	})
 	Context("deletes resources", func() {
