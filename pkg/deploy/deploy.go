@@ -468,6 +468,10 @@ func apply(clients *k8sClients, res resourceutil.Resource, deployConfig utils.De
 					if err := ensureDeployAll(&res, time.Now()); err != nil {
 						return errors.Wrap(err, "failed ensure deploy all on resource not using semver")
 					}
+				} else {
+					if err = ensureSmartDeploy(onClusterObj, &res); err != nil {
+						return errors.Wrap(err, "failed smart deploy ensure")
+					}
 				}
 			}
 
@@ -552,6 +556,41 @@ func createPatch(currentObj unstructured.Unstructured, target resourceutil.Resou
 
 	patch, err := strategicpatch.CreateThreeWayMergePatch([]byte(original), desired, current, patchMeta, true)
 	return patch, types.StrategicMergePatchType, err
+}
+
+// EnsureSmartDeploy merge, if present, the "mia-platform.eu/deploy-checksum" annotation from the Kubernetes cluster
+// into the target Resource that is going to be released.
+func ensureSmartDeploy(onClusterResource *unstructured.Unstructured, target *resourceutil.Resource) error {
+	var path []string
+	switch target.GroupVersionKind.Kind {
+	case "Deployment":
+		path = []string{"spec", "template", "metadata", "annotations"}
+	case "CronJob":
+		path = []string{"spec", "jobTemplate", "spec", "template", "metadata", "annotations"}
+	}
+
+	currentAnn, found, err := unstructured.NestedStringMap(onClusterResource.Object, path...)
+	if err != nil {
+		return err
+	}
+	if !found {
+		currentAnn = make(map[string]string)
+	}
+
+	targetAnn, found, err := unstructured.NestedStringMap(target.Object.Object, path...)
+	if err != nil {
+		return err
+	}
+	if !found {
+		targetAnn = make(map[string]string)
+	}
+	targetAnn[resourceutil.GetMiaAnnotation(deployChecksum)] = currentAnn[resourceutil.GetMiaAnnotation(deployChecksum)]
+	err = unstructured.SetNestedStringMap(target.Object.Object, targetAnn, path...)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func checkIfCreateJob(k8sClient dynamic.Interface, currentObj *unstructured.Unstructured, target resourceutil.Resource) error {

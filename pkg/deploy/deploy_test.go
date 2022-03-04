@@ -409,6 +409,64 @@ func TestEnsureDeployAll(t *testing.T) {
 	})
 }
 
+func TestEnsureSmartDeploy(t *testing.T) {
+	expectedCheckSum := "6ab733c74e26e73bca78aa9c4c9db62664f339d9eefac51dd503c9ff0cf0c329"
+
+	t.Run("Add deployment deploy/checksum annotation", func(t *testing.T) {
+		targetObject, err := resourceutil.NewResources("testdata/test-deployment.yaml", "default")
+		require.Nil(t, err)
+		currentObj := targetObject[0].Object.DeepCopy()
+		unstructured.SetNestedStringMap(currentObj.Object, map[string]string{
+			"mia-platform.eu/deploy-checksum": expectedCheckSum,
+			"test":                            "test",
+		}, "spec", "template", "metadata", "annotations")
+		t.Logf("targetObj: %s\n", currentObj.Object)
+		err = ensureSmartDeploy(currentObj, &targetObject[0])
+		require.Nil(t, err)
+		targetAnn, _, err := unstructured.NestedStringMap(targetObject[0].Object.Object,
+			"spec", "template", "metadata", "annotations")
+		require.Nil(t, err)
+		require.Equal(t, targetAnn["mia-platform.eu/deploy-checksum"], expectedCheckSum)
+	})
+
+	t.Run("Add deployment without deploy/checksum annotation", func(t *testing.T) {
+		targetObject, err := resourceutil.NewResources("testdata/test-deployment.yaml", "default")
+		require.Nil(t, err)
+		currentObj := targetObject[0].Object.DeepCopy()
+		err =
+			unstructured.SetNestedStringMap(targetObject[0].Object.Object, map[string]string{
+				"test": "test",
+			}, "spec", "template", "annotations")
+		require.Nil(t, err)
+
+		err = ensureSmartDeploy(currentObj, &targetObject[0])
+		require.Nil(t, err)
+
+		targetAnn, _, err := unstructured.NestedStringMap(targetObject[0].Object.Object,
+			"spec", "template", "annotations")
+		require.Nil(t, err)
+		require.Equal(t, "test", targetAnn["test"])
+	})
+
+	t.Run("Add cronjob deploy/checksum annotation", func(t *testing.T) {
+		targetObject, err := resourceutil.NewResources("testdata/cronjob-test.cronjob.yml", "default")
+		require.Nil(t, err)
+		currentObj := targetObject[0].Object.DeepCopy()
+		unstructured.SetNestedStringMap(currentObj.Object, map[string]string{
+			"mia-platform.eu/deploy-checksum": expectedCheckSum,
+			"test":                            "test",
+		}, "spec", "jobTemplate", "spec", "template", "metadata", "annotations")
+		t.Logf("targetObj: %s\n", currentObj.Object)
+		err = ensureSmartDeploy(currentObj, &targetObject[0])
+
+		require.Nil(t, err)
+		targetAnn, _, err := unstructured.NestedStringMap(targetObject[0].Object.Object,
+			"spec", "jobTemplate", "spec", "template", "metadata", "annotations")
+		require.Nil(t, err)
+		require.Equal(t, targetAnn["mia-platform.eu/deploy-checksum"], expectedCheckSum)
+	})
+}
+
 func TestInsertDependencies(t *testing.T) {
 	var configMapMap = map[string]string{"configMap1": "aaa", "configMap2": "bbb", "configMapLongLoongLoooooooooooooooooooooooooooooooooooooooooooooong": "eee"}
 	var secretMap = map[string]string{"secret1": "ccc", "secret2": "ddd"}
