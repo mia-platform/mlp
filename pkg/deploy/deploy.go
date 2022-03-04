@@ -577,6 +577,8 @@ func ensureSmartDeploy(onClusterResource *unstructured.Unstructured, target *res
 		currentAnn = make(map[string]string)
 	}
 
+	// If deployChecksum annotation is not found early returns avoiding creating an
+	// empty annotation causing a pod restart
 	depChecksum, found := currentAnn[resourceutil.GetMiaAnnotation(deployChecksum)]
 	if !found {
 		return nil
