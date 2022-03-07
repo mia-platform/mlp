@@ -17,6 +17,8 @@ spec:
       creationTimestamp: null
       labels:
         app: test-deployment
+      annotations:
+        mia-platform.eu/deploy-checksum: ""
     spec:
       containers:
       - image: nginx
