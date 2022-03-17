@@ -9,12 +9,12 @@ COPY go.sum .
 RUN go mod download
 RUN go mod verify
 
-ARG version="DEV"
-ARG date=""
+ARG VERSION="DEV"
+ARG BUILDTIME=""
 
 COPY . .
 
-ENV GO_LDFLAGS="-w -s -X github.com/mia-platform/mlp/internal/cli.BuildDate=${date} -X github.com/mia-platform/mlp/internal/cli.Version=${version}"
+ENV GO_LDFLAGS="-w -s -X github.com/mia-platform/mlp/internal/cli.BuildDate=${BUILDTIME} -X github.com/mia-platform/mlp/internal/cli.Version=${VERSION}"
 RUN GOOS=linux \
     CGO_ENABLED=0 \
     GOARCH=amd64 \
@@ -25,13 +25,6 @@ RUN GOOS=linux \
 ################## Create image ##################
 
 FROM alpine:3.15
-
-ARG version="DEV"
-
-LABEL maintainer="C.E.C.O.M <operations@mia-platform.eu>" \
-      name="mlp: cli for easier deployment of Mia-Platform Console projects" \
-      eu.mia-platform.url="https://www.mia-platform.eu" \
-      eu.mia-platform.version="${version}"
 
 COPY --from=builder /build/mlp /usr/local/bin/
 

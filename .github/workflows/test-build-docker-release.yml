@@ -67,6 +67,10 @@ jobs:
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+          labels: |
+            org.opencontainers.image.documentation=https://docs.mia-platform.eu/docs/runtime_suite_tools/mlp/overview
+            org.opencontainers.image.vendor=Mia s.r.l.
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
@@ -105,6 +109,9 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
           platforms: linux/amd64,linux/arm64
+          build-args: |
+            BUILDTIME=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+            VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
 
   goreleaser:
     name: Go Releaser
