@@ -60,9 +60,9 @@ test: fmt vet envtest
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./... -coverprofile cover.out
 
 coverage: test
-	go tool cover -func=coverage.out
+	go tool cover -func=cover.out
 
 clean:
-	rm -rf ./mlp
+	rm -rf ./bin/mlp
 	go clean -cache
 	rm -rf *.out
