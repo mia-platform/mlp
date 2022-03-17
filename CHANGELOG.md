@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - match as patch patch.ya?ml
 - ignore patches already in kustomization.yaml
+- smart deploy don't force deploy pods on first update
 
 ## [1.0.3] - 2022-02-07
 
