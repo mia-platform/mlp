@@ -1,5 +1,5 @@
 ################### Build mlp ####################
-FROM golang:1.16.14 AS builder
+FROM golang:1.17.8 AS builder
 
 WORKDIR /build
 
@@ -26,10 +26,12 @@ RUN GOOS=linux \
 
 FROM alpine:3.15
 
+ARG version="DEV"
+
 LABEL maintainer="C.E.C.O.M <operations@mia-platform.eu>" \
-      name="Image for console deployments" \
+      name="mlp: cli for easier deployment of Mia-Platform Console projects" \
       eu.mia-platform.url="https://www.mia-platform.eu" \
-      eu.mia-platform.version="3"
+      eu.mia-platform.version="${version}"
 
 COPY --from=builder /build/mlp /usr/local/bin/
 
