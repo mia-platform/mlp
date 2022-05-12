@@ -30,6 +30,7 @@ var defaultSortOrder = resourceOrder{
 	"ClusterRoleBinding",
 	"Role",
 	"RoleBinding",
+	"SecretProviderClass",
 	"Secret",
 	"ConfigMap",
 	"StorageClass",
