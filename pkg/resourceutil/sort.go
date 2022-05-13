@@ -104,15 +104,20 @@ func convertOrderingInMap(ordering resourceOrder) map[string]int {
 	return orderingMap
 }
 
-func getOrderFromAnnotationOrKind(orderingMap map[string]int, resource Resource) (int, bool) {
-	applyBeforeValue, applyBeforeFound := resource.Object.GetAnnotations()[ApplyBeforeAnnotation]
-	if applyBeforeFound {
-		order := len(orderingMap)
+// returns the lowest order of the kinds specified in
+// mia-platform.eu/apply-before-kinds annotation or if the annotation is not
+// present returns the order specified in orderingMap for the resource's kind
+func getOrderFromAnnotationOrKind(orderingMap map[string]int, resource Resource) (float32, bool) {
+	annotations := resource.Object.GetAnnotations()
+	if applyBeforeValue, applyBeforeFound := annotations[ApplyBeforeAnnotation]; applyBeforeFound {
+		order := float32(len(orderingMap)) + 0.5
 
 		for _, kind := range strings.Split(applyBeforeValue, ",") {
-			kindOrder, kindOrderFound := orderingMap[kind]
-			if kindOrderFound && kindOrder < order {
-				order = kindOrder - 1
+			trimmedKind := strings.Trim(kind, " ")
+			kindOrder, kindOrderFound := orderingMap[trimmedKind]
+			kindOrderFloat := float32(kindOrder)
+			if kindOrderFound && kindOrderFloat < order {
+				order = kindOrderFloat - 0.5
 			}
 		}
 
@@ -120,5 +125,5 @@ func getOrderFromAnnotationOrKind(orderingMap map[string]int, resource Resource)
 	}
 
 	order, orderFound := orderingMap[resource.GroupVersionKind.Kind]
-	return order, orderFound
+	return float32(order), orderFound
 }
