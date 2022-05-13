@@ -15,9 +15,9 @@
 package resourceutil
 
 import (
+	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -42,6 +42,9 @@ func TestSortResourcesByKind(t *testing.T) {
 		for _, resource := range SortResourcesByKind(resources, nil) {
 			orderedNames = append(orderedNames, resource.GroupVersionKind.Kind)
 		}
-		require.ElementsMatch(t, expected, orderedNames)
+
+		if !reflect.DeepEqual(orderedNames, expected) {
+			t.Fail()
+		}
 	})
 }
