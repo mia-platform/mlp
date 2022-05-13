@@ -14,7 +14,10 @@
 
 package resourceutil
 
-import "sort"
+import (
+	"sort"
+	"strings"
+)
 
 type resourceOrder []string
 
@@ -66,8 +69,8 @@ func SortResourcesByKind(resources []Resource, ordering resourceOrder) []Resourc
 		kindOfA := resources[i].GroupVersionKind.Kind
 		kindOfB := resources[j].GroupVersionKind.Kind
 
-		aValue, foundA := orderingMap[kindOfA]
-		bValue, foundB := orderingMap[kindOfB]
+		aValue, foundA := getOrderFromAnnotationOrKind(orderingMap, resources[i])
+		bValue, foundB := getOrderFromAnnotationOrKind(orderingMap, resources[j])
 
 		// if both kind are unknown to us return an alphabetical sort by kind or do nothing if the kind is the same
 		if !foundA && !foundB {
@@ -99,4 +102,23 @@ func convertOrderingInMap(ordering resourceOrder) map[string]int {
 	}
 
 	return orderingMap
+}
+
+func getOrderFromAnnotationOrKind(orderingMap map[string]int, resource Resource) (int, bool) {
+	applyBeforeValue, applyBeforeFound := resource.Object.GetAnnotations()[ApplyBeforeAnnotation]
+	if applyBeforeFound {
+		order := len(orderingMap)
+
+		for _, kind := range strings.Split(applyBeforeValue, ",") {
+			kindOrder, kindOrderFound := orderingMap[kind]
+			if kindOrderFound && kindOrder < order {
+				order = kindOrder - 1
+			}
+		}
+
+		return order, true
+	}
+
+	order, orderFound := orderingMap[resource.GroupVersionKind.Kind]
+	return order, orderFound
 }

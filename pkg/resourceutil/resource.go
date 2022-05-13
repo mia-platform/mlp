@@ -49,6 +49,10 @@ const (
 	ConfigMap = "ConfigMap"
 	// Secret is the resource kind for Secrets.
 	Secret = "Secret"
+	// Annotation to override resource application order,
+	// it should be a comma separated list of kinds for which
+	// this specific resource must be applied before.
+	ApplyBeforeAnnotation = "mia-platform.eu/apply-before-kinds"
 )
 
 // Resource a resource reppresentation
