@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- default order for `SecretProviderClass` resource kind
+- new annotation `mia-platform.eu/apply-before-kinds` to override default application order
+
 ## [1.1.0] - 2022-03-17
 
 ### Changed
