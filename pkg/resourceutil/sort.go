@@ -66,11 +66,13 @@ func SortResourcesByKind(resources []Resource, ordering resourceOrder) []Resourc
 
 	orderingMap := convertOrderingInMap(ordering)
 	sort.SliceStable(resources, func(i, j int) bool {
-		kindOfA := resources[i].GroupVersionKind.Kind
-		kindOfB := resources[j].GroupVersionKind.Kind
+		resA := resources[i]
+		resB := resources[j]
+		kindOfA := resA.GroupVersionKind.Kind
+		kindOfB := resB.GroupVersionKind.Kind
 
-		aValue, foundA := getOrderFromAnnotationOrKind(orderingMap, resources[i])
-		bValue, foundB := getOrderFromAnnotationOrKind(orderingMap, resources[j])
+		aValue, foundA := getOrderFromAnnotationOrKind(orderingMap, resA)
+		bValue, foundB := getOrderFromAnnotationOrKind(orderingMap, resB)
 
 		// if both kind are unknown to us return an alphabetical sort by kind or do nothing if the kind is the same
 		if !foundA && !foundB {
