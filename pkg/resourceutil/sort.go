@@ -24,7 +24,7 @@ type resourceOrder []string
 // Annotation to override resource application order,
 // it should be a comma separated list of kinds for which
 // this specific resource must be applied before.
-const ApplyBeforeAnnotation = "mia-platform.eu/apply-before-kinds"
+const applyBeforeAnnotation = "mia-platform.eu/apply-before-kinds"
 
 var defaultSortOrder = resourceOrder{
 	"Namespace",
@@ -118,7 +118,7 @@ func convertOrderingInMap(ordering resourceOrder) map[string]int {
 func getOrderFromAnnotationOrKind(orderingMap map[string]int, resource Resource) (float32, bool) {
 	annotations := resource.Object.GetAnnotations()
 
-	if applyBeforeValue, applyBeforeFound := annotations[ApplyBeforeAnnotation]; applyBeforeFound {
+	if applyBeforeValue, applyBeforeFound := annotations[applyBeforeAnnotation]; applyBeforeFound {
 		order := float32(len(orderingMap))
 
 		for _, kind := range strings.Split(applyBeforeValue, ",") {
