@@ -21,6 +21,11 @@ import (
 
 type resourceOrder []string
 
+// Annotation to override resource application order,
+// it should be a comma separated list of kinds for which
+// this specific resource must be applied before.
+const ApplyBeforeAnnotation = "mia-platform.eu/apply-before-kinds"
+
 var defaultSortOrder = resourceOrder{
 	"Namespace",
 	"NetworkPolicy",
