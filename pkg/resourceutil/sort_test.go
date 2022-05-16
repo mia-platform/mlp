@@ -62,10 +62,10 @@ func TestSortResourcesByKind(t *testing.T) {
 
 	t.Run("Reordering resources with mia-platform.eu/apply-before-kinds annotation", func(t *testing.T) {
 		resources := []Resource{
-			makeResourceWithAnnotation("UnknownBeforeNamespace", "Namespace"),
-			makeResourceWithAnnotation("UnknownBeforeEmpty", ""),
-			makeResourceWithAnnotation("UnknownBeforeDeploymentAndJob", "Job, Deployment"),
-			makeResourceWithAnnotation("UnknownBeforeDeploymentAndUnknown", "Deployment, Unknown"),
+			makeResourceWithAnnotation(t, "UnknownBeforeNamespace", "Namespace"),
+			makeResourceWithAnnotation(t, "UnknownBeforeEmpty", ""),
+			makeResourceWithAnnotation(t, "UnknownBeforeDeploymentAndJob", "Job, Deployment"),
+			makeResourceWithAnnotation(t, "UnknownBeforeDeploymentAndUnknown", "Deployment, Unknown"),
 			{
 				GroupVersionKind: &schema.GroupVersionKind{Kind: "Job"},
 			},
@@ -108,7 +108,8 @@ func TestSortResourcesByKind(t *testing.T) {
 	})
 }
 
-func makeResourceWithAnnotation(kind string, applyBefore string) Resource {
+func makeResourceWithAnnotation(t *testing.T, kind string, applyBefore string) Resource {
+	t.Helper()
 	resource := Resource{
 		GroupVersionKind: &schema.GroupVersionKind{Kind: kind},
 	}
