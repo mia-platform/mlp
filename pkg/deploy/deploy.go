@@ -35,22 +35,26 @@ import (
 	"k8s.io/apimachinery/pkg/util/jsonmergepatch"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubectl/pkg/scheme"
 )
 
 const (
-	dependenciesChecksum = "dependencies-checksum"
-	deployChecksum       = "deploy-checksum"
-	smartDeploy          = "smart_deploy"
-	deployAll            = "deploy_all"
+	dependenciesChecksum      = "dependencies-checksum"
+	deployChecksum            = "deploy-checksum"
+	smartDeploy               = "smart_deploy"
+	deployAll                 = "deploy_all"
+	awaitCompletionAnnotation = "mia-platform.eu/await-completion"
 )
 
 type k8sClients struct {
 	dynamic   dynamic.Interface
 	discovery discovery.DiscoveryInterface
 }
+
+type applyFunction func(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error
 
 // Run execute the deploy command from cli
 func Run(inputPaths []string, deployConfig utils.DeployConfig, opts *utils.Options) {
@@ -317,7 +321,8 @@ func deploy(clients *k8sClients, namespace string, resources []resourceutil.Reso
 
 	// apply the resources
 	for _, res := range resources {
-		err := apply(clients, res, deployConfig)
+		decoratedApply := withAwaitableResource(time.Second*30, apply)
+		err := decoratedApply(clients, res, deployConfig)
 		if err != nil {
 			return err
 		}
@@ -396,6 +401,59 @@ func createJobFromCronjob(k8sClient dynamic.Interface, res *unstructured.Unstruc
 	}
 
 	return jobCreated.GetName(), nil
+}
+
+func withAwaitableResource(timeout time.Duration, apply applyFunction) applyFunction {
+	return func(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
+		gvr, err := resourceutil.FromGVKtoGVR(clients.discovery, res.Object.GroupVersionKind())
+		if err != nil {
+			return err
+		}
+
+		var watchEvents <-chan watch.Event
+
+		startTime := time.Now()
+
+		if _, awaitCompletion := res.Object.GetAnnotations()[awaitCompletionAnnotation]; res.GroupVersionKind.Kind == "Job" && awaitCompletion {
+			watcher, err := clients.dynamic.Resource(gvr).
+				Namespace(res.Object.GetNamespace()).
+				Watch(context.TODO(), metav1.ListOptions{})
+			if err != nil {
+				return err
+			}
+			watchEvents = watcher.ResultChan()
+		}
+
+		if err := apply(clients, res, deployConfig); err != nil {
+			return err
+		}
+
+		if watchEvents == nil {
+			return nil
+		}
+
+		resName := res.Object.GetName()
+
+		for {
+			select {
+			case event := <-watchEvents:
+				u := event.Object.(*unstructured.Unstructured)
+				var job batchv1.Job
+				runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, &job)
+
+				if job.Name != resName {
+					continue
+				}
+
+				if completed := job.Status.CompletionTime; event.Type == watch.Modified && completed != nil && completed.Time.After(startTime) {
+					return nil
+				}
+			case <-time.NewTimer(timeout).C:
+				msg := fmt.Sprintf("Timeout received while waiting for job %s completion", resName)
+				return errors.New(msg)
+			}
+		}
+	}
 }
 
 func apply(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
