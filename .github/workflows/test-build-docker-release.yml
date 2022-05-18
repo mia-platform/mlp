@@ -11,11 +11,13 @@ jobs:
       matrix:
         go_version: [1.17]
         os: [ubuntu-latest]
-        k8s_version: ['1.22', '1.21', '1.20', '1.19']
-    env:
-      ENVTEST_K8S_VERSION: ${{matrix.k8s_version}}
+        kind_node_image: ['kindest/node:v1.22', 'kindest/node:v1.21', 'kindest/node:v1.20', 'kindest/node:v1.19']
     steps:
       - uses: actions/checkout@v2
+      - name: Create k8s Kind Cluster with node image ${{ matrix.kind_node_image }}
+        uses: helm/kind-action@v1.2.0
+        with:
+          node_image: ${{ matrix.kind_node_image }}
       - name: Use golang ${{ matrix.go_version }}
         uses: actions/setup-go@v2
         with:
