@@ -47,7 +47,10 @@ const (
 	smartDeploy               = "smart_deploy"
 	deployAll                 = "deploy_all"
 	awaitCompletionAnnotation = "mia-platform.eu/await-completion"
+	jobAwaitTimeoutDuration   = time.Second * 30
 )
+
+var decoratedApply = withAwaitableJob(jobAwaitTimeoutDuration, apply)
 
 type k8sClients struct {
 	dynamic   dynamic.Interface
@@ -321,7 +324,6 @@ func deploy(clients *k8sClients, namespace string, resources []resourceutil.Reso
 
 	// apply the resources
 	for _, res := range resources {
-		decoratedApply := withAwaitableResource(time.Second*30, apply)
 		err := decoratedApply(clients, res, deployConfig)
 		if err != nil {
 			return err
@@ -403,18 +405,19 @@ func createJobFromCronjob(k8sClient dynamic.Interface, res *unstructured.Unstruc
 	return jobCreated.GetName(), nil
 }
 
-func withAwaitableResource(timeout time.Duration, apply applyFunction) applyFunction {
+func withAwaitableJob(timeout time.Duration, apply applyFunction) applyFunction {
 	return func(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
 		gvr, err := resourceutil.FromGVKtoGVR(clients.discovery, res.Object.GroupVersionKind())
 		if err != nil {
 			return err
 		}
 
+		// Register a watcher and start to listen for events for the gvr
+		// if res is an annotated with awaitCompletionAnnotation job
 		var watchEvents <-chan watch.Event
-
 		startTime := time.Now()
-
-		if _, awaitCompletion := res.Object.GetAnnotations()[awaitCompletionAnnotation]; res.GroupVersionKind.Kind == "Job" && awaitCompletion {
+		_, awaitCompletionFound := res.Object.GetAnnotations()[awaitCompletionAnnotation]
+		if res.GroupVersionKind.Kind == "Job" && awaitCompletionFound {
 			watcher, err := clients.dynamic.Resource(gvr).
 				Namespace(res.Object.GetNamespace()).
 				Watch(context.TODO(), metav1.ListOptions{})
@@ -422,6 +425,7 @@ func withAwaitableResource(timeout time.Duration, apply applyFunction) applyFunc
 				return err
 			}
 			watchEvents = watcher.ResultChan()
+			fmt.Println("Registered watcher for job:", res.Object.GetName())
 		}
 
 		if err := apply(clients, res, deployConfig); err != nil {
@@ -432,24 +436,25 @@ func withAwaitableResource(timeout time.Duration, apply applyFunction) applyFunc
 			return nil
 		}
 
-		resName := res.Object.GetName()
-
+		// Consume watcher events and wait for the job to complete or exit because of timeout
 		for {
 			select {
 			case event := <-watchEvents:
+				fmt.Println("Event:", event)
 				u := event.Object.(*unstructured.Unstructured)
 				var job batchv1.Job
 				runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, &job)
 
-				if job.Name != resName {
+				if job.Name != res.Object.GetName() {
 					continue
 				}
 
 				if completed := job.Status.CompletionTime; event.Type == watch.Modified && completed != nil && completed.Time.After(startTime) {
+					fmt.Println("Job completed:", res.Object.GetName())
 					return nil
 				}
 			case <-time.NewTimer(timeout).C:
-				msg := fmt.Sprintf("Timeout received while waiting for job %s completion", resName)
+				msg := fmt.Sprintf("Timeout received while waiting for job %s completion", res.Object.GetName())
 				return errors.New(msg)
 			}
 		}
