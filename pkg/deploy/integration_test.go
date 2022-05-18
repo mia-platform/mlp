@@ -115,7 +115,7 @@ var _ = Describe("deploy on mock kubernetes", func() {
 			By("No annotation last applied for configmap and secrets")
 			Expect(sec.GetLabels()[corev1.LastAppliedConfigAnnotation]).To(Equal(""))
 		})
-		It("creates and updates depoyment", func() {
+		It("creates and updates deployment", func() {
 			err := doRun(clients, "test3", []string{"testdata/integration/apply-resources/test-deployment-1.yaml"}, deployConfig, currentTime)
 			Expect(err).NotTo(HaveOccurred())
 			err = doRun(clients, "test3", []string{"testdata/integration/apply-resources/test-deployment-2.yaml"}, deployConfig, currentTime)
