@@ -28,7 +28,7 @@ The main subcommands that the tool has are:
 brew install mia-platform/tap/mlp
 ```
 
-## Using Docker
+### Using Docker
 
 ```
 docker run -it --rm ghcr.io/mia-platform/mlp
@@ -39,6 +39,10 @@ docker run -it --rm ghcr.io/mia-platform/mlp
 ```
 go get -u github.com/mia-platform/mlp
 ```
+
+## Test
+
+Run tests using `make test` in the repo root directory. Notice that in order to run integration tests locally you **must have** configured a k8s cluster connection in the running environment.
 
 ## Docs
 
