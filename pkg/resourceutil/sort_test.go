@@ -66,21 +66,11 @@ func TestSortResourcesByKind(t *testing.T) {
 			makeResourceWithAnnotation(t, "UnknownBeforeEmpty", ""),
 			makeResourceWithAnnotation(t, "UnknownBeforeDeploymentAndJob", "Job, Deployment"),
 			makeResourceWithAnnotation(t, "UnknownBeforeDeploymentAndUnknown", "Deployment, Unknown"),
-			{
-				GroupVersionKind: &schema.GroupVersionKind{Kind: "Job"},
-			},
-			{
-				GroupVersionKind: &schema.GroupVersionKind{Kind: "Pod"},
-			},
-			{
-				GroupVersionKind: &schema.GroupVersionKind{Kind: "Deployment"},
-			},
-			{
-				GroupVersionKind: &schema.GroupVersionKind{Kind: "Namespace"},
-			},
-			{
-				GroupVersionKind: &schema.GroupVersionKind{Kind: "Unknown"},
-			},
+			{GroupVersionKind: &schema.GroupVersionKind{Kind: "Job"}},
+			{GroupVersionKind: &schema.GroupVersionKind{Kind: "Pod"}},
+			{GroupVersionKind: &schema.GroupVersionKind{Kind: "Deployment"}},
+			{GroupVersionKind: &schema.GroupVersionKind{Kind: "Namespace"}},
+			{GroupVersionKind: &schema.GroupVersionKind{Kind: "Unknown"}},
 		}
 
 		expected := []string{
