@@ -55,9 +55,7 @@ func TestSortResourcesByKind(t *testing.T) {
 			orderedNames = append(orderedNames, resource.GroupVersionKind.Kind)
 		}
 
-		if !reflect.DeepEqual(orderedNames, expected) {
-			t.Fail()
-		}
+		assertDeepEqual(t, orderedNames, expected)
 	})
 
 	t.Run("Reordering resources with mia-platform.eu/apply-before-kinds annotation", func(t *testing.T) {
@@ -89,13 +87,18 @@ func TestSortResourcesByKind(t *testing.T) {
 			orderedNames = append(orderedNames, resource.GroupVersionKind.Kind)
 		}
 
-		if !reflect.DeepEqual(orderedNames, expected) {
-			fmt.Println(t.Name(), "reflect.DeepEqual failed")
-			fmt.Println("  expected:", expected)
-			fmt.Println("  actual:  ", orderedNames)
-			t.Fail()
-		}
+		assertDeepEqual(t, orderedNames, expected)
 	})
+}
+
+func assertDeepEqual(t *testing.T, actual, expected interface{}) {
+	t.Helper()
+	if !reflect.DeepEqual(actual, expected) {
+		fmt.Println(t.Name(), "reflect.DeepEqual failed")
+		fmt.Println("  expected:", expected)
+		fmt.Println("  actual:  ", actual)
+		t.Fail()
+	}
 }
 
 func makeResourceWithAnnotation(t *testing.T, kind string, applyBefore string) Resource {
