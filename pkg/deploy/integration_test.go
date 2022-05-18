@@ -155,7 +155,7 @@ var _ = Describe("deploy on mock kubernetes", func() {
 			Expect(err).NotTo(HaveOccurred())
 			u, err := clients.dynamic.Resource(gvrJobs).
 				Namespace(ns).
-				Get(context.Background(), "awaitable-job", metav1.GetOptions{})
+				Get(context.Background(), "test-awaitable-job", metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			var job batchv1.Job
 			runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, &job)
