@@ -157,6 +157,18 @@ var _ = Describe("deploy on mock kubernetes", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(jobList.Items[0].GetLabels()["job-name"]).To(ContainSubstring("test-cronjob"))
 		})
+		It("awaits for job completion if annotated with mia-platform.eu/await-completion", func() {
+			ns := "test-await-job-completion"
+			err := doRun(clients, ns, []string{"testdata/integration/apply-resources/awaitable-job.yaml"}, deployConfig, currentTime)
+			Expect(err).NotTo(HaveOccurred())
+			u, err := clients.dynamic.Resource(gvrJobs).
+				Namespace(ns).
+				Get(context.Background(), "awaitable-job", metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			var job batchv1.Job
+			runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, &job)
+			Expect(job.Status.CompletionTime).NotTo(BeNil())
+		})
 	})
 	Context("smart deploy", func() {
 		deployConfig := utils.DeployConfig{
