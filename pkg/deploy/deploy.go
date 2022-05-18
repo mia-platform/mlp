@@ -440,7 +440,6 @@ func withAwaitableJob(timeout time.Duration, apply applyFunction) applyFunction 
 		for {
 			select {
 			case event := <-watchEvents:
-				fmt.Println("Event:", event)
 				u := event.Object.(*unstructured.Unstructured)
 				var job batchv1.Job
 				runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, &job)
