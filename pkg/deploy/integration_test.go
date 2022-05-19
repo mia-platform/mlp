@@ -48,6 +48,12 @@ var _ = BeforeSuite(func() {
 	cfg, err := kubeConfig.ClientConfig()
 	Expect(err).To(BeNil())
 
+	// The following two options manage client-side throttling to decrease pressure on api-server
+	// Kubectl sets 300 bursts 50.0 QPS:
+	// https://github.com/kubernetes/kubectl/blob/0862c57c87184432986c85674a237737dabc53fa/pkg/cmd/cmd.go#L92
+	cfg.QPS = 5000.0
+	cfg.Burst = 5000
+
 	clients = &k8sClients{
 		dynamic:   dynamic.NewForConfigOrDie(cfg),
 		discovery: discovery.NewDiscoveryClientForConfigOrDie(cfg),
