@@ -60,10 +60,10 @@ func TestSortResourcesByKind(t *testing.T) {
 
 	t.Run("Reordering resources with mia-platform.eu/apply-before-kinds annotation", func(t *testing.T) {
 		resources := []Resource{
-			makeResourceWithAnnotation(t, "UnknownBeforeNamespace", "Namespace"),
-			makeResourceWithAnnotation(t, "UnknownBeforeEmpty", ""),
-			makeResourceWithAnnotation(t, "UnknownBeforeDeploymentAndJob", "Job, Deployment"),
-			makeResourceWithAnnotation(t, "UnknownBeforeDeploymentAndUnknown", "Deployment, Unknown"),
+			makeResourceWithApplyBeforeAnnotation(t, "UnknownBeforeNamespace", "Namespace"),
+			makeResourceWithApplyBeforeAnnotation(t, "UnknownBeforeEmpty", ""),
+			makeResourceWithApplyBeforeAnnotation(t, "UnknownBeforeDeploymentAndJob", "Job, Deployment"),
+			makeResourceWithApplyBeforeAnnotation(t, "UnknownBeforeDeploymentAndUnknown", "Deployment, Unknown"),
 			{GroupVersionKind: &schema.GroupVersionKind{Kind: "Job"}},
 			{GroupVersionKind: &schema.GroupVersionKind{Kind: "Pod"}},
 			{GroupVersionKind: &schema.GroupVersionKind{Kind: "Deployment"}},
@@ -101,7 +101,7 @@ func assertDeepEqual(t *testing.T, actual, expected interface{}) {
 	}
 }
 
-func makeResourceWithAnnotation(t *testing.T, kind string, applyBefore string) Resource {
+func makeResourceWithApplyBeforeAnnotation(t *testing.T, kind string, applyBefore string) Resource {
 	t.Helper()
 	resource := Resource{
 		GroupVersionKind: &schema.GroupVersionKind{Kind: kind},
