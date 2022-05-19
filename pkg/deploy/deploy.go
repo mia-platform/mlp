@@ -448,7 +448,7 @@ func withAwaitableJob(timeout time.Duration, apply applyFunction) applyFunction 
 					continue
 				}
 
-				if completed := job.Status.CompletionTime; event.Type == watch.Modified && completed != nil && completed.Time.After(startTime) {
+				if completedAt := job.Status.CompletionTime; event.Type == watch.Modified && completedAt != nil && completedAt.Time.After(startTime) {
 					fmt.Println("Job completed:", res.Object.GetName())
 					return nil
 				}
