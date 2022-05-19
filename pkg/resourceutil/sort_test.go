@@ -34,6 +34,7 @@ func TestSortResourcesByKind(t *testing.T) {
 			{GroupVersionKind: &schema.GroupVersionKind{Kind: "Deployment"}},
 			{GroupVersionKind: &schema.GroupVersionKind{Kind: "PodSecurityPolicy"}},
 			{GroupVersionKind: &schema.GroupVersionKind{Kind: "ServiceAccount"}},
+			{GroupVersionKind: &schema.GroupVersionKind{Kind: "SecretProviderClass"}},
 			{GroupVersionKind: &schema.GroupVersionKind{Kind: "Service"}},
 		}
 		expected := []string{
@@ -41,6 +42,7 @@ func TestSortResourcesByKind(t *testing.T) {
 			"ServiceAccount",
 			"ClusterRole",
 			"ClusterRoleBinding",
+			"SecretProviderClass",
 			"Secret",
 			"ConfigMap",
 			"ConfigMap",
