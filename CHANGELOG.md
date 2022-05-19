@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - support for jobs annotation `mia-platform.eu/await-completion` for waiting job completion after it has been applied on the cluster
 
+### Changed
+
+- use `kind` in integration tests
+
 ## [1.1.0] - 2022-03-17
 
 ### Changed
