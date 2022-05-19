@@ -16,7 +16,7 @@ To make the command work, also the following flags described in [options](./25_o
 
 ## Resources application order
 
-By default resources to be deployed are applied in a [prechosen order](https://github.com/mia-platform/mlp/blob/main/pkg/resourceutil/sort.go) based on their `Kind`. It can be overridden by annotating the target resource with `mia-platform.eu/apply-before-kinds`. This annotation takes a comma-separated list of kinds for which the resource must be applied before. Any resource having this annotation falls outside the kind-based sorting logic and therefore cannot be applied after other resources having in their `mia-platform.eu/apply-before-kinds` annotation its kind.
+By default resources to be deployed are applied in a [prechosen order](https://github.com/mia-platform/mlp/blob/main/pkg/resourceutil/sort.go) based on their `Kind`. It can be overridden by annotating the target resource with `mia-platform.eu/apply-before-kinds`. This annotation takes a comma-separated list of kinds for which the resource must be applied before. If some of the specified kinds is not managed in the default order listing they are ignored. Any resource having this annotation falls outside the kind-based sorting logic and therefore cannot be applied after other resources having in their `mia-platform.eu/apply-before-kinds` annotation its kind.
 Below there is an example of a resource that must be applied before `Pod`s and `Deployment`s:
 ``` yaml
 apiVersion: batch/v1
