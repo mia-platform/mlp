@@ -15,10 +15,9 @@
 package resourceutil
 
 import (
-	"fmt"
-	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -55,7 +54,7 @@ func TestSortResourcesByKind(t *testing.T) {
 			orderedNames = append(orderedNames, resource.GroupVersionKind.Kind)
 		}
 
-		assertDeepEqual(t, orderedNames, expected)
+		assert.Exactly(t, expected, orderedNames)
 	})
 
 	t.Run("Reordering resources with mia-platform.eu/apply-before-kinds annotation", func(t *testing.T) {
@@ -87,18 +86,8 @@ func TestSortResourcesByKind(t *testing.T) {
 			orderedNames = append(orderedNames, resource.GroupVersionKind.Kind)
 		}
 
-		assertDeepEqual(t, orderedNames, expected)
+		assert.Exactly(t, expected, orderedNames)
 	})
-}
-
-func assertDeepEqual(t *testing.T, actual, expected interface{}) {
-	t.Helper()
-	if !reflect.DeepEqual(actual, expected) {
-		fmt.Println(t.Name(), "reflect.DeepEqual failed")
-		fmt.Println("  expected:", expected)
-		fmt.Println("  actual:  ", actual)
-		t.Fail()
-	}
 }
 
 func makeResourceWithApplyBeforeAnnotation(t *testing.T, kind string, applyBefore string) Resource {
