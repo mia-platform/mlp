@@ -123,7 +123,7 @@ func getOrderFromAnnotationOrKind(orderingMap map[string]int, resource Resource)
 		order := float32(len(orderingMap))
 
 		for _, kind := range strings.Split(applyBeforeValue, ",") {
-			trimmedKind := strings.Trim(kind, " ")
+			trimmedKind := strings.TrimSpace(kind)
 			kindOrder, kindOrderFound := orderingMap[trimmedKind]
 			kindOrderFloat := float32(kindOrder)
 
