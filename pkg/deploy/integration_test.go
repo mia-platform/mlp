@@ -64,7 +64,7 @@ var _ = AfterSuite(func() {
 	By("tearing down the test environment")
 }, 60)
 
-var _ = Describe("deploy on mock kubernetes", func() {
+var _ = Describe("deploy on kubernetes", func() {
 	deployConfig := utils.DeployConfig{
 		DeployType:              deployAll,
 		ForceDeployWhenNoSemver: true,
@@ -155,7 +155,7 @@ var _ = Describe("deploy on mock kubernetes", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(jobList.Items[0].GetLabels()["job-name"]).To(ContainSubstring("test-cronjob"))
 		})
-		It("awaits for job completion if annotated with mia-platform.eu/await-completion", func() {
+		It("awaits for job completion if annotated with mia-platform.eu/await-completion - with completion", func() {
 			ns := "test-await-job-completion"
 			err := doRun(clients, ns, []string{"testdata/integration/apply-resources/awaitable-job.yaml"}, deployConfig, currentTime)
 			Expect(err).NotTo(HaveOccurred())
@@ -166,6 +166,18 @@ var _ = Describe("deploy on mock kubernetes", func() {
 			var job batchv1.Job
 			runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, &job)
 			Expect(job.Status.CompletionTime).NotTo(BeNil())
+		})
+		It("awaits for job completion if annotated with mia-platform.eu/await-completion - with timeout", func() {
+			ns := "test-await-job-completion"
+			err := doRun(clients, ns, []string{"testdata/integration/apply-resources/awaitable-job-timeout.yaml"}, deployConfig, currentTime)
+			Expect(err).To(HaveOccurred())
+			u, err := clients.dynamic.Resource(gvrJobs).
+				Namespace(ns).
+				Get(context.Background(), "test-awaitable-job-timeout", metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			var job batchv1.Job
+			runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, &job)
+			Expect(job.Status.CompletionTime).To(BeNil())
 		})
 	})
 	Context("smart deploy", func() {
