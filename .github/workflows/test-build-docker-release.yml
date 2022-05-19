@@ -5,13 +5,13 @@ on:
   push:
 jobs:
   tests:
-    name: Test k8s ${{ matrix.k8s_version }} on os ${{matrix.os}} - go version ${{ matrix.go_version }}
+    name: Test k8s ${{ matrix.kind_node_image }} on os ${{matrix.os}} - go version ${{ matrix.go_version }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         go_version: [1.17]
         os: [ubuntu-latest]
-        kind_node_image: ['kindest/node:v1.22.0', 'kindest/node:v1.21.1', 'kindest/node:v1.20.0', 'kindest/node:v1.19.0']
+        kind_node_image: ['kindest/node:v1.22.0', 'kindest/node:v1.20.0', 'kindest/node:v1.19.0'] # ['kindest/node:v1.22.0', 'kindest/node:v1.21.1', 'kindest/node:v1.20.0', 'kindest/node:v1.19.0']
     steps:
       - uses: actions/checkout@v2
       - name: Create k8s Kind Cluster with node image ${{ matrix.kind_node_image }}
