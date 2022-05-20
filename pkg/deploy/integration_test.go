@@ -164,7 +164,8 @@ var _ = Describe("deploy on kubernetes", func() {
 				Get(context.Background(), "test-awaitable-job", metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			var job batchv1.Job
-			runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, &job)
+			err = runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, &job)
+			Expect(err).NotTo(HaveOccurred())
 			Expect(job.Status.CompletionTime).NotTo(BeNil())
 		})
 		It("awaits for job completion if annotated with mia-platform.eu/await-completion - with timeout", func() {
