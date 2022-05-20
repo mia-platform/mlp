@@ -17,7 +17,7 @@ package resourceutil
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -56,7 +56,7 @@ func TestSortResourcesByKind(t *testing.T) {
 			orderedNames = append(orderedNames, resource.GroupVersionKind.Kind)
 		}
 
-		assert.Exactly(t, expected, orderedNames)
+		require.Exactly(t, expected, orderedNames)
 	})
 
 	t.Run("Reordering resources with mia-platform.eu/apply-before-kinds annotation", func(t *testing.T) {
@@ -88,7 +88,7 @@ func TestSortResourcesByKind(t *testing.T) {
 			orderedNames = append(orderedNames, resource.GroupVersionKind.Kind)
 		}
 
-		assert.Exactly(t, expected, orderedNames)
+		require.Exactly(t, expected, orderedNames)
 	})
 }
 
