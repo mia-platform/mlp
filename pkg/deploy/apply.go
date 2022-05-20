@@ -29,7 +29,7 @@ type applyFunction func(clients *k8sClients, res resourceutil.Resource, deployCo
 
 const awaitCompletionAnnotation = "mia-platform.eu/await-completion"
 
-var decoratedApply = withAwaitableResource(apply)
+var apply = withAwaitableResource(applyResource)
 
 func withAwaitableResource(apply applyFunction) applyFunction {
 	return func(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
@@ -130,7 +130,7 @@ func handleResourceCompletionEvent(res *resourceutil.Resource, event *watch.Even
 	}
 }
 
-func apply(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
+func applyResource(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
 
 	gvr, err := resourceutil.FromGVKtoGVR(clients.discovery, res.Object.GroupVersionKind())
 	if err != nil {

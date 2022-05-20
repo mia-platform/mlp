@@ -290,7 +290,7 @@ func deploy(clients *k8sClients, namespace string, resources []resourceutil.Reso
 
 	// apply the resources
 	for _, res := range resources {
-		err := decoratedApply(clients, res, deployConfig)
+		err := apply(clients, res, deployConfig)
 		if err != nil {
 			return err
 		}
