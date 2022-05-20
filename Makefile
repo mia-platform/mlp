@@ -35,8 +35,13 @@ fmt: ## Run go fmt against code.
 vet: ## Run go vet against code.
 	go vet ./...
 
-test: fmt vet
+unit_test:
 	go test ./... -coverprofile cover.out
+
+integration_test:
+	go test ./... -coverprofile cover.out -tags integration
+
+test: unit_test integration_test
 
 coverage: test
 	go tool cover -func=cover.out
