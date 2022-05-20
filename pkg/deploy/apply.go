@@ -92,7 +92,7 @@ func withAwaitableResource(apply applyFunction) applyFunction {
 		}
 
 		// check if res can be handled
-		if _, err := handleResourceCompletionEvent(&res, nil, startTime); err != nil {
+		if _, err := handleResourceCompletionEvent(res, nil, startTime); err != nil {
 			return err
 		}
 
@@ -100,7 +100,7 @@ func withAwaitableResource(apply applyFunction) applyFunction {
 		for {
 			select {
 			case event := <-watchEvents:
-				isCompleted, err := handleResourceCompletionEvent(&res, &event, startTime)
+				isCompleted, err := handleResourceCompletionEvent(res, &event, startTime)
 				if err != nil {
 					msg := "Error while watching resource events"
 					return errors.Wrap(err, msg)
@@ -121,7 +121,7 @@ func withAwaitableResource(apply applyFunction) applyFunction {
 // the initial watch time as arguments. It returns (true, nil) when the given
 // resource has completed in the given event. If the event is nil returns (false, nil)
 // when the resource supports events watching otherwise returns (false, error).
-func handleResourceCompletionEvent(res *resourceutil.Resource, event *watch.Event, startTime time.Time) (bool, error) {
+func handleResourceCompletionEvent(res resourceutil.Resource, event *watch.Event, startTime time.Time) (bool, error) {
 	switch res.GroupVersionKind.Kind {
 	case "Job":
 		if event == nil {
