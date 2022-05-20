@@ -15,7 +15,6 @@
 package deploy
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -24,8 +23,6 @@ import (
 	"github.com/mia-platform/mlp/internal/utils"
 	"github.com/mia-platform/mlp/pkg/resourceutil"
 	"github.com/pkg/errors"
-	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -167,25 +164,6 @@ func insertDependencies(res *resourceutil.Resource, configMapMap map[string]stri
 	return unstructured.SetNestedStringMap(res.Object.Object,
 		currentAnnotations,
 		path...)
-}
-
-func ensureDeployAll(res *resourceutil.Resource, currentTime time.Time) error {
-	var path []string
-	switch res.GroupVersionKind.Kind {
-	case "Deployment":
-		path = []string{"spec", "template", "metadata", "annotations"}
-	case "CronJob":
-		path = []string{"spec", "jobTemplate", "spec", "template", "metadata", "annotations"}
-	}
-	currentAnnotations, found, err := unstructured.NestedStringMap(res.Object.Object, path...)
-	if err != nil {
-		return err
-	}
-	if !found {
-		currentAnnotations = make(map[string]string)
-	}
-	currentAnnotations[resourceutil.GetMiaAnnotation(deployChecksum)] = resourceutil.GetChecksum([]byte(currentTime.Format(time.RFC3339)))
-	return unstructured.SetNestedStringMap(res.Object.Object, currentAnnotations, path...)
 }
 
 // cleanup removes the resources no longer deployed by `mlp` and updates
@@ -335,141 +313,5 @@ func ensureNamespaceExistence(clients *k8sClients, namespace string) error {
 		return err
 	}
 
-	return nil
-}
-
-func createJobFromCronjob(k8sClient dynamic.Interface, res *unstructured.Unstructured) (string, error) {
-
-	var cronjobObj batchv1beta1.CronJob
-	err := runtime.DefaultUnstructuredConverter.
-		FromUnstructured(res.Object, &cronjobObj)
-	if err != nil {
-		return "", fmt.Errorf("error in conversion to Cronjob")
-	}
-	annotations := make(map[string]string)
-	annotations["cronjob.kubernetes.io/instantiate"] = "manual"
-	job := &batchv1.Job{
-		TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "Job"},
-		ObjectMeta: metav1.ObjectMeta{
-			// Use this instead of Name field to avoid name conflicts
-			GenerateName: res.GetName() + "-",
-			Annotations:  annotations,
-			Labels:       cronjobObj.Spec.JobTemplate.Labels,
-
-			// TODO: decide if it necessary to include it or not. At the moment it
-			// prevents the pod creation saying that it cannot mount the default token
-			// inside the container
-			//
-			// OwnerReferences: []metav1.OwnerReference{
-			// 	{
-			// 		APIVersion: batchv1beta1.SchemeGroupVersion.String(),
-			// 		Kind:       cronjobObj.Kind,
-			// 		Name:       cronjobObj.GetName(),
-			// 		UID:        cronjobObj.GetUID(),
-			// 	},
-			// },
-		},
-		Spec: cronjobObj.Spec.JobTemplate.Spec,
-	}
-
-	fmt.Printf("Creating job from cronjob: %s\n", res.GetName())
-
-	unstrCurrentObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&job)
-	if err != nil {
-		return "", err
-	}
-
-	jobCreated, err := k8sClient.Resource(gvrJobs).
-		Namespace(res.GetNamespace()).
-		Create(context.Background(),
-			&unstructured.Unstructured{
-				Object: unstrCurrentObj,
-			},
-			metav1.CreateOptions{})
-	if err != nil {
-		return "", err
-	}
-
-	return jobCreated.GetName(), nil
-}
-
-// EnsureSmartDeploy merge, if present, the "mia-platform.eu/deploy-checksum" annotation from the Kubernetes cluster
-// into the target Resource that is going to be released.
-func ensureSmartDeploy(onClusterResource *unstructured.Unstructured, target *resourceutil.Resource) error {
-	var path []string
-	switch target.GroupVersionKind.Kind {
-	case "Deployment":
-		path = []string{"spec", "template", "metadata", "annotations"}
-	case "CronJob":
-		path = []string{"spec", "jobTemplate", "spec", "template", "metadata", "annotations"}
-	}
-
-	currentAnn, found, err := unstructured.NestedStringMap(onClusterResource.Object, path...)
-	if err != nil {
-		return err
-	}
-	if !found {
-		currentAnn = make(map[string]string)
-	}
-
-	// If deployChecksum annotation is not found early returns avoiding creating an
-	// empty annotation causing a pod restart
-	depChecksum, found := currentAnn[resourceutil.GetMiaAnnotation(deployChecksum)]
-	if !found {
-		return nil
-	}
-
-	targetAnn, found, err := unstructured.NestedStringMap(target.Object.Object, path...)
-	if err != nil {
-		return err
-	}
-	if !found {
-		targetAnn = make(map[string]string)
-	}
-	targetAnn[resourceutil.GetMiaAnnotation(deployChecksum)] = depChecksum
-	err = unstructured.SetNestedStringMap(target.Object.Object, targetAnn, path...)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func checkIfCreateJob(k8sClient dynamic.Interface, currentObj *unstructured.Unstructured, target resourceutil.Resource) error {
-	original := currentObj.GetAnnotations()[corev1.LastAppliedConfigAnnotation]
-
-	obj := target.Object.DeepCopy()
-	objAnn := obj.GetAnnotations()
-	_, found := objAnn[corev1.LastAppliedConfigAnnotation]
-	if found {
-		delete(objAnn, corev1.LastAppliedConfigAnnotation)
-		obj.SetAnnotations(objAnn)
-	}
-	desired, err := obj.MarshalJSON()
-	if err != nil {
-		return errors.Wrap(err, "serializing target configuration")
-	}
-
-	if !bytes.Equal([]byte(original), desired) {
-		if err := cronJobAutoCreate(k8sClient, &target.Object); err != nil {
-			return errors.Wrap(err, "failed on cronJobAutoCreate")
-		}
-	}
-	return nil
-}
-
-// Create a Job from every CronJob having the mia-platform.eu/autocreate annotation set to true
-func cronJobAutoCreate(k8sClient dynamic.Interface, res *unstructured.Unstructured) error {
-	if res.GetKind() != "CronJob" {
-		return nil
-	}
-	val, ok := res.GetAnnotations()[resourceutil.GetMiaAnnotation("autocreate")]
-	if !ok || val != "true" {
-		return nil
-	}
-
-	if _, err := createJobFromCronjob(k8sClient, res); err != nil {
-		return err
-	}
 	return nil
 }
