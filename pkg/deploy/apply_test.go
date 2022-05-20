@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	dynamicFake "k8s.io/client-go/dynamic/fake"
 )
@@ -282,5 +283,37 @@ func TestEnsureSmartDeploy(t *testing.T) {
 			"spec", "jobTemplate", "spec", "template", "metadata", "annotations")
 		require.Nil(t, err)
 		require.Equal(t, targetAnn["mia-platform.eu/deploy-checksum"], expectedCheckSum)
+	})
+}
+
+func TestHandleResourceCompletionEvent(t *testing.T) {
+	t.Run("Handles Job resources", func(t *testing.T) {
+		job := resourceutil.Resource{
+			GroupVersionKind: &schema.GroupVersionKind{
+				Group:   "batch",
+				Version: "v1",
+				Kind:    "Job",
+			},
+		}
+
+		isCompleted, err := handleResourceCompletionEvent(job, nil, time.Now())
+
+		require.Exactly(t, false, isCompleted)
+		require.Nil(t, err)
+	})
+
+	t.Run("Does not handle Unknown resources", func(t *testing.T) {
+		job := resourceutil.Resource{
+			GroupVersionKind: &schema.GroupVersionKind{
+				Group:   "foo",
+				Version: "bar",
+				Kind:    "Unknown",
+			},
+		}
+
+		isCompleted, err := handleResourceCompletionEvent(job, nil, time.Now())
+
+		require.Exactly(t, false, isCompleted)
+		require.NotNil(t, err)
 	})
 }
