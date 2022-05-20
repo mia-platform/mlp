@@ -41,11 +41,10 @@ import (
 )
 
 const (
-	dependenciesChecksum      = "dependencies-checksum"
-	deployChecksum            = "deploy-checksum"
-	smartDeploy               = "smart_deploy"
-	deployAll                 = "deploy_all"
-	awaitCompletionAnnotation = "mia-platform.eu/await-completion"
+	dependenciesChecksum = "dependencies-checksum"
+	deployChecksum       = "deploy-checksum"
+	smartDeploy          = "smart_deploy"
+	deployAll            = "deploy_all"
 )
 
 type k8sClients struct {

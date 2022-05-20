@@ -19,6 +19,8 @@ import (
 
 type applyFunction func(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error
 
+const awaitCompletionAnnotation = "mia-platform.eu/await-completion"
+
 var decoratedApply = withAwaitableResource(apply)
 
 func withAwaitableResource(apply applyFunction) applyFunction {
