@@ -31,13 +31,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/jsonmergepatch"
-	"k8s.io/apimachinery/pkg/util/mergepatch"
-	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/kubectl/pkg/scheme"
 )
 
 const (
@@ -396,64 +391,6 @@ func createJobFromCronjob(k8sClient dynamic.Interface, res *unstructured.Unstruc
 	}
 
 	return jobCreated.GetName(), nil
-}
-
-// createPatch returns the patch to be used in order to update the resource inside the cluster.
-// The function performs a Three Way Merge Patch with the last applied configuration written in the
-// object annotation, the actual resource state deployed inside the cluster and the desired state after
-// the update.
-func createPatch(currentObj unstructured.Unstructured, target resourceutil.Resource) ([]byte, types.PatchType, error) {
-	// Get the config in the annotation
-	original := currentObj.GetAnnotations()[corev1.LastAppliedConfigAnnotation]
-
-	// Get the desired configuration
-	obj := target.Object.DeepCopy()
-	objAnn := obj.GetAnnotations()
-	_, found := objAnn[corev1.LastAppliedConfigAnnotation]
-	if found {
-		delete(objAnn, corev1.LastAppliedConfigAnnotation)
-		obj.SetAnnotations(objAnn)
-	} else {
-		objAnn = make(map[string]string)
-	}
-	objEncoded, err := obj.MarshalJSON()
-	if err != nil {
-		return nil, types.StrategicMergePatchType, err
-	}
-	objAnn[corev1.LastAppliedConfigAnnotation] = string(objEncoded)
-	obj.SetAnnotations(objAnn)
-	desired, err := obj.MarshalJSON()
-	if err != nil {
-		return nil, types.StrategicMergePatchType, err
-	}
-	// Get the resource in the cluster
-	current, err := currentObj.MarshalJSON()
-	if err != nil {
-		return nil, types.StrategicMergePatchType, errors.Wrap(err, "serializing live configuration")
-	}
-
-	// Get the resource scheme
-	versionedObject, err := scheme.Scheme.New(*target.GroupVersionKind)
-
-	// use a three way json merge if the resource is a CRD
-	if runtime.IsNotRegisteredError(err) {
-		// fall back to generic JSON merge patch
-		patchType := types.MergePatchType
-		preconditions := []mergepatch.PreconditionFunc{mergepatch.RequireKeyUnchanged("apiVersion"),
-			mergepatch.RequireKeyUnchanged("kind"), mergepatch.RequireMetadataKeyUnchanged("name")}
-		patch, err := jsonmergepatch.CreateThreeWayJSONMergePatch([]byte(original), desired, current, preconditions...)
-		return patch, patchType, err
-	} else if err != nil {
-		return nil, types.StrategicMergePatchType, err
-	}
-
-	patchMeta, err := strategicpatch.NewPatchMetaFromStruct(versionedObject)
-	if err != nil {
-		return nil, types.StrategicMergePatchType, errors.Wrap(err, "unable to create patch metadata from object")
-	}
-
-	patch, err := strategicpatch.CreateThreeWayMergePatch([]byte(original), desired, current, patchMeta, true)
-	return patch, types.StrategicMergePatchType, err
 }
 
 // EnsureSmartDeploy merge, if present, the "mia-platform.eu/deploy-checksum" annotation from the Kubernetes cluster
