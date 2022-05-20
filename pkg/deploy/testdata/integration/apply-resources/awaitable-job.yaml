@@ -3,7 +3,7 @@ kind: Job
 metadata:
   name: test-awaitable-job
   annotations:
-    mia-platform.eu/await-completion: ""
+    mia-platform.eu/await-completion: 30s
 spec:
   template:
     spec:
@@ -14,4 +14,4 @@ spec:
           command:
             - sleep
           args:
-            - 5s
+            - 1s

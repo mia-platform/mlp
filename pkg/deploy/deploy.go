@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/jsonmergepatch"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubectl/pkg/scheme"
@@ -47,17 +46,12 @@ const (
 	smartDeploy               = "smart_deploy"
 	deployAll                 = "deploy_all"
 	awaitCompletionAnnotation = "mia-platform.eu/await-completion"
-	jobAwaitTimeoutDuration   = time.Second * 30
 )
-
-var decoratedApply = withAwaitableJob(jobAwaitTimeoutDuration, apply)
 
 type k8sClients struct {
 	dynamic   dynamic.Interface
 	discovery discovery.DiscoveryInterface
 }
-
-type applyFunction func(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error
 
 // Run execute the deploy command from cli
 func Run(inputPaths []string, deployConfig utils.DeployConfig, opts *utils.Options) {
@@ -403,163 +397,6 @@ func createJobFromCronjob(k8sClient dynamic.Interface, res *unstructured.Unstruc
 	}
 
 	return jobCreated.GetName(), nil
-}
-
-func withAwaitableJob(timeout time.Duration, apply applyFunction) applyFunction {
-	return func(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
-		gvr, err := resourceutil.FromGVKtoGVR(clients.discovery, res.Object.GroupVersionKind())
-		if err != nil {
-			return err
-		}
-
-		// Register a watcher and start to listen for events for the gvr
-		// if res is an annotated with awaitCompletionAnnotation job
-		var watchEvents <-chan watch.Event
-		startTime := time.Now()
-		_, awaitCompletionFound := res.Object.GetAnnotations()[awaitCompletionAnnotation]
-		if res.GroupVersionKind.Kind == "Job" && awaitCompletionFound {
-			watcher, err := clients.dynamic.Resource(gvr).
-				Namespace(res.Object.GetNamespace()).
-				Watch(context.TODO(), metav1.ListOptions{})
-			if err != nil {
-				return err
-			}
-			watchEvents = watcher.ResultChan()
-			fmt.Println("Registered watcher for job:", res.Object.GetName())
-		}
-
-		if err := apply(clients, res, deployConfig); err != nil {
-			return err
-		}
-
-		if watchEvents == nil {
-			return nil
-		}
-
-		// Consume watcher events and wait for the job to complete or exit because of timeout
-		for {
-			select {
-			case event := <-watchEvents:
-				u := event.Object.(*unstructured.Unstructured)
-				var job batchv1.Job
-				runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, &job)
-
-				if job.Name != res.Object.GetName() {
-					continue
-				}
-
-				if completedAt := job.Status.CompletionTime; event.Type == watch.Modified && completedAt != nil && completedAt.Time.After(startTime) {
-					fmt.Println("Job completed:", res.Object.GetName())
-					return nil
-				}
-			case <-time.NewTimer(timeout).C:
-				msg := fmt.Sprintf("Timeout received while waiting for job %s completion", res.Object.GetName())
-				return errors.New(msg)
-			}
-		}
-	}
-}
-
-func apply(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
-
-	gvr, err := resourceutil.FromGVKtoGVR(clients.discovery, res.Object.GroupVersionKind())
-	if err != nil {
-		return err
-	}
-
-	var onClusterObj *unstructured.Unstructured
-	if onClusterObj, err = clients.dynamic.Resource(gvr).
-		Namespace(res.Object.GetNamespace()).
-		Get(context.Background(), res.Object.GetName(), metav1.GetOptions{}); err != nil {
-		// create the resource only if it is not present in the cluster
-		if apierrors.IsNotFound(err) {
-			fmt.Printf("Creating %s: %s\n", res.Object.GetKind(), res.Object.GetName())
-
-			// creates kubectl.kubernetes.io/last-applied-configuration annotation
-			// inside the resource except for Secrets and ConfigMaps
-			if res.Object.GetKind() != "Secret" && res.Object.GetKind() != "ConfigMap" {
-				orignAnn := res.Object.GetAnnotations()
-				if orignAnn == nil {
-					orignAnn = make(map[string]string)
-				}
-				objJson, err := res.Object.MarshalJSON()
-				if err != nil {
-					return err
-				}
-				orignAnn[corev1.LastAppliedConfigAnnotation] = string(objJson)
-				res.Object.SetAnnotations(orignAnn)
-			}
-
-			if err = cronJobAutoCreate(clients.dynamic, &res.Object); err != nil {
-				return err
-			}
-
-			_, err = clients.dynamic.Resource(gvr).
-				Namespace(res.Object.GetNamespace()).
-				Create(context.Background(),
-					&res.Object,
-					metav1.CreateOptions{})
-		}
-		return err
-	}
-
-	// Do not modify the resource if is already present on cluster and the annotation is set to "once"
-	if res.Object.GetAnnotations()[resourceutil.GetMiaAnnotation("deploy")] != "once" {
-
-		// Replace only if it is a Secret or configmap otherwise patch the resource
-		if res.Object.GetKind() == "Secret" || res.Object.GetKind() == "ConfigMap" {
-			fmt.Printf("Replacing %s: %s\n", res.Object.GetKind(), res.Object.GetName())
-
-			_, err = clients.dynamic.Resource(gvr).
-				Namespace(res.Object.GetNamespace()).
-				Update(context.Background(),
-					&res.Object,
-					metav1.UpdateOptions{})
-
-		} else {
-
-			fmt.Printf("Updating %s: %s\n", res.Object.GetKind(), res.Object.GetName())
-
-			if deployConfig.DeployType == smartDeploy && (res.Object.GetKind() == "CronJob" || res.Object.GetKind() == "Deployment") {
-				isNotUsingSemver, err := resourceutil.IsNotUsingSemver(&res)
-				if err != nil {
-					return errors.Wrap(err, "failed semver check")
-				}
-
-				if deployConfig.ForceDeployWhenNoSemver && isNotUsingSemver {
-					if err := ensureDeployAll(&res, time.Now()); err != nil {
-						return errors.Wrap(err, "failed ensure deploy all on resource not using semver")
-					}
-				} else {
-					if err = ensureSmartDeploy(onClusterObj, &res); err != nil {
-						return errors.Wrap(err, "failed smart deploy ensure")
-					}
-				}
-			}
-
-			if res.Object.GetKind() == "CronJob" {
-				if err := checkIfCreateJob(clients.dynamic, onClusterObj, res); err != nil {
-					return errors.Wrap(err, "failed check if create job")
-				}
-			}
-
-			patch, patchType, err := createPatch(*onClusterObj, res)
-
-			// create the patch
-			if err != nil {
-				return errors.Wrap(err, "failed to create patch")
-			}
-
-			if _, err := clients.dynamic.Resource(gvr).
-				Namespace(res.Object.GetNamespace()).
-				Patch(context.Background(),
-					res.Object.GetName(), patchType, patch, metav1.PatchOptions{}); err != nil {
-				return errors.Wrap(err, "failed to patch")
-			}
-		}
-		return err
-	}
-	return nil
 }
 
 // createPatch returns the patch to be used in order to update the resource inside the cluster.

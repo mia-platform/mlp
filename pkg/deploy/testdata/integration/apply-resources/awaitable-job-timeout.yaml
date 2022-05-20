@@ -3,7 +3,7 @@ kind: Job
 metadata:
   name: test-awaitable-job-timeout
   annotations:
-    mia-platform.eu/await-completion: ""
+    mia-platform.eu/await-completion: 1s
 spec:
   template:
     spec:
