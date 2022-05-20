@@ -25,7 +25,7 @@ type resourceOrder []string
 // it should be a comma separated list of kinds for which
 // this specific resource must be applied before.
 // i.e. mia-platform.eu/apply-before-kinds: Job, Deployment, Pod
-const applyBeforeAnnotation = "mia-platform.eu/apply-before-kinds"
+var applyBeforeAnnotation = GetMiaAnnotation("apply-before-kinds")
 
 var defaultSortOrder = resourceOrder{
 	"Namespace",
