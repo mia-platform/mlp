@@ -34,8 +34,6 @@ import (
 
 const (
 	dependenciesChecksum = "dependencies-checksum"
-	deployChecksum       = "deploy-checksum"
-	smartDeploy          = "smart_deploy"
 	deployAll            = "deploy_all"
 )
 

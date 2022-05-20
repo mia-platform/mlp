@@ -27,6 +27,11 @@ import (
 
 type applyFunction func(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error
 
+const (
+	deployChecksum = "deploy-checksum"
+	smartDeploy    = "smart_deploy"
+)
+
 var (
 	awaitCompletionAnnotation = resourceutil.GetMiaAnnotation("await-completion")
 	apply                     = withAwaitableResource(applyResource)
