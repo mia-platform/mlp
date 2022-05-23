@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mia-platform/mlp/internal/utils"
 	"github.com/mia-platform/mlp/pkg/resourceutil"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
@@ -31,7 +32,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	discoveryFake "k8s.io/client-go/discovery/fake"
 	dynamicFake "k8s.io/client-go/dynamic/fake"
+	clientsetFake "k8s.io/client-go/kubernetes/fake"
 )
 
 func TestCheckIfCreateJob(t *testing.T) {
@@ -403,4 +406,78 @@ func TestHandleResourceCompletionEvent(t *testing.T) {
 		require.Exactly(t, false, isCompleted)
 		require.Nil(t, err)
 	})
+}
+
+func TestWithAwaitableResource(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = corev1.AddToScheme(scheme)
+	_ = batchv1.AddToScheme(scheme)
+
+	deployConfig := utils.DeployConfig{}
+
+	t.Run("Ignores non annotated resources", func(t *testing.T) {
+		u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&batchv1.Job{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "batch/v1",
+				Kind:       "Job",
+			},
+		})
+		require.Nil(t, err)
+		res := resourceutil.Resource{
+			GroupVersionKind: &schema.GroupVersionKind{
+				Group:   "batch",
+				Version: "v1",
+				Kind:    "Job",
+			},
+			Object: unstructured.Unstructured{
+				Object: u,
+			},
+		}
+
+		clients := k8sClients{
+			dynamic:   dynamicFake.NewSimpleDynamicClient(scheme),
+			discovery: clientsetFake.NewSimpleClientset().Discovery(),
+		}
+
+		discovery, ok := clients.discovery.(*discoveryFake.FakeDiscovery)
+		require.True(t, ok)
+		discovery.Fake.Resources = []*metav1.APIResourceList{
+			{
+				GroupVersion: "batch/v1",
+				APIResources: []metav1.APIResource{
+					{
+						Kind: "Job",
+						Name: "jobs",
+					},
+				},
+			},
+		}
+
+		applyCalled := false
+		err = withAwaitableResource(func(c *k8sClients, r resourceutil.Resource, d utils.DeployConfig) error {
+			applyCalled = true
+			require.Exactly(t, &clients, c)
+			require.Exactly(t, res, r)
+			require.Exactly(t, deployConfig, d)
+			return nil
+		})(&clients, res, deployConfig)
+
+		require.Nil(t, err)
+		require.Exactly(t, true, applyCalled)
+	})
+}
+
+func Test(t *testing.T) {
+	testCases := []struct {
+		desc string
+	}{
+		{
+			desc: "",
+		},
+	}
+	for _, tC := range testCases {
+		t.Run(tC.desc, func(t *testing.T) {
+
+		})
+	}
 }
