@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/mia-platform/mlp/pkg/resourceutil"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -345,7 +344,7 @@ func TestHandleResourceCompletionEvent(t *testing.T) {
 
 		isCompleted, err := handleResourceCompletionEvent(job, &event, startTime)
 
-		assert.Exactly(t, true, isCompleted)
+		require.Exactly(t, true, isCompleted)
 		require.Nil(t, err)
 	})
 
@@ -375,9 +374,33 @@ func TestHandleResourceCompletionEvent(t *testing.T) {
 
 		isCompleted, err := handleResourceCompletionEvent(job, &event, startTime)
 
-		assert.Exactly(t, true, isCompleted)
+		require.Exactly(t, false, isCompleted)
 		require.Nil(t, err)
 	})
 
-	t.Run("Correctly handles jobs incomplete jobs", func(t *testing.T) {})
+	t.Run("Correctly handles jobs incomplete jobs", func(t *testing.T) {
+		startTime := time.Now()
+		job := resourceutil.Resource{
+			GroupVersionKind: &schema.GroupVersionKind{
+				Group:   "batch",
+				Version: "v1",
+				Kind:    "Job",
+			},
+			Object: unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"name": "job-name",
+				},
+			},
+		}
+
+		event := watch.Event{
+			Type:   watch.Modified,
+			Object: &job.Object,
+		}
+
+		isCompleted, err := handleResourceCompletionEvent(job, &event, startTime)
+
+		require.Exactly(t, false, isCompleted)
+		require.Nil(t, err)
+	})
 }
