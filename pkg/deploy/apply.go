@@ -72,6 +72,7 @@ func withAwaitableResource(apply applyFunction) applyFunction {
 			}
 			watchEvents = watcher.ResultChan()
 			fmt.Printf("Registered a watcher for resource: %s.%s.%s having name %s\n", gvr.Group, gvr.Version, gvr.Resource, res.Object.GetName())
+			defer watcher.Stop()
 		}
 
 		// actually apply the resource
