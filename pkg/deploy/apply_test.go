@@ -35,6 +35,7 @@ import (
 	discoveryFake "k8s.io/client-go/discovery/fake"
 	dynamicFake "k8s.io/client-go/dynamic/fake"
 	clientsetFake "k8s.io/client-go/kubernetes/fake"
+	k8stest "k8s.io/client-go/testing"
 )
 
 func TestCheckIfCreateJob(t *testing.T) {
@@ -415,43 +416,29 @@ func TestWithAwaitableResource(t *testing.T) {
 
 	deployConfig := utils.DeployConfig{}
 
-	t.Run("Ignores non annotated resources", func(t *testing.T) {
-		u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&batchv1.Job{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: "batch/v1",
-				Kind:       "Job",
-			},
-		})
-		require.Nil(t, err)
-		res := resourceutil.Resource{
-			GroupVersionKind: &schema.GroupVersionKind{
-				Group:   "batch",
-				Version: "v1",
-				Kind:    "Job",
-			},
-			Object: unstructured.Unstructured{
-				Object: u,
-			},
-		}
+	clients := k8sClients{
+		dynamic:   dynamicFake.NewSimpleDynamicClient(scheme),
+		discovery: clientsetFake.NewSimpleClientset().Discovery(),
+	}
 
-		clients := k8sClients{
-			dynamic:   dynamicFake.NewSimpleDynamicClient(scheme),
-			discovery: clientsetFake.NewSimpleClientset().Discovery(),
-		}
-
-		discovery, ok := clients.discovery.(*discoveryFake.FakeDiscovery)
-		require.True(t, ok)
-		discovery.Fake.Resources = []*metav1.APIResourceList{
-			{
-				GroupVersion: "batch/v1",
-				APIResources: []metav1.APIResource{
-					{
-						Kind: "Job",
-						Name: "jobs",
-					},
+	discovery, ok := clients.discovery.(*discoveryFake.FakeDiscovery)
+	require.True(t, ok)
+	discovery.Fake.Resources = []*metav1.APIResourceList{
+		{
+			GroupVersion: "batch/v1",
+			APIResources: []metav1.APIResource{
+				{
+					Kind: "Job",
+					Name: "jobs",
 				},
 			},
-		}
+		},
+	}
+
+	t.Run("Ignores non annotated resources", func(t *testing.T) {
+		resources, err := resourceutil.NewResources("testdata/simple-job.yaml", "default")
+		require.Nil(t, err)
+		res := resources[0]
 
 		applyCalled := false
 		err = withAwaitableResource(func(c *k8sClients, r resourceutil.Resource, d utils.DeployConfig) error {
@@ -463,6 +450,61 @@ func TestWithAwaitableResource(t *testing.T) {
 		})(&clients, res, deployConfig)
 
 		require.Nil(t, err)
-		require.Exactly(t, true, applyCalled)
+		require.True(t, applyCalled)
+	})
+
+	t.Run("Awaits annotated resources for completion", func(t *testing.T) {
+		resources, err := resourceutil.NewResources("testdata/awaitable-job.yaml", "default")
+		require.Nil(t, err)
+		res := resources[0]
+
+		watcher := watch.NewFakeWithChanSize(1, false)
+		clients.dynamic.(*dynamicFake.FakeDynamicClient).Fake.PrependWatchReactor("jobs", k8stest.DefaultWatchReactor(watcher, nil))
+
+		watcher.Modify(&unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": "batch/v1",
+				"kind":       "Job",
+				"metadata": map[string]string{
+					"name": res.Object.GetName(),
+				},
+				"status": map[string]interface{}{
+					"completionTime": time.Now().Add(time.Hour).UTC().Format(time.RFC3339),
+				},
+			},
+		})
+
+		applyCalled := false
+		err = withAwaitableResource(func(c *k8sClients, r resourceutil.Resource, d utils.DeployConfig) error {
+			applyCalled = true
+			require.Exactly(t, &clients, c)
+			require.Exactly(t, res, r)
+			require.Exactly(t, deployConfig, d)
+			return nil
+		})(&clients, res, deployConfig)
+
+		require.Nil(t, err)
+		require.True(t, applyCalled)
+	})
+
+	t.Run("Gets timeout on annotated resources after time specified in annotation", func(t *testing.T) {
+		resources, err := resourceutil.NewResources("testdata/awaitable-job.yaml", "default")
+		require.Nil(t, err)
+		res := resources[0]
+
+		watcher := watch.NewFakeWithChanSize(1, false)
+		clients.dynamic.(*dynamicFake.FakeDynamicClient).Fake.PrependWatchReactor("jobs", k8stest.DefaultWatchReactor(watcher, nil))
+
+		applyCalled := false
+		err = withAwaitableResource(func(c *k8sClients, r resourceutil.Resource, d utils.DeployConfig) error {
+			applyCalled = true
+			require.Exactly(t, &clients, c)
+			require.Exactly(t, res, r)
+			require.Exactly(t, deployConfig, d)
+			return nil
+		})(&clients, res, deployConfig)
+
+		require.NotNil(t, err)
+		require.True(t, applyCalled)
 	})
 }
