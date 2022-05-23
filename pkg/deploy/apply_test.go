@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/mia-platform/mlp/pkg/resourceutil"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 	dynamicFake "k8s.io/client-go/dynamic/fake"
 )
 
@@ -303,7 +305,7 @@ func TestHandleResourceCompletionEvent(t *testing.T) {
 	})
 
 	t.Run("Does not handle Unknown resources", func(t *testing.T) {
-		job := resourceutil.Resource{
+		res := resourceutil.Resource{
 			GroupVersionKind: &schema.GroupVersionKind{
 				Group:   "foo",
 				Version: "bar",
@@ -311,9 +313,71 @@ func TestHandleResourceCompletionEvent(t *testing.T) {
 			},
 		}
 
-		isCompleted, err := handleResourceCompletionEvent(job, nil, time.Now())
+		isCompleted, err := handleResourceCompletionEvent(res, nil, time.Now())
 
 		require.Exactly(t, false, isCompleted)
 		require.NotNil(t, err)
 	})
+
+	t.Run("Correctly handles jobs completed after the start time", func(t *testing.T) {
+		startTime := time.Now()
+		completionTime := startTime.Add(time.Minute)
+		job := resourceutil.Resource{
+			GroupVersionKind: &schema.GroupVersionKind{
+				Group:   "batch",
+				Version: "v1",
+				Kind:    "Job",
+			},
+			Object: unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"name": "job-name",
+					"status": map[string]interface{}{
+						"completionTime": completionTime.UTC().Format(time.RFC3339),
+					},
+				},
+			},
+		}
+
+		event := watch.Event{
+			Type:   watch.Modified,
+			Object: &job.Object,
+		}
+
+		isCompleted, err := handleResourceCompletionEvent(job, &event, startTime)
+
+		assert.Exactly(t, true, isCompleted)
+		require.Nil(t, err)
+	})
+
+	t.Run("Correctly handles jobs completed before the start time", func(t *testing.T) {
+		completionTime := time.Now()
+		startTime := completionTime.Add(time.Minute)
+		job := resourceutil.Resource{
+			GroupVersionKind: &schema.GroupVersionKind{
+				Group:   "batch",
+				Version: "v1",
+				Kind:    "Job",
+			},
+			Object: unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"name": "job-name",
+					"status": map[string]interface{}{
+						"completionTime": completionTime.UTC().Format(time.RFC3339),
+					},
+				},
+			},
+		}
+
+		event := watch.Event{
+			Type:   watch.Modified,
+			Object: &job.Object,
+		}
+
+		isCompleted, err := handleResourceCompletionEvent(job, &event, startTime)
+
+		assert.Exactly(t, true, isCompleted)
+		require.Nil(t, err)
+	})
+
+	t.Run("Correctly handles jobs incomplete jobs", func(t *testing.T) {})
 }
