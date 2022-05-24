@@ -292,121 +292,124 @@ func TestEnsureSmartDeploy(t *testing.T) {
 }
 
 func TestHandleResourceCompletionEvent(t *testing.T) {
-	t.Run("Handles Job resources", func(t *testing.T) {
-		job := resourceutil.Resource{
-			GroupVersionKind: &schema.GroupVersionKind{
-				Group:   "batch",
-				Version: "v1",
-				Kind:    "Job",
+	testCases := []struct {
+		desc         string
+		startTime    time.Time
+		job          resourceutil.Resource
+		event        *watch.Event
+		isCompleted  bool
+		errorRequire func(require.TestingT, interface{}, ...interface{})
+	}{
+		{
+			desc:      "Handles Job resources",
+			startTime: time.Now(),
+			job: resourceutil.Resource{
+				GroupVersionKind: &schema.GroupVersionKind{
+					Group:   "batch",
+					Version: "v1",
+					Kind:    "Job",
+				},
 			},
-		}
-
-		isCompleted, err := handleResourceCompletionEvent(job, nil, time.Now())
-
-		require.Exactly(t, false, isCompleted)
-		require.Nil(t, err)
-	})
-
-	t.Run("Does not handle Unknown resources", func(t *testing.T) {
-		res := resourceutil.Resource{
-			GroupVersionKind: &schema.GroupVersionKind{
-				Group:   "foo",
-				Version: "bar",
-				Kind:    "Unknown",
+			event:        nil,
+			isCompleted:  false,
+			errorRequire: require.Nil,
+		}, {
+			desc:      "Does not handle Unknown resources",
+			startTime: time.Now(),
+			job: resourceutil.Resource{
+				GroupVersionKind: &schema.GroupVersionKind{
+					Group:   "foo",
+					Version: "bar",
+					Kind:    "Unknown",
+				},
 			},
-		}
-
-		isCompleted, err := handleResourceCompletionEvent(res, nil, time.Now())
-
-		require.Exactly(t, false, isCompleted)
-		require.NotNil(t, err)
-	})
-
-	t.Run("Correctly handles jobs completed after the start time", func(t *testing.T) {
-		startTime := time.Now()
-		completionTime := startTime.Add(time.Minute)
-		job := resourceutil.Resource{
-			GroupVersionKind: &schema.GroupVersionKind{
-				Group:   "batch",
-				Version: "v1",
-				Kind:    "Job",
-			},
-			Object: unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"name": "job-name",
-					"status": map[string]interface{}{
-						"completionTime": completionTime.UTC().Format(time.RFC3339),
+			event:        nil,
+			isCompleted:  false,
+			errorRequire: require.NotNil,
+		}, {
+			desc:      "Correctly handles jobs completed after the start time",
+			startTime: time.Now(),
+			job: resourceutil.Resource{
+				GroupVersionKind: &schema.GroupVersionKind{
+					Group:   "batch",
+					Version: "v1",
+					Kind:    "Job",
+				},
+				Object: unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"status": map[string]interface{}{
+							"completionTime": time.Now().Add(time.Hour).UTC().Format(time.RFC3339),
+						},
 					},
 				},
 			},
-		}
-
-		event := watch.Event{
-			Type:   watch.Modified,
-			Object: &job.Object,
-		}
-
-		isCompleted, err := handleResourceCompletionEvent(job, &event, startTime)
-
-		require.Exactly(t, true, isCompleted)
-		require.Nil(t, err)
-	})
-
-	t.Run("Correctly handles jobs completed before the start time", func(t *testing.T) {
-		completionTime := time.Now()
-		startTime := completionTime.Add(time.Minute)
-		job := resourceutil.Resource{
-			GroupVersionKind: &schema.GroupVersionKind{
-				Group:   "batch",
-				Version: "v1",
-				Kind:    "Job",
-			},
-			Object: unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"name": "job-name",
-					"status": map[string]interface{}{
-						"completionTime": completionTime.UTC().Format(time.RFC3339),
+			event: &watch.Event{
+				Type: watch.Modified,
+				Object: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"status": map[string]interface{}{
+							"completionTime": time.Now().Add(time.Hour).UTC().Format(time.RFC3339),
+						},
 					},
 				},
 			},
-		}
-
-		event := watch.Event{
-			Type:   watch.Modified,
-			Object: &job.Object,
-		}
-
-		isCompleted, err := handleResourceCompletionEvent(job, &event, startTime)
-
-		require.Exactly(t, false, isCompleted)
-		require.Nil(t, err)
-	})
-
-	t.Run("Correctly handles jobs incomplete jobs", func(t *testing.T) {
-		startTime := time.Now()
-		job := resourceutil.Resource{
-			GroupVersionKind: &schema.GroupVersionKind{
-				Group:   "batch",
-				Version: "v1",
-				Kind:    "Job",
-			},
-			Object: unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"name": "job-name",
+			isCompleted:  true,
+			errorRequire: require.Nil,
+		}, {
+			desc:      "Correctly handles jobs completed before the start time",
+			startTime: time.Now().Add(time.Hour),
+			job: resourceutil.Resource{
+				GroupVersionKind: &schema.GroupVersionKind{
+					Group:   "batch",
+					Version: "v1",
+					Kind:    "Job",
+				},
+				Object: unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"status": map[string]interface{}{
+							"completionTime": time.Now().UTC().Format(time.RFC3339),
+						},
+					},
 				},
 			},
-		}
+			event: &watch.Event{
+				Type: watch.Modified,
+				Object: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"status": map[string]interface{}{
+							"completionTime": time.Now().UTC().Format(time.RFC3339),
+						},
+					},
+				},
+			},
+			isCompleted:  false,
+			errorRequire: require.Nil,
+		}, {
+			desc:      "Correctly handles incomplete jobs",
+			startTime: time.Now().Add(time.Hour),
+			job: resourceutil.Resource{
+				GroupVersionKind: &schema.GroupVersionKind{
+					Group:   "batch",
+					Version: "v1",
+					Kind:    "Job",
+				},
+			},
+			event: &watch.Event{
+				Type:   watch.Modified,
+				Object: &unstructured.Unstructured{},
+			},
+			isCompleted:  false,
+			errorRequire: require.Nil,
+		},
+	}
+	for _, tC := range testCases {
+		t.Run(tC.desc, func(t *testing.T) {
+			isCompleted, err := handleResourceCompletionEvent(tC.job, tC.event, tC.startTime)
 
-		event := watch.Event{
-			Type:   watch.Modified,
-			Object: &job.Object,
-		}
-
-		isCompleted, err := handleResourceCompletionEvent(job, &event, startTime)
-
-		require.Exactly(t, false, isCompleted)
-		require.Nil(t, err)
-	})
+			require.Exactly(t, tC.isCompleted, isCompleted)
+			tC.errorRequire(t, err)
+		})
+	}
 }
 
 func TestWithAwaitableResource(t *testing.T) {
