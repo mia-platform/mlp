@@ -292,6 +292,21 @@ func TestEnsureSmartDeploy(t *testing.T) {
 }
 
 func TestHandleResourceCompletionEvent(t *testing.T) {
+	job := resourceutil.Resource{
+		GroupVersionKind: &schema.GroupVersionKind{
+			Group:   "batch",
+			Version: "v1",
+			Kind:    "Job",
+		},
+		Object: unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"metadata": map[string]string{
+					"name": "job-name",
+				},
+			},
+		},
+	}
+
 	testCases := []struct {
 		desc         string
 		startTime    time.Time
@@ -329,24 +344,14 @@ func TestHandleResourceCompletionEvent(t *testing.T) {
 		}, {
 			desc:      "Correctly handles jobs completed after the start time",
 			startTime: time.Now(),
-			job: resourceutil.Resource{
-				GroupVersionKind: &schema.GroupVersionKind{
-					Group:   "batch",
-					Version: "v1",
-					Kind:    "Job",
-				},
-				Object: unstructured.Unstructured{
-					Object: map[string]interface{}{
-						"status": map[string]interface{}{
-							"completionTime": time.Now().Add(time.Hour).UTC().Format(time.RFC3339),
-						},
-					},
-				},
-			},
+			job:       job,
 			event: &watch.Event{
 				Type: watch.Modified,
 				Object: &unstructured.Unstructured{
 					Object: map[string]interface{}{
+						"metadata": map[string]string{
+							"name": "job-name",
+						},
 						"status": map[string]interface{}{
 							"completionTime": time.Now().Add(time.Hour).UTC().Format(time.RFC3339),
 						},
@@ -358,24 +363,14 @@ func TestHandleResourceCompletionEvent(t *testing.T) {
 		}, {
 			desc:      "Correctly handles jobs completed before the start time",
 			startTime: time.Now().Add(time.Hour),
-			job: resourceutil.Resource{
-				GroupVersionKind: &schema.GroupVersionKind{
-					Group:   "batch",
-					Version: "v1",
-					Kind:    "Job",
-				},
-				Object: unstructured.Unstructured{
-					Object: map[string]interface{}{
-						"status": map[string]interface{}{
-							"completionTime": time.Now().UTC().Format(time.RFC3339),
-						},
-					},
-				},
-			},
+			job:       job,
 			event: &watch.Event{
 				Type: watch.Modified,
 				Object: &unstructured.Unstructured{
 					Object: map[string]interface{}{
+						"metadata": map[string]string{
+							"name": "job-name",
+						},
 						"status": map[string]interface{}{
 							"completionTime": time.Now().UTC().Format(time.RFC3339),
 						},
@@ -387,16 +382,35 @@ func TestHandleResourceCompletionEvent(t *testing.T) {
 		}, {
 			desc:      "Correctly handles incomplete jobs",
 			startTime: time.Now().Add(time.Hour),
-			job: resourceutil.Resource{
-				GroupVersionKind: &schema.GroupVersionKind{
-					Group:   "batch",
-					Version: "v1",
-					Kind:    "Job",
+			job:       job,
+			event: &watch.Event{
+				Type: watch.Modified,
+				Object: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"metadata": map[string]string{
+							"name": "job-name",
+						},
+					},
 				},
 			},
+			isCompleted:  false,
+			errorRequire: require.Nil,
+		}, {
+			desc:      "Matches resources by name",
+			startTime: time.Now(),
+			job:       job,
 			event: &watch.Event{
-				Type:   watch.Modified,
-				Object: &unstructured.Unstructured{},
+				Type: watch.Modified,
+				Object: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"metadata": map[string]string{
+							"name": "other-job-name",
+						},
+						"status": map[string]interface{}{
+							"completionTime": time.Now().Add(time.Hour).UTC().Format(time.RFC3339),
+						},
+					},
+				},
 			},
 			isCompleted:  false,
 			errorRequire: require.Nil,
