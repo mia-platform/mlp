@@ -3,7 +3,7 @@ kind: Job
 metadata:
   name: awaitable-job
   annotations:
-    mia-platform.eu/await-completion: 1s
+    mia-platform.eu/await-completion: 250ms
 spec:
   template:
     spec:

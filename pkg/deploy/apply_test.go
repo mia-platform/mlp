@@ -410,6 +410,43 @@ func TestHandleResourceCompletionEvent(t *testing.T) {
 }
 
 func TestWithAwaitableResource(t *testing.T) {
+	testCases := []struct {
+		desc          string
+		resFileName   string
+		watcherEvents []unstructured.Unstructured
+		errorRequire  func(require.TestingT, interface{}, ...interface{})
+	}{
+		{
+			desc:          "Ignores non annotated resources",
+			resFileName:   "testdata/simple-job.yaml",
+			watcherEvents: []unstructured.Unstructured{},
+			errorRequire:  require.Nil,
+		}, {
+			desc:        "Awaits annotated resources for completion",
+			resFileName: "testdata/awaitable-job.yaml",
+			watcherEvents: []unstructured.Unstructured{
+				{
+					Object: map[string]interface{}{
+						"apiVersion": "batch/v1",
+						"kind":       "Job",
+						"metadata": map[string]string{
+							"name": "awaitable-job",
+						},
+						"status": map[string]interface{}{
+							"completionTime": time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339),
+						},
+					},
+				},
+			},
+			errorRequire: require.Nil,
+		}, {
+			desc:          "Awaits annotated resources for completion",
+			resFileName:   "testdata/awaitable-job.yaml",
+			watcherEvents: []unstructured.Unstructured{},
+			errorRequire:  require.NotNil,
+		},
+	}
+
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)
 	_ = batchv1.AddToScheme(scheme)
@@ -435,76 +472,30 @@ func TestWithAwaitableResource(t *testing.T) {
 		},
 	}
 
-	t.Run("Ignores non annotated resources", func(t *testing.T) {
-		resources, err := resourceutil.NewResources("testdata/simple-job.yaml", "default")
-		require.Nil(t, err)
-		res := resources[0]
+	for _, tC := range testCases {
+		t.Run(tC.desc, func(t *testing.T) {
+			resources, err := resourceutil.NewResources(tC.resFileName, "default")
+			require.Nil(t, err)
+			res := resources[0]
 
-		applyCalled := false
-		err = withAwaitableResource(func(c *k8sClients, r resourceutil.Resource, d utils.DeployConfig) error {
-			applyCalled = true
-			require.Exactly(t, &clients, c)
-			require.Exactly(t, res, r)
-			require.Exactly(t, deployConfig, d)
-			return nil
-		})(&clients, res, deployConfig)
+			watcher := watch.NewFakeWithChanSize(len(tC.watcherEvents), false)
+			clients.dynamic.(*dynamicFake.FakeDynamicClient).Fake.PrependWatchReactor("jobs", k8stest.DefaultWatchReactor(watcher, nil))
 
-		require.Nil(t, err)
-		require.True(t, applyCalled)
-	})
+			for _, e := range tC.watcherEvents {
+				watcher.Modify(&e)
+			}
 
-	t.Run("Awaits annotated resources for completion", func(t *testing.T) {
-		resources, err := resourceutil.NewResources("testdata/awaitable-job.yaml", "default")
-		require.Nil(t, err)
-		res := resources[0]
+			applyCalled := false
+			err = withAwaitableResource(func(c *k8sClients, r resourceutil.Resource, d utils.DeployConfig) error {
+				applyCalled = true
+				require.Exactly(t, &clients, c)
+				require.Exactly(t, res, r)
+				require.Exactly(t, deployConfig, d)
+				return nil
+			})(&clients, res, deployConfig)
 
-		watcher := watch.NewFakeWithChanSize(1, false)
-		clients.dynamic.(*dynamicFake.FakeDynamicClient).Fake.PrependWatchReactor("jobs", k8stest.DefaultWatchReactor(watcher, nil))
-
-		watcher.Modify(&unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"apiVersion": "batch/v1",
-				"kind":       "Job",
-				"metadata": map[string]string{
-					"name": res.Object.GetName(),
-				},
-				"status": map[string]interface{}{
-					"completionTime": time.Now().Add(time.Hour).UTC().Format(time.RFC3339),
-				},
-			},
+			require.True(t, applyCalled)
+			tC.errorRequire(t, err)
 		})
-
-		applyCalled := false
-		err = withAwaitableResource(func(c *k8sClients, r resourceutil.Resource, d utils.DeployConfig) error {
-			applyCalled = true
-			require.Exactly(t, &clients, c)
-			require.Exactly(t, res, r)
-			require.Exactly(t, deployConfig, d)
-			return nil
-		})(&clients, res, deployConfig)
-
-		require.Nil(t, err)
-		require.True(t, applyCalled)
-	})
-
-	t.Run("Gets timeout on annotated resources after time specified in annotation", func(t *testing.T) {
-		resources, err := resourceutil.NewResources("testdata/awaitable-job.yaml", "default")
-		require.Nil(t, err)
-		res := resources[0]
-
-		watcher := watch.NewFakeWithChanSize(1, false)
-		clients.dynamic.(*dynamicFake.FakeDynamicClient).Fake.PrependWatchReactor("jobs", k8stest.DefaultWatchReactor(watcher, nil))
-
-		applyCalled := false
-		err = withAwaitableResource(func(c *k8sClients, r resourceutil.Resource, d utils.DeployConfig) error {
-			applyCalled = true
-			require.Exactly(t, &clients, c)
-			require.Exactly(t, res, r)
-			require.Exactly(t, deployConfig, d)
-			return nil
-		})(&clients, res, deployConfig)
-
-		require.NotNil(t, err)
-		require.True(t, applyCalled)
-	})
+	}
 }
