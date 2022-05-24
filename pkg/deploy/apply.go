@@ -129,17 +129,22 @@ func handleResourceCompletionEvent(res resourceutil.Resource, event *watch.Event
 			return false, nil
 		}
 
-		u := event.Object.(*unstructured.Unstructured)
-		var job batchv1.Job
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, &job); err != nil {
+		var jobFromRes batchv1.Job
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(res.Object.Object, &jobFromRes); err != nil {
 			return false, err
 		}
 
-		if job.Name != res.Object.GetName() {
+		u := event.Object.(*unstructured.Unstructured)
+		var jobFromEvent batchv1.Job
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, &jobFromEvent); err != nil {
+			return false, err
+		}
+
+		if jobFromEvent.Name != jobFromRes.Name {
 			return false, nil
 		}
 
-		if completedAt := job.Status.CompletionTime; completedAt != nil && completedAt.Time.After(startTime) {
+		if completedAt := jobFromEvent.Status.CompletionTime; completedAt != nil && completedAt.Time.After(startTime) {
 			fmt.Println("Job completed:", res.Object.GetName())
 			return true, nil
 		}
