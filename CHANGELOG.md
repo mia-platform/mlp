@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- default order for `SecretProviderClass` resource kind
+- new annotation `mia-platform.eu/apply-before-kinds` to override default resources application order
 - support for jobs annotation `mia-platform.eu/await-completion` for waiting job completion after it has been applied on the cluster
 
 ### Changed

@@ -14,9 +14,18 @@
 
 package resourceutil
 
-import "sort"
+import (
+	"sort"
+	"strings"
+)
 
 type resourceOrder []string
+
+// Annotation to override resource application order,
+// it should be a comma separated list of kinds for which
+// this specific resource must be applied before.
+// i.e. mia-platform.eu/apply-before-kinds: Job, Deployment, Pod
+var applyBeforeAnnotation = GetMiaAnnotation("apply-before-kinds")
 
 var defaultSortOrder = resourceOrder{
 	"Namespace",
@@ -30,6 +39,7 @@ var defaultSortOrder = resourceOrder{
 	"ClusterRoleBinding",
 	"Role",
 	"RoleBinding",
+	"SecretProviderClass",
 	"Secret",
 	"ConfigMap",
 	"StorageClass",
@@ -62,11 +72,13 @@ func SortResourcesByKind(resources []Resource, ordering resourceOrder) []Resourc
 
 	orderingMap := convertOrderingInMap(ordering)
 	sort.SliceStable(resources, func(i, j int) bool {
-		kindOfA := resources[i].GroupVersionKind.Kind
-		kindOfB := resources[j].GroupVersionKind.Kind
+		resA := resources[i]
+		resB := resources[j]
+		kindOfA := resA.GroupVersionKind.Kind
+		kindOfB := resB.GroupVersionKind.Kind
 
-		aValue, foundA := orderingMap[kindOfA]
-		bValue, foundB := orderingMap[kindOfB]
+		aValue, foundA := getOrderFromAnnotationOrKind(orderingMap, resA)
+		bValue, foundB := getOrderFromAnnotationOrKind(orderingMap, resB)
 
 		// if both kind are unknown to us return an alphabetical sort by kind or do nothing if the kind is the same
 		if !foundA && !foundB {
@@ -98,4 +110,31 @@ func convertOrderingInMap(ordering resourceOrder) map[string]int {
 	}
 
 	return orderingMap
+}
+
+// returns the lowest order of the kinds specified in
+// mia-platform.eu/apply-before-kinds annotation or, if the annotation is not
+// present, returns the order specified in orderingMap for the resource's kind
+// P.S. we use decimals for overridden orders to avoid conflicts with defaults.
+func getOrderFromAnnotationOrKind(orderingMap map[string]int, resource Resource) (float32, bool) {
+	annotations := resource.Object.GetAnnotations()
+
+	if applyBeforeValue, applyBeforeFound := annotations[applyBeforeAnnotation]; applyBeforeFound {
+		order := float32(len(orderingMap))
+
+		for _, kind := range strings.Split(applyBeforeValue, ",") {
+			trimmedKind := strings.TrimSpace(kind)
+			kindOrder, kindOrderFound := orderingMap[trimmedKind]
+			kindOrderFloat := float32(kindOrder)
+
+			if kindOrderFound && kindOrderFloat < order {
+				order = kindOrderFloat - 0.5
+			}
+		}
+
+		return order, true
+	}
+
+	order, orderFound := orderingMap[resource.GroupVersionKind.Kind]
+	return float32(order), orderFound
 }
