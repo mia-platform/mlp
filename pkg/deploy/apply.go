@@ -125,10 +125,11 @@ func withAwaitableResource(apply applyFunction) applyFunction {
 func handleResourceCompletionEvent(res resourceutil.Resource, event *watch.Event, startTime time.Time) (bool, error) {
 	switch res.GroupVersionKind.Kind {
 	case "Job":
+		// only manage watch events
 		if event == nil || event.Type != watch.Modified {
 			return false, nil
 		}
-
+		// convert resources into jobs
 		var jobFromRes batchv1.Job
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(res.Object.Object, &jobFromRes); err != nil {
 			return false, err
@@ -139,11 +140,11 @@ func handleResourceCompletionEvent(res resourceutil.Resource, event *watch.Event
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, &jobFromEvent); err != nil {
 			return false, err
 		}
-
+		// if job from event is the one we are listening for changes
 		if jobFromEvent.Name != jobFromRes.Name {
 			return false, nil
 		}
-
+		// check f job has completed after start time
 		if completedAt := jobFromEvent.Status.CompletionTime; completedAt != nil && completedAt.Time.After(startTime) {
 			fmt.Println("Job completed:", res.Object.GetName())
 			return true, nil
