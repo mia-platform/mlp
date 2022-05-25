@@ -16,6 +16,8 @@ package deploy
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -515,4 +517,31 @@ func TestWithAwaitableResource(t *testing.T) {
 			tC.errorRequire(t, err)
 		})
 	}
+
+	t.Run("Forwards inner apply errors", func(t *testing.T) {
+		res := resourceutil.Resource{
+			GroupVersionKind: &schema.GroupVersionKind{
+				Group:   "batch",
+				Version: "v1",
+				Kind:    "Job",
+			},
+			Object: unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "batch/v1",
+					"kind":       "Job",
+					"metadata": map[string]string{
+						"name": "awaitable-job",
+					},
+				},
+			},
+		}
+		expectedErr := errors.New("Some apply error")
+
+		actualErr := withAwaitableResource(func(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
+			return expectedErr
+		})(&clients, res, deployConfig)
+
+		fmt.Println(actualErr)
+		require.Exactly(t, expectedErr, actualErr)
+	})
 }
