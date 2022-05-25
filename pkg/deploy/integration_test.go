@@ -12,50 +12,45 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build integration
-// +build integration
-
 package deploy
 
 import (
 	"context"
+	"path/filepath"
 	"time"
 
 	"github.com/mia-platform/mlp/internal/utils"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/rest"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/tools/clientcmd"
+	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
+var testEnv *envtest.Environment
+var cfg *rest.Config
 var clients *k8sClients
 
 var _ = BeforeSuite(func() {
 
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
-	// load local cluster config
-	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-	configOverrides := &clientcmd.ConfigOverrides{}
-	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
-	cfg, err := kubeConfig.ClientConfig()
-	Expect(err).To(BeNil())
-
-	// The following two options manage client-side throttling to decrease pressure on api-server
-	// Kubectl sets 300 bursts 50.0 QPS:
-	// https://github.com/kubernetes/kubectl/blob/0862c57c87184432986c85674a237737dabc53fa/pkg/cmd/cmd.go#L92
-	cfg.QPS = 5000.0
-	cfg.Burst = 5000
+	testEnv = &envtest.Environment{
+		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
+		ErrorIfCRDPathMissing: false,
+	}
+	var err error
+	cfg, err = testEnv.Start()
+	Expect(err).NotTo(HaveOccurred())
+	Expect(cfg).NotTo(BeNil())
 
 	clients = &k8sClients{
 		dynamic:   dynamic.NewForConfigOrDie(cfg),
@@ -65,9 +60,13 @@ var _ = BeforeSuite(func() {
 
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")
+	if testEnv != nil {
+		err := testEnv.Stop()
+		Expect(err).NotTo(HaveOccurred())
+	}
 }, 60)
 
-var _ = Describe("deploy on kubernetes", func() {
+var _ = Describe("deploy on mock kubernetes", func() {
 	deployConfig := utils.DeployConfig{
 		DeployType:              deployAll,
 		ForceDeployWhenNoSemver: true,
@@ -124,7 +123,7 @@ var _ = Describe("deploy on kubernetes", func() {
 			By("No annotation last applied for configmap and secrets")
 			Expect(sec.GetLabels()[corev1.LastAppliedConfigAnnotation]).To(Equal(""))
 		})
-		It("creates and updates deployment", func() {
+		It("creates and updates depoyment", func() {
 			err := doRun(clients, "test3", []string{"testdata/integration/apply-resources/test-deployment-1.yaml"}, deployConfig, currentTime)
 			Expect(err).NotTo(HaveOccurred())
 			err = doRun(clients, "test3", []string{"testdata/integration/apply-resources/test-deployment-2.yaml"}, deployConfig, currentTime)
@@ -157,32 +156,6 @@ var _ = Describe("deploy on kubernetes", func() {
 				List(context.Background(), metav1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(jobList.Items[0].GetLabels()["job-name"]).To(ContainSubstring("test-cronjob"))
-		})
-		It("awaits for job completion if annotated with mia-platform.eu/await-completion - with completion", func() {
-			ns := "test-await-job-completion"
-			err := doRun(clients, ns, []string{"testdata/integration/apply-resources/awaitable-job.yaml"}, deployConfig, currentTime)
-			Expect(err).NotTo(HaveOccurred())
-			u, err := clients.dynamic.Resource(gvrJobs).
-				Namespace(ns).
-				Get(context.Background(), "test-awaitable-job", metav1.GetOptions{})
-			Expect(err).NotTo(HaveOccurred())
-			var job batchv1.Job
-			err = runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, &job)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(job.Status.CompletionTime).NotTo(BeNil())
-		})
-		It("awaits for job completion if annotated with mia-platform.eu/await-completion - with timeout", func() {
-			ns := "test-await-job-completion"
-			err := doRun(clients, ns, []string{"testdata/integration/apply-resources/awaitable-job-timeout.yaml"}, deployConfig, currentTime)
-			Expect(err).To(HaveOccurred())
-			u, err := clients.dynamic.Resource(gvrJobs).
-				Namespace(ns).
-				Get(context.Background(), "test-awaitable-job-timeout", metav1.GetOptions{})
-			Expect(err).NotTo(HaveOccurred())
-			var job batchv1.Job
-			err = runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, &job)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(job.Status.CompletionTime).To(BeNil())
 		})
 	})
 	Context("smart deploy", func() {
