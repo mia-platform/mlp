@@ -47,9 +47,42 @@ const (
 )
 
 var (
-	awaitCompletionAnnotation = resourceutil.GetMiaAnnotation("await-completion")
-	apply                     = withAwaitableResource(applyResource)
+	deleteBeforeApplyAnnotation = resourceutil.GetMiaAnnotation("delete-before-apply")
+	awaitCompletionAnnotation   = resourceutil.GetMiaAnnotation("await-completion")
+	apply                       = decorateApplyResource(withAwaitableResource, withDeletableResource)
 )
+
+func decorateApplyResource(decorators ...func(applyFunction) applyFunction) applyFunction {
+	res := applyResource
+	for _, f := range decorators {
+		res = f(res)
+	}
+	return res
+}
+
+// withDeletableResource is an apply function decorator that deletes resources
+// annotated with deleteBeforeApplyAnnotation before applying them to the cluster
+func withDeletableResource(apply applyFunction) applyFunction {
+	return func(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
+		deleteBeforeApplyValue, deleteBeforeApplyFound := res.Object.GetAnnotations()[deleteBeforeApplyAnnotation]
+		if deleteBeforeApplyFound && deleteBeforeApplyValue == "true" {
+			gvr, err := resourceutil.FromGVKtoGVR(clients.discovery, res.Object.GroupVersionKind())
+			if err != nil {
+				return err
+			}
+
+			fmt.Printf("Deleting resource %s before apply\n", res.Object.GetName())
+
+			err = clients.dynamic.Resource(gvr).
+				Delete(context.TODO(), res.Object.GetName(), metav1.DeleteOptions{})
+			if err != nil {
+				return err
+			}
+		}
+
+		return apply(clients, res, deployConfig)
+	}
+}
 
 func withAwaitableResource(apply applyFunction) applyFunction {
 	return func(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
