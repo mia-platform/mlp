@@ -526,6 +526,21 @@ func TestWithAwaitableResource(t *testing.T) {
 
 func TestWithDeletableResource(t *testing.T) {
 	resName := "res-name"
+	requireResourceExists := func(shouldExist bool) func(t *testing.T, clients *k8sClients, res resourceutil.Resource) {
+		return func(t *testing.T, clients *k8sClients, res resourceutil.Resource) {
+			gvr, err := resourceutil.FromGVKtoGVR(clients.discovery, *res.GroupVersionKind)
+			require.Nil(t, err)
+			_, err = clients.dynamic.Resource(gvr).
+				Get(context.TODO(), resName, metav1.GetOptions{})
+
+			if shouldExist {
+				require.Nil(t, err)
+			} else {
+				require.NotNil(t, err)
+				require.True(t, apierrors.IsNotFound(err))
+			}
+		}
+	}
 	testCases := []struct {
 		desc        string
 		annotations map[string]interface{}
@@ -544,14 +559,7 @@ func TestWithDeletableResource(t *testing.T) {
 					Create(context.TODO(), &res.Object, metav1.CreateOptions{})
 				require.Nil(t, err)
 			},
-			requireFn: func(t *testing.T, clients *k8sClients, res resourceutil.Resource) {
-				gvr, err := resourceutil.FromGVKtoGVR(clients.discovery, *res.GroupVersionKind)
-				require.Nil(t, err)
-				_, err = clients.dynamic.Resource(gvr).
-					Get(context.TODO(), resName, metav1.GetOptions{})
-				require.NotNil(t, err)
-				require.True(t, apierrors.IsNotFound(err))
-			},
+			requireFn: requireResourceExists(false),
 		}, {
 			desc:        "Ignores non annotated resources",
 			annotations: map[string]interface{}{},
@@ -562,25 +570,12 @@ func TestWithDeletableResource(t *testing.T) {
 					Create(context.TODO(), &res.Object, metav1.CreateOptions{})
 				require.Nil(t, err)
 			},
-			requireFn: func(t *testing.T, clients *k8sClients, res resourceutil.Resource) {
-				gvr, err := resourceutil.FromGVKtoGVR(clients.discovery, *res.GroupVersionKind)
-				require.Nil(t, err)
-				_, err = clients.dynamic.Resource(gvr).
-					Get(context.TODO(), resName, metav1.GetOptions{})
-				require.Nil(t, err)
-			},
+			requireFn: requireResourceExists(true),
 		}, {
 			desc:        "Correctly handles non existing resources",
 			annotations: map[string]interface{}{},
 			setup:       func(t *testing.T, clients *k8sClients, res resourceutil.Resource) {},
-			requireFn: func(t *testing.T, clients *k8sClients, res resourceutil.Resource) {
-				gvr, err := resourceutil.FromGVKtoGVR(clients.discovery, *res.GroupVersionKind)
-				require.Nil(t, err)
-				_, err = clients.dynamic.Resource(gvr).
-					Get(context.TODO(), resName, metav1.GetOptions{})
-				require.NotNil(t, err)
-				require.True(t, apierrors.IsNotFound(err))
-			},
+			requireFn:   requireResourceExists(false),
 		},
 	}
 	deployConfig := utils.DeployConfig{}
