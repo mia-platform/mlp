@@ -64,8 +64,8 @@ func decorateApplyResource(decorators ...func(applyFunction) applyFunction) appl
 // annotated with deleteBeforeApplyAnnotation before applying them to the cluster
 func withDeletableResource(apply applyFunction) applyFunction {
 	return func(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
-		deleteBeforeApplyValue, deleteBeforeApplyFound := res.Object.GetAnnotations()[deleteBeforeApplyAnnotation]
-		if deleteBeforeApplyFound && deleteBeforeApplyValue == "true" {
+		_, deleteBeforeApplyFound := res.Object.GetAnnotations()[deleteBeforeApplyAnnotation]
+		if deleteBeforeApplyFound {
 			gvr, err := resourceutil.FromGVKtoGVR(clients.discovery, res.Object.GroupVersionKind())
 			if err != nil {
 				return err
