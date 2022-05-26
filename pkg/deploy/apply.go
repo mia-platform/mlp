@@ -75,7 +75,7 @@ func withDeletableResource(apply applyFunction) applyFunction {
 
 			err = clients.dynamic.Resource(gvr).
 				Delete(context.TODO(), res.Object.GetName(), metav1.DeleteOptions{})
-			if err != nil {
+			if err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
 		}
