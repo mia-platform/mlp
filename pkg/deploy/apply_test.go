@@ -17,7 +17,6 @@ package deploy
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -28,6 +27,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -541,7 +541,178 @@ func TestWithAwaitableResource(t *testing.T) {
 			return expectedErr
 		})(&clients, res, deployConfig)
 
-		fmt.Println(actualErr)
 		require.Exactly(t, expectedErr, actualErr)
 	})
+}
+
+func TestWithDeletableResource(t *testing.T) {
+
+	deployConfig := utils.DeployConfig{}
+
+	t.Run("Deletes annotated resources before apply", func(t *testing.T) {
+		clients := createFakeClients(t)
+		res := resourceutil.Resource{
+			GroupVersionKind: &schema.GroupVersionKind{
+				Group:   "batch",
+				Version: "v1",
+				Kind:    "Job",
+			},
+			Object: unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "batch/v1",
+					"kind":       "Job",
+					"metadata": map[string]interface{}{
+						"name": "job-name",
+						"annotations": map[string]interface{}{
+							deleteBeforeApplyAnnotation: "true",
+						},
+					},
+				},
+			},
+		}
+
+		gvr, err := resourceutil.FromGVKtoGVR(clients.discovery, *res.GroupVersionKind)
+		require.Nil(t, err)
+		_, err = clients.dynamic.Resource(gvr).
+			Create(context.TODO(), &res.Object, metav1.CreateOptions{})
+		require.Nil(t, err)
+
+		applyCalled := false
+		err = withDeletableResource(func(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
+			applyCalled = true
+			return nil
+		})(&clients, res, deployConfig)
+		require.True(t, applyCalled)
+		require.Nil(t, err)
+
+		_, err = clients.dynamic.Resource(gvr).
+			Get(context.TODO(), "job-name", metav1.GetOptions{})
+		require.NotNil(t, err)
+		require.True(t, apierrors.IsNotFound(err))
+	})
+
+	t.Run("Ignores non annotated resources", func(t *testing.T) {
+		clients := createFakeClients(t)
+		res := resourceutil.Resource{
+			GroupVersionKind: &schema.GroupVersionKind{
+				Group:   "batch",
+				Version: "v1",
+				Kind:    "Job",
+			},
+			Object: unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "batch/v1",
+					"kind":       "Job",
+					"metadata": map[string]interface{}{
+						"name": "job-name",
+					},
+				},
+			},
+		}
+
+		gvr, err := resourceutil.FromGVKtoGVR(clients.discovery, *res.GroupVersionKind)
+		require.Nil(t, err)
+		_, err = clients.dynamic.Resource(gvr).
+			Create(context.TODO(), &res.Object, metav1.CreateOptions{})
+		require.Nil(t, err)
+
+		applyCalled := false
+		err = withDeletableResource(func(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
+			applyCalled = true
+			return nil
+		})(&clients, res, deployConfig)
+		require.True(t, applyCalled)
+		require.Nil(t, err)
+
+		_, err = clients.dynamic.Resource(gvr).
+			Get(context.TODO(), "job-name", metav1.GetOptions{})
+		require.Nil(t, err)
+	})
+
+	t.Run("Correctly handles non existing resources", func(t *testing.T) {
+		clients := createFakeClients(t)
+		res := resourceutil.Resource{
+			GroupVersionKind: &schema.GroupVersionKind{
+				Group:   "batch",
+				Version: "v1",
+				Kind:    "Job",
+			},
+			Object: unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "batch/v1",
+					"kind":       "Job",
+					"metadata": map[string]interface{}{
+						"name": "job-name",
+						"annotations": map[string]interface{}{
+							deleteBeforeApplyAnnotation: "true",
+						},
+					},
+				},
+			},
+		}
+
+		applyCalled := false
+		err := withDeletableResource(func(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
+			applyCalled = true
+			return nil
+		})(&clients, res, deployConfig)
+		require.True(t, applyCalled)
+		require.Nil(t, err)
+	})
+
+	t.Run("Forwards inner apply errors", func(t *testing.T) {
+		clients := createFakeClients(t)
+		res := resourceutil.Resource{
+			GroupVersionKind: &schema.GroupVersionKind{
+				Group:   "batch",
+				Version: "v1",
+				Kind:    "Job",
+			},
+			Object: unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "batch/v1",
+					"kind":       "Job",
+					"metadata": map[string]string{
+						"name": "awaitable-job",
+					},
+				},
+			},
+		}
+		expectedErr := errors.New("Some apply error")
+
+		actualErr := withAwaitableResource(func(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
+			return expectedErr
+		})(&clients, res, deployConfig)
+
+		require.Exactly(t, expectedErr, actualErr)
+	})
+}
+
+func createFakeClients(t *testing.T) k8sClients {
+	t.Helper()
+
+	scheme := runtime.NewScheme()
+	_ = corev1.AddToScheme(scheme)
+	_ = batchv1.AddToScheme(scheme)
+
+	clients := k8sClients{
+		dynamic:   dynamicFake.NewSimpleDynamicClient(scheme),
+		discovery: clientsetFake.NewSimpleClientset().Discovery(),
+	}
+
+	discovery, ok := clients.discovery.(*discoveryFake.FakeDiscovery)
+	require.True(t, ok)
+	discovery.Fake.Resources = []*metav1.APIResourceList{
+		{
+			GroupVersion: "batch/v1",
+			APIResources: []metav1.APIResource{
+				{
+					Kind: "Job",
+					Name: "jobs",
+				},
+			},
+		},
+	}
+
+	return clients
 }
