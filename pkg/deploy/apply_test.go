@@ -17,7 +17,6 @@ package deploy
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -466,33 +465,11 @@ func TestWithAwaitableResource(t *testing.T) {
 		},
 	}
 
-	scheme := runtime.NewScheme()
-	_ = corev1.AddToScheme(scheme)
-	_ = batchv1.AddToScheme(scheme)
-
 	deployConfig := utils.DeployConfig{}
-
-	clients := k8sClients{
-		dynamic:   dynamicFake.NewSimpleDynamicClient(scheme),
-		discovery: clientsetFake.NewSimpleClientset().Discovery(),
-	}
-
-	discovery, ok := clients.discovery.(*discoveryFake.FakeDiscovery)
-	require.True(t, ok)
-	discovery.Fake.Resources = []*metav1.APIResourceList{
-		{
-			GroupVersion: "batch/v1",
-			APIResources: []metav1.APIResource{
-				{
-					Kind: "Job",
-					Name: "jobs",
-				},
-			},
-		},
-	}
 
 	for _, tC := range testCases {
 		t.Run(tC.desc, func(t *testing.T) {
+			clients := createFakeClientsWithJobs(t)
 			resources, err := resourceutil.NewResources(tC.resFileName, "default")
 			require.Nil(t, err)
 			res := resources[0]
@@ -519,6 +496,7 @@ func TestWithAwaitableResource(t *testing.T) {
 	}
 
 	t.Run("Forwards inner apply errors", func(t *testing.T) {
+		clients := createFakeClientsWithJobs(t)
 		res := resourceutil.Resource{
 			GroupVersionKind: &schema.GroupVersionKind{
 				Group:   "batch",
@@ -541,7 +519,51 @@ func TestWithAwaitableResource(t *testing.T) {
 			return expectedErr
 		})(&clients, res, deployConfig)
 
-		fmt.Println(actualErr)
 		require.Exactly(t, expectedErr, actualErr)
 	})
+}
+
+func createFakeClients(t *testing.T, resourcesList []*metav1.APIResourceList) k8sClients {
+	t.Helper()
+
+	scheme := runtime.NewScheme()
+	_ = corev1.AddToScheme(scheme)
+	_ = batchv1.AddToScheme(scheme)
+
+	clients := k8sClients{
+		dynamic:   dynamicFake.NewSimpleDynamicClient(scheme),
+		discovery: clientsetFake.NewSimpleClientset().Discovery(),
+	}
+
+	discovery, ok := clients.discovery.(*discoveryFake.FakeDiscovery)
+	require.True(t, ok)
+	discovery.Fake.Resources = []*metav1.APIResourceList{
+		{
+			GroupVersion: "batch/v1",
+			APIResources: []metav1.APIResource{
+				{
+					Kind: "Job",
+					Name: "jobs",
+				},
+			},
+		},
+	}
+
+	return clients
+}
+
+func createFakeClientsWithJobs(t *testing.T) k8sClients {
+	t.Helper()
+	resList := []*metav1.APIResourceList{
+		{
+			GroupVersion: "batch/v1",
+			APIResources: []metav1.APIResource{
+				{
+					Kind: "Job",
+					Name: "jobs",
+				},
+			},
+		},
+	}
+	return createFakeClients(t, resList)
 }
