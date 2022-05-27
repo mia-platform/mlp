@@ -134,13 +134,17 @@ func handleResourceCompletionEvent(res resourceutil.Resource, event *watch.Event
 			return false, nil
 		}
 		// convert resources into jobs
-		var jobFromRes batchv1.Job
+		var jobFromRes, jobFromEvent batchv1.Job
+
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(res.Object.Object, &jobFromRes); err != nil {
 			return false, err
 		}
 
-		u := event.Object.(*unstructured.Unstructured)
-		var jobFromEvent batchv1.Job
+		u, ok := event.Object.(*unstructured.Unstructured)
+		if !ok {
+			msg := fmt.Sprintf("Cannot convert object event to unstructured while handling events for Job")
+			return false, errors.New(msg)
+		}
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, &jobFromEvent); err != nil {
 			return false, err
 		}
@@ -150,7 +154,7 @@ func handleResourceCompletionEvent(res resourceutil.Resource, event *watch.Event
 		}
 		// check f job has completed after start time
 		if completedAt := jobFromEvent.Status.CompletionTime; completedAt != nil && completedAt.Time.After(startTime) {
-			fmt.Println("Job completed:", res.Object.GetName())
+			fmt.Println("Job completed:", jobFromEvent.Name)
 			return true, nil
 		}
 
