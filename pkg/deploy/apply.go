@@ -128,7 +128,7 @@ func withAwaitableResource(apply applyFunction) applyFunction {
 func handleResourceCompletionEvent(res resourceutil.Resource, event *watch.Event, startTime time.Time) (bool, error) {
 	switch res.GroupVersionKind.Kind {
 	case "Job":
-		// only manage watch events
+		// only manage watch.Modified events
 		if event == nil || event.Type != watch.Modified {
 			return false, nil
 		}
