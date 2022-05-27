@@ -160,7 +160,6 @@ func handleResourceCompletionEvent(res resourceutil.Resource, event *watch.Event
 
 		return false, nil
 	case "ExternalSecret":
-		// only manage watch.Modified events
 		if event == nil || event.Type != watch.Modified {
 			return false, nil
 		}
