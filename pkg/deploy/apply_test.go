@@ -528,7 +528,7 @@ func TestWithAwaitableResource(t *testing.T) {
 			},
 			errorRequire: require.Nil,
 		}, {
-			desc:          "Awaits annotated resources for completion",
+			desc:          "Timeout without completion events",
 			resFileName:   "testdata/awaitable-job.yaml",
 			watcherEvents: []unstructured.Unstructured{},
 			errorRequire:  require.NotNil,
