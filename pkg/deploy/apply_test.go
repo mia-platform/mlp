@@ -572,10 +572,12 @@ func TestWithDeletableResource(t *testing.T) {
 			},
 			requireFn: requireResourceExists(true),
 		}, {
-			desc:        "Correctly handles non existing resources",
-			annotations: map[string]interface{}{},
-			setup:       func(t *testing.T, clients *k8sClients, res resourceutil.Resource) {},
-			requireFn:   requireResourceExists(false),
+			desc: "Correctly handles non existing resources",
+			annotations: map[string]interface{}{
+				deleteBeforeApplyAnnotation: "true",
+			},
+			setup:     func(t *testing.T, clients *k8sClients, res resourceutil.Resource) {},
+			requireFn: requireResourceExists(false),
 		},
 	}
 	deployConfig := utils.DeployConfig{}
