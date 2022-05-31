@@ -24,6 +24,8 @@ import (
 func TestSortResourcesByKind(t *testing.T) {
 	t.Run("Reordering resources based on default reordering function", func(t *testing.T) {
 		resources := []Resource{
+			{GroupVersionKind: &schema.GroupVersionKind{Kind: "ExternalSecret"}},
+			{GroupVersionKind: &schema.GroupVersionKind{Kind: "SecretStore"}},
 			{GroupVersionKind: &schema.GroupVersionKind{Kind: "Unknown"}},
 			{GroupVersionKind: &schema.GroupVersionKind{Kind: "Secret"}},
 			{GroupVersionKind: &schema.GroupVersionKind{Kind: "ConfigMap"}},
@@ -42,6 +44,8 @@ func TestSortResourcesByKind(t *testing.T) {
 			"ServiceAccount",
 			"ClusterRole",
 			"ClusterRoleBinding",
+			"SecretStore",
+			"ExternalSecret",
 			"SecretProviderClass",
 			"Secret",
 			"ConfigMap",
