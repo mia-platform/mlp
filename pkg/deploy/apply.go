@@ -22,7 +22,6 @@ import (
 
 	"github.com/mia-platform/mlp/internal/utils"
 	"github.com/mia-platform/mlp/pkg/resourceutil"
-
 	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
@@ -48,9 +47,42 @@ const (
 )
 
 var (
-	awaitCompletionAnnotation = resourceutil.GetMiaAnnotation("await-completion")
-	apply                     = withAwaitableResource(applyResource)
+	deleteBeforeApplyAnnotation = resourceutil.GetMiaAnnotation("delete-before-apply")
+	awaitCompletionAnnotation   = resourceutil.GetMiaAnnotation("await-completion")
+	apply                       = decorateApplyResource(withAwaitableResource, withDeletableResource)
 )
+
+func decorateApplyResource(decorators ...func(applyFunction) applyFunction) applyFunction {
+	decoratedApplyFn := applyResource
+	for _, f := range decorators {
+		decoratedApplyFn = f(decoratedApplyFn)
+	}
+	return decoratedApplyFn
+}
+
+// withDeletableResource is an apply function decorator that deletes resources
+// annotated with deleteBeforeApplyAnnotation before applying them to the cluster
+func withDeletableResource(apply applyFunction) applyFunction {
+	return func(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
+		_, deleteBeforeApplyFound := res.Object.GetAnnotations()[deleteBeforeApplyAnnotation]
+		if deleteBeforeApplyFound {
+			gvr, err := resourceutil.FromGVKtoGVR(clients.discovery, res.Object.GroupVersionKind())
+			if err != nil {
+				return err
+			}
+
+			fmt.Printf("Deleting resource %s before apply\n", res.Object.GetName())
+
+			err = clients.dynamic.Resource(gvr).
+				Delete(context.TODO(), res.Object.GetName(), metav1.DeleteOptions{})
+			if err != nil && !apierrors.IsNotFound(err) {
+				return err
+			}
+		}
+
+		return apply(clients, res, deployConfig)
+	}
+}
 
 // withAwaitableResource is an apply function decorator that awaits resources
 // decorated with awaitCompletionAnnotation for completion after they are
