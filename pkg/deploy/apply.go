@@ -92,7 +92,7 @@ func withAwaitableResource(apply applyFunction) applyFunction {
 		// parse timeout from annotation value
 		timeout, err := time.ParseDuration(awaitCompletionValue)
 		if err != nil {
-			msg := fmt.Sprintf("Error in %s annotation value: must be a valid duration", awaitCompletionAnnotation)
+			msg := fmt.Sprintf("Error in %s annotation value for resource \"%s\": must be a valid duration", awaitCompletionAnnotation, res.Object.GetName())
 			return errors.Wrap(err, msg)
 		}
 
