@@ -41,4 +41,8 @@ spec:
 ## Await resources completion
 
 During the deploy phase resources are applied sequentially one after the other. `mlp` allows to wait for the completion of a resource using the annotation `mia-platform.eu/await-completion` on the specific resource to be awaited. The annotation value should be a duration string as expected by the [`time.ParseDuration`](https://pkg.go.dev/time#ParseDuration) function that specifies the time to wait for completion before a timeout error is triggered. 
-At the moment only `Job` resources support this annotation. Job resources using this annotation will be applied by `mlp` then the tool will listen to cluster events until the resource status becomes `Completed`.
+
+The resources supported by this annotation:
+
+- **Job**: the resource will be applied by `mlp` then the tool will listen to cluster events until the job status becomes `Completed`
+
