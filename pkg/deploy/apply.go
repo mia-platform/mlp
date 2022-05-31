@@ -146,7 +146,7 @@ func handleResourceCompletionEvent(res resourceutil.Resource, event *watch.Event
 
 		u, ok := event.Object.(*unstructured.Unstructured)
 		if !ok {
-			msg := fmt.Sprintf("Cannot convert object event to unstructured while handling events for Job")
+			msg := "Cannot convert object event to unstructured while handling events for Job"
 			return false, errors.New(msg)
 		}
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, &jobFromEvent); err != nil {
