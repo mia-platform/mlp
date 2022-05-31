@@ -53,11 +53,11 @@ var (
 )
 
 func decorateApplyResource(decorators ...func(applyFunction) applyFunction) applyFunction {
-	res := applyResource
+	decoratedApplyFn := applyResource
 	for _, f := range decorators {
-		res = f(res)
+		decoratedApplyFn = f(decoratedApplyFn)
 	}
-	return res
+	return decoratedApplyFn
 }
 
 // withDeletableResource is an apply function decorator that deletes resources
