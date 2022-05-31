@@ -1,4 +1,4 @@
-// Copyright 2020 Mia srl
+// Copyright 2022 Mia srl
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -124,12 +124,11 @@ func withAwaitableResource(apply applyFunction) applyFunction {
 		// parse timeout from annotation value
 		timeout, err := time.ParseDuration(awaitCompletionValue)
 		if err != nil {
-			msg := fmt.Sprintf("Error in %s annotation value: must be a valid duration", awaitCompletionAnnotation)
+			msg := fmt.Sprintf("Error in %s annotation value for resource \"%s\": must be a valid duration", awaitCompletionAnnotation, res.Object.GetName())
 			return errors.Wrap(err, msg)
 		}
 
-		// check if res can be handled
-		if _, err := handleResourceCompletionEvent(res, nil, startTime); err != nil {
+		if err := assertAwaitSupportedForThisResource(res); err != nil {
 			return err
 		}
 
@@ -154,6 +153,11 @@ func withAwaitableResource(apply applyFunction) applyFunction {
 	}
 }
 
+func assertAwaitSupportedForThisResource(res resourceutil.Resource) error {
+	_, err := handleResourceCompletionEvent(res, nil, time.Now())
+	return err
+}
+
 // handleResourceCompletionEvent takes the target resource, the watch event and
 // the initial watch time as arguments. It returns (true, nil) when the given
 // resource has completed in the given event. If the event is nil returns (false, nil)
@@ -161,18 +165,22 @@ func withAwaitableResource(apply applyFunction) applyFunction {
 func handleResourceCompletionEvent(res resourceutil.Resource, event *watch.Event, startTime time.Time) (bool, error) {
 	switch res.GroupVersionKind.Kind {
 	case "Job":
-		// only manage watch events
+		// only manage watch.Modified events
 		if event == nil || event.Type != watch.Modified {
 			return false, nil
 		}
 		// convert resources into jobs
-		var jobFromRes batchv1.Job
+		var jobFromRes, jobFromEvent batchv1.Job
+
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(res.Object.Object, &jobFromRes); err != nil {
 			return false, err
 		}
 
-		u := event.Object.(*unstructured.Unstructured)
-		var jobFromEvent batchv1.Job
+		u, ok := event.Object.(*unstructured.Unstructured)
+		if !ok {
+			msg := "Cannot convert object event to unstructured while handling events for Job"
+			return false, errors.New(msg)
+		}
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, &jobFromEvent); err != nil {
 			return false, err
 		}
@@ -180,9 +188,9 @@ func handleResourceCompletionEvent(res resourceutil.Resource, event *watch.Event
 		if jobFromEvent.Name != jobFromRes.Name {
 			return false, nil
 		}
-		// check f job has completed after start time
+		// check if job has completed after start time
 		if completedAt := jobFromEvent.Status.CompletionTime; completedAt != nil && completedAt.Time.After(startTime) {
-			fmt.Println("Job completed:", res.Object.GetName())
+			fmt.Println("Job completed:", jobFromEvent.Name)
 			return true, nil
 		}
 
