@@ -147,7 +147,7 @@ func handleResourceCompletionEvent(res resourceutil.Resource, event *watch.Event
 		if jobFromEvent.Name != jobFromRes.Name {
 			return false, nil
 		}
-		// check f job has completed after start time
+		// check if job has completed after start time
 		if completedAt := jobFromEvent.Status.CompletionTime; completedAt != nil && completedAt.Time.After(startTime) {
 			fmt.Println("Job completed:", res.Object.GetName())
 			return true, nil
