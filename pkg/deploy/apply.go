@@ -176,7 +176,7 @@ func handleResourceCompletionEvent(res resourceutil.Resource, event *watch.Event
 
 		u, ok := event.Object.(*unstructured.Unstructured)
 		if !ok {
-			msg := fmt.Sprintf("Cannot convert object from event into unstructured while handling ExternalSecret events")
+			msg := "Cannot convert object from event into unstructured while handling ExternalSecret events"
 			return false, errors.New(msg)
 		}
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, &extsecFromEvent); err != nil {
