@@ -1,4 +1,4 @@
-// Copyright 2020 Mia srl
+// Copyright 2022 Mia srl
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 
 	"github.com/mia-platform/mlp/internal/utils"
 	"github.com/mia-platform/mlp/pkg/resourceutil"
+
 	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
@@ -151,7 +152,7 @@ func handleResourceCompletionEvent(res resourceutil.Resource, event *watch.Event
 		if jobFromEvent.Name != jobFromRes.Name {
 			return false, nil
 		}
-		// check f job has completed after start time
+		// check if job has completed after start time
 		if completedAt := jobFromEvent.Status.CompletionTime; completedAt != nil && completedAt.Time.After(startTime) {
 			fmt.Println("Job completed:", jobFromEvent.Name)
 			return true, nil
