@@ -1,0 +1,17 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: awaitable-job
+  annotations:
+    mia-platform.eu/await-completion: 250ms
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: busybox
+          image: busybox 
+          command:
+            - sleep
+          args:
+            - 1s
