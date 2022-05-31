@@ -96,8 +96,7 @@ func withAwaitableResource(apply applyFunction) applyFunction {
 			return errors.Wrap(err, msg)
 		}
 
-		// check if res can be handled
-		if _, err := handleResourceCompletionEvent(res, nil, startTime); err != nil {
+		if err := assertAwaitSupportedForThisResource(res); err != nil {
 			return err
 		}
 
@@ -120,6 +119,11 @@ func withAwaitableResource(apply applyFunction) applyFunction {
 			}
 		}
 	}
+}
+
+func assertAwaitSupportedForThisResource(res resourceutil.Resource) error {
+	_, err := handleResourceCompletionEvent(res, nil, time.Now())
+	return err
 }
 
 // handleResourceCompletionEvent takes the target resource, the watch event and
