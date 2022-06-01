@@ -27,6 +27,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -562,6 +563,126 @@ func TestWithAwaitableResource(t *testing.T) {
 
 			require.True(t, applyCalled)
 			tC.errorRequire(t, err)
+		})
+	}
+
+	t.Run("Forwards inner apply errors", func(t *testing.T) {
+		clients := createFakeClientsWithJobs(t)
+		res := resourceutil.Resource{
+			GroupVersionKind: &schema.GroupVersionKind{
+				Group:   "batch",
+				Version: "v1",
+				Kind:    "Job",
+			},
+			Object: unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "batch/v1",
+					"kind":       "Job",
+					"metadata": map[string]string{
+						"name": "awaitable-job",
+					},
+				},
+			},
+		}
+		expectedErr := errors.New("Some apply error")
+
+		actualErr := withAwaitableResource(func(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
+			return expectedErr
+		})(&clients, res, deployConfig)
+
+		require.Exactly(t, expectedErr, actualErr)
+	})
+}
+
+func TestWithDeletableResource(t *testing.T) {
+	resName := "res-name"
+	requireResourceExists := func(shouldExist bool) func(t *testing.T, clients *k8sClients, res resourceutil.Resource) {
+		return func(t *testing.T, clients *k8sClients, res resourceutil.Resource) {
+			gvr, err := resourceutil.FromGVKtoGVR(clients.discovery, *res.GroupVersionKind)
+			require.Nil(t, err)
+			_, err = clients.dynamic.Resource(gvr).
+				Get(context.TODO(), resName, metav1.GetOptions{})
+
+			if shouldExist {
+				require.Nil(t, err)
+			} else {
+				require.NotNil(t, err)
+				require.True(t, apierrors.IsNotFound(err))
+			}
+		}
+	}
+	testCases := []struct {
+		desc        string
+		annotations map[string]interface{}
+		setup       func(t *testing.T, clients *k8sClients, res resourceutil.Resource)
+		requireFn   func(t *testing.T, clients *k8sClients, res resourceutil.Resource)
+	}{
+		{
+			desc: "Deletes annotated resources before apply",
+			annotations: map[string]interface{}{
+				deleteBeforeApplyAnnotation: "true",
+			},
+			setup: func(t *testing.T, clients *k8sClients, res resourceutil.Resource) {
+				gvr, err := resourceutil.FromGVKtoGVR(clients.discovery, *res.GroupVersionKind)
+				require.Nil(t, err)
+				_, err = clients.dynamic.Resource(gvr).
+					Create(context.TODO(), &res.Object, metav1.CreateOptions{})
+				require.Nil(t, err)
+			},
+			requireFn: requireResourceExists(false),
+		}, {
+			desc:        "Ignores non annotated resources",
+			annotations: map[string]interface{}{},
+			setup: func(t *testing.T, clients *k8sClients, res resourceutil.Resource) {
+				gvr, err := resourceutil.FromGVKtoGVR(clients.discovery, *res.GroupVersionKind)
+				require.Nil(t, err)
+				_, err = clients.dynamic.Resource(gvr).
+					Create(context.TODO(), &res.Object, metav1.CreateOptions{})
+				require.Nil(t, err)
+			},
+			requireFn: requireResourceExists(true),
+		}, {
+			desc: "Correctly handles non existing resources",
+			annotations: map[string]interface{}{
+				deleteBeforeApplyAnnotation: "true",
+			},
+			setup:     func(t *testing.T, clients *k8sClients, res resourceutil.Resource) {},
+			requireFn: requireResourceExists(false),
+		},
+	}
+	deployConfig := utils.DeployConfig{}
+
+	for _, tC := range testCases {
+		t.Run(tC.desc, func(t *testing.T) {
+			clients := createFakeClientsWithJobs(t)
+			res := resourceutil.Resource{
+				GroupVersionKind: &schema.GroupVersionKind{
+					Group:   "batch",
+					Version: "v1",
+					Kind:    "Job",
+				},
+				Object: unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"apiVersion": "batch/v1",
+						"kind":       "Job",
+						"metadata": map[string]interface{}{
+							"name":        resName,
+							"annotations": tC.annotations,
+						},
+					},
+				},
+			}
+
+			tC.setup(t, &clients, res)
+
+			applyCalled := false
+			err := withDeletableResource(func(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
+				applyCalled = true
+				tC.requireFn(t, clients, res)
+				return nil
+			})(&clients, res, deployConfig)
+			require.True(t, applyCalled)
+			require.Nil(t, err)
 		})
 	}
 

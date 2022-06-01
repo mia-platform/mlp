@@ -46,3 +46,7 @@ The resources supported by this annotation:
 
 - **Job**: the resource will be applied by `mlp` then the tool will listen to cluster events until the job status becomes `Completed`
 - **ExternalSecret**: this [CRD](https://external-secrets.io/v0.5.4/api-externalsecret/) will be applied and then `mlp` will watch cluster events until the resource `.status.refreshTime` is updated
+
+## Delete resources before applying them
+
+By annotating a resource with `mia-platform.eu/delete-before-apply`, having arbitrary value, the user can force `mlp` to delete the corresponding resource on the cluster before re-creating it. If the annotated resource is not already present on the cluster no additional operations will occur.
