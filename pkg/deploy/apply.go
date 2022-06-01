@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	externalsecretsv1beta1 "github.com/external-secrets/external-secrets/apis/externalsecrets/v1beta1"
 	"github.com/mia-platform/mlp/internal/utils"
 	"github.com/mia-platform/mlp/pkg/resourceutil"
 	"github.com/pkg/errors"
@@ -191,6 +192,35 @@ func handleResourceCompletionEvent(res resourceutil.Resource, event *watch.Event
 		// check if job has completed after start time
 		if completedAt := jobFromEvent.Status.CompletionTime; completedAt != nil && completedAt.Time.After(startTime) {
 			fmt.Println("Job completed:", jobFromEvent.Name)
+			return true, nil
+		}
+
+		return false, nil
+	case "ExternalSecret":
+		if event == nil || event.Type != watch.Modified {
+			return false, nil
+		}
+
+		var extsecFromRes, extsecFromEvent externalsecretsv1beta1.ExternalSecret
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(res.Object.Object, &extsecFromRes); err != nil {
+			return false, err
+		}
+
+		u, ok := event.Object.(*unstructured.Unstructured)
+		if !ok {
+			msg := "Cannot convert object from event into unstructured object while handling ExternalSecret events"
+			return false, errors.New(msg)
+		}
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, &extsecFromEvent); err != nil {
+			return false, err
+		}
+
+		if extsecFromEvent.Name != extsecFromRes.Name {
+			return false, nil
+		}
+
+		if refreshedAt := extsecFromEvent.Status.RefreshTime; refreshedAt.Time.After(startTime) {
+			fmt.Println("ExternalSecret completed:", extsecFromEvent.Name)
 			return true, nil
 		}
 

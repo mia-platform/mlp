@@ -309,31 +309,47 @@ func TestHandleResourceCompletionEvent(t *testing.T) {
 		},
 	}
 
+	extsec := resourceutil.Resource{
+		GroupVersionKind: &schema.GroupVersionKind{
+			Group:   "external-secrets.io",
+			Version: "v1beta1",
+			Kind:    "ExternalSecret",
+		},
+		Object: unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"metadata": map[string]string{
+					"name": "extsec-name",
+				},
+			},
+		},
+	}
+
 	testCases := []struct {
 		desc         string
 		startTime    time.Time
-		job          resourceutil.Resource
+		res          resourceutil.Resource
 		event        *watch.Event
 		isCompleted  bool
 		errorRequire func(require.TestingT, interface{}, ...interface{})
 	}{
 		{
-			desc:      "Handles Job resources",
-			startTime: time.Now(),
-			job: resourceutil.Resource{
-				GroupVersionKind: &schema.GroupVersionKind{
-					Group:   "batch",
-					Version: "v1",
-					Kind:    "Job",
-				},
-			},
+			desc:         "Handles Job resources",
+			startTime:    time.Now(),
+			res:          job,
+			event:        nil,
+			isCompleted:  false,
+			errorRequire: require.Nil,
+		}, {
+			desc:         "Handles ExternalSecret resources",
+			startTime:    time.Now(),
+			res:          extsec,
 			event:        nil,
 			isCompleted:  false,
 			errorRequire: require.Nil,
 		}, {
 			desc:      "Does not handle Unknown resources",
 			startTime: time.Now(),
-			job: resourceutil.Resource{
+			res: resourceutil.Resource{
 				GroupVersionKind: &schema.GroupVersionKind{
 					Group:   "foo",
 					Version: "bar",
@@ -346,7 +362,7 @@ func TestHandleResourceCompletionEvent(t *testing.T) {
 		}, {
 			desc:      "Correctly handles jobs completed after the start time",
 			startTime: time.Now(),
-			job:       job,
+			res:       job,
 			event: &watch.Event{
 				Type: watch.Modified,
 				Object: &unstructured.Unstructured{
@@ -365,7 +381,7 @@ func TestHandleResourceCompletionEvent(t *testing.T) {
 		}, {
 			desc:      "Correctly handles jobs completed before the start time",
 			startTime: time.Now().Add(time.Hour),
-			job:       job,
+			res:       job,
 			event: &watch.Event{
 				Type: watch.Modified,
 				Object: &unstructured.Unstructured{
@@ -384,7 +400,7 @@ func TestHandleResourceCompletionEvent(t *testing.T) {
 		}, {
 			desc:      "Correctly handles incomplete jobs",
 			startTime: time.Now().Add(time.Hour),
-			job:       job,
+			res:       job,
 			event: &watch.Event{
 				Type: watch.Modified,
 				Object: &unstructured.Unstructured{
@@ -398,9 +414,63 @@ func TestHandleResourceCompletionEvent(t *testing.T) {
 			isCompleted:  false,
 			errorRequire: require.Nil,
 		}, {
+			desc:      "Correctly handles externalsecrets completed after the start time",
+			startTime: time.Now(),
+			res:       extsec,
+			event: &watch.Event{
+				Type: watch.Modified,
+				Object: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"metadata": map[string]string{
+							"name": "extsec-name",
+						},
+						"status": map[string]interface{}{
+							"refreshTime": time.Now().Add(time.Hour).UTC().Format(time.RFC3339),
+						},
+					},
+				},
+			},
+			isCompleted:  true,
+			errorRequire: require.Nil,
+		}, {
+			desc:      "Correctly handles externalsecrets completed before the start time",
+			startTime: time.Now().Add(time.Hour),
+			res:       extsec,
+			event: &watch.Event{
+				Type: watch.Modified,
+				Object: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"metadata": map[string]string{
+							"name": "extsec-name",
+						},
+						"status": map[string]interface{}{
+							"refreshTime": time.Now().UTC().Format(time.RFC3339),
+						},
+					},
+				},
+			},
+			isCompleted:  false,
+			errorRequire: require.Nil,
+		}, {
+			desc:      "Correctly handles incomplete externalsecrets",
+			startTime: time.Now().Add(time.Hour),
+			res:       extsec,
+			event: &watch.Event{
+				Type: watch.Modified,
+				Object: &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"metadata": map[string]string{
+							"name": "extsec-name",
+						},
+					},
+				},
+			},
+			isCompleted:  false,
+			errorRequire: require.Nil,
+		}, {
 			desc:      "Matches resources by name",
 			startTime: time.Now(),
-			job:       job,
+			res:       job,
 			event: &watch.Event{
 				Type: watch.Modified,
 				Object: &unstructured.Unstructured{
@@ -420,7 +490,7 @@ func TestHandleResourceCompletionEvent(t *testing.T) {
 	}
 	for _, tC := range testCases {
 		t.Run(tC.desc, func(t *testing.T) {
-			isCompleted, err := handleResourceCompletionEvent(tC.job, tC.event, tC.startTime)
+			isCompleted, err := handleResourceCompletionEvent(tC.res, tC.event, tC.startTime)
 
 			require.Exactly(t, tC.isCompleted, isCompleted)
 			tC.errorRequire(t, err)
@@ -459,7 +529,7 @@ func TestWithAwaitableResource(t *testing.T) {
 			},
 			errorRequire: require.Nil,
 		}, {
-			desc:          "Awaits annotated resources for completion",
+			desc:          "Timeout without completion events",
 			resFileName:   "testdata/awaitable-job.yaml",
 			watcherEvents: []unstructured.Unstructured{},
 			errorRequire:  require.NotNil,
@@ -648,8 +718,8 @@ func createFakeClients(t *testing.T, resourcesList []*metav1.APIResourceList) k8
 	t.Helper()
 
 	scheme := runtime.NewScheme()
-	_ = corev1.AddToScheme(scheme)
-	_ = batchv1.AddToScheme(scheme)
+	corev1.AddToScheme(scheme)
+	batchv1.AddToScheme(scheme)
 
 	clients := k8sClients{
 		dynamic:   dynamicFake.NewSimpleDynamicClient(scheme),
@@ -658,17 +728,7 @@ func createFakeClients(t *testing.T, resourcesList []*metav1.APIResourceList) k8
 
 	discovery, ok := clients.discovery.(*discoveryFake.FakeDiscovery)
 	require.True(t, ok)
-	discovery.Fake.Resources = []*metav1.APIResourceList{
-		{
-			GroupVersion: "batch/v1",
-			APIResources: []metav1.APIResource{
-				{
-					Kind: "Job",
-					Name: "jobs",
-				},
-			},
-		},
-	}
+	discovery.Fake.Resources = resourcesList
 
 	return clients
 }
