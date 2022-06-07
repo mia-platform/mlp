@@ -321,6 +321,8 @@ func applyResource(clients *k8sClients, res resourceutil.Resource, deployConfig 
 				return errors.Wrap(err, "failed to create patch")
 			}
 
+			fmt.Printf("GENERATED PATCH: (%s) \n%s", patchType, patch)
+
 			if _, err := clients.dynamic.Resource(gvr).
 				Namespace(res.Object.GetNamespace()).
 				Patch(context.Background(),
@@ -333,36 +335,49 @@ func applyResource(clients *k8sClients, res resourceutil.Resource, deployConfig 
 	return nil
 }
 
+// annotateTargetResource annotates a given resource with corev1.LastAppliedConfigAnnotation
+func annotateTargetResource(res resourceutil.Resource) (unstructured.Unstructured, error) {
+	annotatedRes := res.Object.DeepCopy()
+	annotations := annotatedRes.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	if _, found := annotations[corev1.LastAppliedConfigAnnotation]; found {
+		delete(annotations, corev1.LastAppliedConfigAnnotation)
+		annotatedRes.SetAnnotations(annotations)
+	}
+
+	resJson, err := annotatedRes.MarshalJSON()
+	if err != nil {
+		return unstructured.Unstructured{}, err
+	}
+
+	annotations[corev1.LastAppliedConfigAnnotation] = string(resJson)
+	annotatedRes.SetAnnotations(annotations)
+
+	return *annotatedRes, nil
+}
+
 // createPatch returns the patch to be used in order to update the resource inside the cluster.
 // The function performs a Three Way Merge Patch with the last applied configuration written in the
 // object annotation, the actual resource state deployed inside the cluster and the desired state after
 // the update.
 func createPatch(currentObj unstructured.Unstructured, target resourceutil.Resource) ([]byte, types.PatchType, error) {
-	// Get the config in the annotation
-	original := currentObj.GetAnnotations()[corev1.LastAppliedConfigAnnotation]
+	// Get last applied config from current object annotation
+	lastAppliedConfigJson := currentObj.GetAnnotations()[corev1.LastAppliedConfigAnnotation]
 
 	// Get the desired configuration
-	obj := target.Object.DeepCopy()
-	objAnn := obj.GetAnnotations()
-	_, found := objAnn[corev1.LastAppliedConfigAnnotation]
-	if found {
-		delete(objAnn, corev1.LastAppliedConfigAnnotation)
-		obj.SetAnnotations(objAnn)
-	} else {
-		objAnn = make(map[string]string)
-	}
-	objEncoded, err := obj.MarshalJSON()
+	annotatedTarget, err := annotateTargetResource(target)
 	if err != nil {
 		return nil, types.StrategicMergePatchType, err
 	}
-	objAnn[corev1.LastAppliedConfigAnnotation] = string(objEncoded)
-	obj.SetAnnotations(objAnn)
-	desired, err := obj.MarshalJSON()
+	targetJson, err := annotatedTarget.MarshalJSON()
 	if err != nil {
 		return nil, types.StrategicMergePatchType, err
 	}
+
 	// Get the resource in the cluster
-	current, err := currentObj.MarshalJSON()
+	currentJson, err := currentObj.MarshalJSON()
 	if err != nil {
 		return nil, types.StrategicMergePatchType, errors.Wrap(err, "serializing live configuration")
 	}
@@ -376,7 +391,7 @@ func createPatch(currentObj unstructured.Unstructured, target resourceutil.Resou
 		patchType := types.MergePatchType
 		preconditions := []mergepatch.PreconditionFunc{mergepatch.RequireKeyUnchanged("apiVersion"),
 			mergepatch.RequireKeyUnchanged("kind"), mergepatch.RequireMetadataKeyUnchanged("name")}
-		patch, err := jsonmergepatch.CreateThreeWayJSONMergePatch([]byte(original), desired, current, preconditions...)
+		patch, err := jsonmergepatch.CreateThreeWayJSONMergePatch([]byte(lastAppliedConfigJson), targetJson, currentJson, preconditions...)
 		return patch, patchType, err
 	} else if err != nil {
 		return nil, types.StrategicMergePatchType, err
@@ -387,7 +402,7 @@ func createPatch(currentObj unstructured.Unstructured, target resourceutil.Resou
 		return nil, types.StrategicMergePatchType, errors.Wrap(err, "unable to create patch metadata from object")
 	}
 
-	patch, err := strategicpatch.CreateThreeWayMergePatch([]byte(original), desired, current, patchMeta, true)
+	patch, err := strategicpatch.CreateThreeWayMergePatch([]byte(lastAppliedConfigJson), targetJson, currentJson, patchMeta, true)
 	return patch, types.StrategicMergePatchType, err
 }
 
