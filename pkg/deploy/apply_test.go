@@ -154,14 +154,10 @@ func TestCreatePatch(t *testing.T) {
 		deployment, err := resourceutil.NewResources("testdata/test-deployment.yaml", "default")
 		require.Nil(t, err)
 
-		lastApplied, err := deployment[0].Object.MarshalJSON()
-		require.Nil(t, err)
-		deployment[0].Object.SetAnnotations(map[string]string{
-			"kubectl.kubernetes.io/last-applied-configuration": string(lastApplied),
-		})
-
+		expected := "{\"metadata\":{\"annotations\":{\"kubectl.kubernetes.io/last-applied-configuration\":\"{\\\"apiVersion\\\":\\\"apps/v1\\\",\\\"kind\\\":\\\"Deployment\\\",\\\"metadata\\\":{\\\"creationTimestamp\\\":null,\\\"labels\\\":{\\\"app\\\":\\\"test-deployment\\\"},\\\"name\\\":\\\"test-deployment\\\",\\\"namespace\\\":\\\"default\\\"},\\\"spec\\\":{\\\"replicas\\\":1,\\\"selector\\\":{\\\"matchLabels\\\":{\\\"app\\\":\\\"test-deployment\\\"}},\\\"strategy\\\":{},\\\"template\\\":{\\\"metadata\\\":{\\\"creationTimestamp\\\":null,\\\"labels\\\":{\\\"app\\\":\\\"test-deployment\\\"}},\\\"spec\\\":{\\\"containers\\\":[{\\\"image\\\":\\\"nginx\\\",\\\"name\\\":\\\"nginx\\\",\\\"resources\\\":{}}]}}},\\\"status\\\":{}}\\n\"}}}"
 		patch, patchType, err := createPatch(deployment[0].Object, deployment[0])
-		require.Equal(t, "{}", string(patch), "patch should be empty")
+
+		require.Equal(t, expected, string(patch), "patch should contain only last applied")
 		require.Equal(t, patchType, types.StrategicMergePatchType)
 		require.Nil(t, err)
 	})
@@ -170,31 +166,34 @@ func TestCreatePatch(t *testing.T) {
 		deployment, err := resourceutil.NewResources("testdata/test-deployment.yaml", "default")
 		require.Nil(t, err)
 
-		deployment[0].Object.SetAnnotations(map[string]string{
-			"kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"apps/v1\",\"kind\":\"Deployment\",\"metadata\":{\"annotations\":{},\"creationTimestamp\":null,\"labels\":{\"app\":\"test-deployment\"},\"name\":\"test-deployment\",\"namespace\":\"default\"},\"spec\":{\"replicas\":1,\"selector\":{\"matchLabels\":{\"app\":\"test-deployment\"}},\"strategy\":{},\"template\":{\"metadata\":{\"creationTimestamp\":null,\"labels\":{\"app\":\"test-deployment\"}},\"spec\":{\"containers\":[{\"image\":\"nginx\",\"name\":\"nginx\",\"resources\":{}}]}}},\"status\":{}}\n"},
-		)
-
 		oldDeploy := deployment[0].Object.DeepCopy()
 		err = unstructured.SetNestedField(oldDeploy.Object, "2",
 			"spec", "replicas")
 		require.Nil(t, err)
-		t.Logf("oldobj: %s\n", oldDeploy.Object)
+		oldDeployJson, err := oldDeploy.MarshalJSON()
+		require.Nil(t, err)
+		oldDeploy.SetAnnotations(map[string]string{
+			"kubectl.kubernetes.io/last-applied-configuration": string(oldDeployJson),
+		})
+
+		expected := "{\"metadata\":{\"annotations\":{\"kubectl.kubernetes.io/last-applied-configuration\":\"{\\\"apiVersion\\\":\\\"apps/v1\\\",\\\"kind\\\":\\\"Deployment\\\",\\\"metadata\\\":{\\\"creationTimestamp\\\":null,\\\"labels\\\":{\\\"app\\\":\\\"test-deployment\\\"},\\\"name\\\":\\\"test-deployment\\\",\\\"namespace\\\":\\\"default\\\"},\\\"spec\\\":{\\\"replicas\\\":1,\\\"selector\\\":{\\\"matchLabels\\\":{\\\"app\\\":\\\"test-deployment\\\"}},\\\"strategy\\\":{},\\\"template\\\":{\\\"metadata\\\":{\\\"creationTimestamp\\\":null,\\\"labels\\\":{\\\"app\\\":\\\"test-deployment\\\"}},\\\"spec\\\":{\\\"containers\\\":[{\\\"image\\\":\\\"nginx\\\",\\\"name\\\":\\\"nginx\\\",\\\"resources\\\":{}}]}}},\\\"status\\\":{}}\\n\"}},\"spec\":{\"replicas\":1}}"
 		patch, patchType, err := createPatch(*oldDeploy, deployment[0])
-		require.Equal(t, "{\"spec\":{\"replicas\":1}}", string(patch), "patch should contain the new resource name")
+
+		require.Equal(t, expected, string(patch), "patch should contain the changed replicas and last applied")
 		require.Equal(t, patchType, types.StrategicMergePatchType)
 		require.Nil(t, err)
 	})
 
-	t.Run("Changes made on the cluster are kept", func(t *testing.T) {
+	t.Run("Changes made at runtime are kept", func(t *testing.T) {
 		targetR, err := resourceutil.NewResources("testdata/test-deployment.yaml", "default")
+		require.Nil(t, err)
+
+		lastAppliedJson, err := targetR[0].Object.MarshalJSON()
 		require.Nil(t, err)
 
 		targetR[0].Object.SetAnnotations(map[string]string{
 			"target-annotation": "value",
 		})
-
-		lastAppliedJson, err := targetR[0].Object.MarshalJSON()
-		require.Nil(t, err)
 
 		onCluster := targetR[0].Object.DeepCopy()
 		onCluster.SetAnnotations(map[string]string{
@@ -202,14 +201,15 @@ func TestCreatePatch(t *testing.T) {
 			"cluster-annotation": "value",
 		})
 
+		expected := "{\"metadata\":{\"annotations\":{\"kubectl.kubernetes.io/last-applied-configuration\":\"{\\\"apiVersion\\\":\\\"apps/v1\\\",\\\"kind\\\":\\\"Deployment\\\",\\\"metadata\\\":{\\\"annotations\\\":{\\\"target-annotation\\\":\\\"value\\\"},\\\"creationTimestamp\\\":null,\\\"labels\\\":{\\\"app\\\":\\\"test-deployment\\\"},\\\"name\\\":\\\"test-deployment\\\",\\\"namespace\\\":\\\"default\\\"},\\\"spec\\\":{\\\"replicas\\\":1,\\\"selector\\\":{\\\"matchLabels\\\":{\\\"app\\\":\\\"test-deployment\\\"}},\\\"strategy\\\":{},\\\"template\\\":{\\\"metadata\\\":{\\\"creationTimestamp\\\":null,\\\"labels\\\":{\\\"app\\\":\\\"test-deployment\\\"}},\\\"spec\\\":{\\\"containers\\\":[{\\\"image\\\":\\\"nginx\\\",\\\"name\\\":\\\"nginx\\\",\\\"resources\\\":{}}]}}},\\\"status\\\":{}}\\n\",\"target-annotation\":\"value\"}}}"
 		patch, patchType, err := createPatch(*onCluster, targetR[0])
 
-		require.Equal(t, "{\"metadata\":{\"annotations\":{\"target-annotation\":\"value\"}}}", string(patch), "patch should contain target-annotation")
+		require.Equal(t, expected, string(patch), "patch should contain target-annotation and last applied")
 		require.Equal(t, patchType, types.StrategicMergePatchType)
 		require.Nil(t, err)
 	})
 
-	t.Run("apply time annotation => delete", func(t *testing.T) {
+	t.Run("Delete annotation if present in last applied but not in target", func(t *testing.T) {
 		targetR, err := resourceutil.NewResources("testdata/test-deployment.yaml", "default")
 		require.Nil(t, err)
 
@@ -230,9 +230,10 @@ func TestCreatePatch(t *testing.T) {
 			"cluster-annotation": "value",
 		})
 
+		expected := "{\"metadata\":{\"annotations\":{\"cluster-annotation\":null,\"kubectl.kubernetes.io/last-applied-configuration\":\"{\\\"apiVersion\\\":\\\"apps/v1\\\",\\\"kind\\\":\\\"Deployment\\\",\\\"metadata\\\":{\\\"annotations\\\":{\\\"target-annotation\\\":\\\"value\\\"},\\\"creationTimestamp\\\":null,\\\"labels\\\":{\\\"app\\\":\\\"test-deployment\\\"},\\\"name\\\":\\\"test-deployment\\\",\\\"namespace\\\":\\\"default\\\"},\\\"spec\\\":{\\\"replicas\\\":1,\\\"selector\\\":{\\\"matchLabels\\\":{\\\"app\\\":\\\"test-deployment\\\"}},\\\"strategy\\\":{},\\\"template\\\":{\\\"metadata\\\":{\\\"creationTimestamp\\\":null,\\\"labels\\\":{\\\"app\\\":\\\"test-deployment\\\"}},\\\"spec\\\":{\\\"containers\\\":[{\\\"image\\\":\\\"nginx\\\",\\\"name\\\":\\\"nginx\\\",\\\"resources\\\":{}}]}}},\\\"status\\\":{}}\\n\",\"target-annotation\":\"value\"}}}"
 		patch, patchType, err := createPatch(*onCluster, targetR[0])
 
-		require.Equal(t, "{\"metadata\":{\"annotations\":{\"cluster-annotation\":null,\"target-annotation\":\"value\"}}}", string(patch), "patch should contain target-annotation")
+		require.Equal(t, expected, string(patch), "patch should contain target-annotation")
 		require.Equal(t, patchType, types.StrategicMergePatchType)
 		require.Nil(t, err)
 	})
