@@ -185,33 +185,7 @@ func TestCreatePatch(t *testing.T) {
 		require.Nil(t, err)
 	})
 
-	t.Run("same object => empty patch", func(t *testing.T) {
-		targetR, err := resourceutil.NewResources("testdata/test-deployment.yaml", "default")
-		require.Nil(t, err)
-
-		targetR[0].Object.SetAnnotations(map[string]string{
-			"original-annotation":   "value",
-			"original-annotation-2": "value",
-		})
-
-		lastAppliedJson, err := targetR[0].Object.MarshalJSON()
-		require.Nil(t, err)
-
-		onCluster := targetR[0].Object.DeepCopy()
-		onCluster.SetAnnotations(map[string]string{
-			"kubectl.kubernetes.io/last-applied-configuration": string(lastAppliedJson),
-			"original-annotation":                              "value",
-			"original-annotation-2":                            "value",
-		})
-
-		patch, patchType, err := createPatch(*onCluster, targetR[0])
-
-		require.Equal(t, "{}", string(patch), "patch should contain original-annotation")
-		require.Equal(t, patchType, types.StrategicMergePatchType)
-		require.Nil(t, err)
-	})
-
-	t.Run("runtime annotation => do not delete", func(t *testing.T) {
+	t.Run("Changes made on the cluster are kept", func(t *testing.T) {
 		targetR, err := resourceutil.NewResources("testdata/test-deployment.yaml", "default")
 		require.Nil(t, err)
 
