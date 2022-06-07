@@ -194,7 +194,7 @@ var _ = Describe("deploy on mock kubernetes", func() {
 			}
 
 			// Force deploy_all, lastapplied annotation should not be equals
-			err := doRun(clients, "test7", []string{"testdata/integration/smart-deploy/stage1"}, deployAll, currentTime)
+			err := doRun(clients, "test7", []string{"testdata/integration/smart-deploy/stage2"}, deployAll, currentTime)
 			Expect(err).NotTo(HaveOccurred())
 			deployment, err := clients.dynamic.Resource(gvrDeployments).
 				Namespace("test7").
@@ -205,7 +205,7 @@ var _ = Describe("deploy on mock kubernetes", func() {
 			lastApplied = thisLastApplied
 
 			// Another smart_deploy, should be identical to the previous
-			err = doRun(clients, "test7", []string{"testdata/integration/smart-deploy/stage1"}, deployConfig, currentTime)
+			err = doRun(clients, "test7", []string{"testdata/integration/smart-deploy/stage2"}, deployConfig, currentTime)
 			Expect(err).NotTo(HaveOccurred())
 			deployment, err = clients.dynamic.Resource(gvrDeployments).
 				Namespace("test7").
