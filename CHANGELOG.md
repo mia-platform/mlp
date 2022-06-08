@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - use `kind` in integration tests
 
+### Fixed
+
+- fixed a bug in `createPatch` that caused all annotations to be deleted in the resulting patch if the target resource was annotated with `kubectl.kubernetes.io/last-applied-configuration`
+
 ## [1.1.0] - 2022-03-17
 
 ### Changed
