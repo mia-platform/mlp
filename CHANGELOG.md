@@ -14,10 +14,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - support for jobs annotation `mia-platform.eu/await-completion` for waiting job completion after it has been applied on the cluster
 - support for  resource`ExternalSecrets` for the annotation `mia-platform.eu/await-completion`
 
-### Changed
-
-- use `kind` in integration tests
-
 ### Fixed
 
 - fixed a bug in `createPatch` that caused all annotations to be deleted in the resulting patch if the target resource was annotated with `kubectl.kubernetes.io/last-applied-configuration`
