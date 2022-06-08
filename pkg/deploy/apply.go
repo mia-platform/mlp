@@ -321,8 +321,6 @@ func applyResource(clients *k8sClients, res resourceutil.Resource, deployConfig 
 				return errors.Wrap(err, "failed to create patch")
 			}
 
-			fmt.Printf("GENERATED PATCH: (%s) \n%s", patchType, patch)
-
 			if _, err := clients.dynamic.Resource(gvr).
 				Namespace(res.Object.GetNamespace()).
 				Patch(context.Background(),
