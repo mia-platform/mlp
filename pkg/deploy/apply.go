@@ -335,8 +335,8 @@ func applyResource(clients *k8sClients, res resourceutil.Resource, deployConfig 
 	return nil
 }
 
-// annotateTargetResource annotates a given resource with corev1.LastAppliedConfigAnnotation
-func annotateTargetResource(res resourceutil.Resource) (unstructured.Unstructured, error) {
+// annotateWithLastApplied annotates a given resource with corev1.LastAppliedConfigAnnotation
+func annotateWithLastApplied(res resourceutil.Resource) (unstructured.Unstructured, error) {
 	annotatedRes := res.Object.DeepCopy()
 	annotations := annotatedRes.GetAnnotations()
 	if annotations == nil {
@@ -367,7 +367,7 @@ func createPatch(currentObj unstructured.Unstructured, target resourceutil.Resou
 	lastAppliedConfigJson := currentObj.GetAnnotations()[corev1.LastAppliedConfigAnnotation]
 
 	// Get the desired configuration
-	annotatedTarget, err := annotateTargetResource(target)
+	annotatedTarget, err := annotateWithLastApplied(target)
 	if err != nil {
 		return nil, types.StrategicMergePatchType, err
 	}
