@@ -150,38 +150,92 @@ func TestCreateJobFromCronJob(t *testing.T) {
 }
 
 func TestCreatePatch(t *testing.T) {
-	t.Run("Pass the same object should produce empty patch", func(t *testing.T) {
-		deployment, err := resourceutil.NewResources("testdata/test-deployment.yaml", "default")
+	createDeployment := func(annotation string, lastApplied *resourceutil.Resource) *resourceutil.Resource {
+		t.Helper()
+		deployments, err := resourceutil.NewResources("testdata/test-deployment.yaml", "default")
 		require.Nil(t, err)
 
-		deployment[0].Object.SetAnnotations(map[string]string{
-			"kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"apps/v1\",\"kind\":\"Deployment\",\"metadata\":{\"annotations\":{},\"creationTimestamp\":null,\"labels\":{\"app\":\"test-deployment\"},\"name\":\"test-deployment\",\"namespace\":\"default\"},\"spec\":{\"replicas\":1,\"selector\":{\"matchLabels\":{\"app\":\"test-deployment\"}},\"strategy\":{},\"template\":{\"metadata\":{\"creationTimestamp\":null,\"labels\":{\"app\":\"test-deployment\"}},\"spec\":{\"containers\":[{\"image\":\"nginx\",\"name\":\"nginx\",\"resources\":{}}]}}},\"status\":{}}\n"},
-		)
+		deployment := deployments[0]
 
-		patch, patchType, err := createPatch(deployment[0].Object, deployment[0])
-		require.Equal(t, "{}", string(patch), "patch should be empty")
-		require.Equal(t, patchType, types.StrategicMergePatchType)
-		require.Nil(t, err)
-	})
+		if annotation != "" {
+			annotations := deployment.Object.GetAnnotations()
+			if annotations == nil {
+				annotations = make(map[string]string)
+			}
+			annotations[annotation] = "value"
+			deployment.Object.SetAnnotations(annotations)
+		}
 
-	t.Run("change replicas", func(t *testing.T) {
-		deployment, err := resourceutil.NewResources("testdata/test-deployment.yaml", "default")
-		require.Nil(t, err)
+		if lastApplied != nil {
+			annotations := deployment.Object.GetAnnotations()
+			if annotations == nil {
+				annotations = make(map[string]string)
+			}
 
-		deployment[0].Object.SetAnnotations(map[string]string{
-			"kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"apps/v1\",\"kind\":\"Deployment\",\"metadata\":{\"annotations\":{},\"creationTimestamp\":null,\"labels\":{\"app\":\"test-deployment\"},\"name\":\"test-deployment\",\"namespace\":\"default\"},\"spec\":{\"replicas\":1,\"selector\":{\"matchLabels\":{\"app\":\"test-deployment\"}},\"strategy\":{},\"template\":{\"metadata\":{\"creationTimestamp\":null,\"labels\":{\"app\":\"test-deployment\"}},\"spec\":{\"containers\":[{\"image\":\"nginx\",\"name\":\"nginx\",\"resources\":{}}]}}},\"status\":{}}\n"},
-		)
+			lastAppliedJson, err := lastApplied.Object.MarshalJSON()
+			require.Nil(t, err)
 
-		oldDeploy := deployment[0].Object.DeepCopy()
-		err = unstructured.SetNestedField(oldDeploy.Object, "2",
-			"spec", "replicas")
-		require.Nil(t, err)
-		t.Logf("oldobj: %s\n", oldDeploy.Object)
-		patch, patchType, err := createPatch(*oldDeploy, deployment[0])
-		require.Equal(t, "{\"spec\":{\"replicas\":1}}", string(patch), "patch should contain the new resource name")
-		require.Equal(t, patchType, types.StrategicMergePatchType)
-		require.Nil(t, err)
-	})
+			annotations[corev1.LastAppliedConfigAnnotation] = string(lastAppliedJson)
+			deployment.Object.SetAnnotations(annotations)
+		}
+
+		return &deployment
+	}
+
+	deployment := createDeployment("", nil)
+
+	deploymentWithLastApplied := createDeployment("", deployment)
+
+	deploymentWith2Replicas := createDeployment("", nil)
+	unstructured.SetNestedField(deploymentWith2Replicas.Object.Object, "2", "spec", "replicas")
+
+	deploymentWithDifferentAnnotationValue := createDeployment("current", createDeployment("current", nil))
+	annotations := deploymentWithDifferentAnnotationValue.Object.GetAnnotations()
+	annotations["current"] = "other"
+	deploymentWithDifferentAnnotationValue.Object.SetAnnotations(annotations)
+
+	testCases := []struct {
+		desc     string
+		current  *unstructured.Unstructured
+		target   *resourceutil.Resource
+		expected string
+	}{
+		{
+			desc:     "Pass the same object should produce empty patch",
+			current:  &deploymentWithLastApplied.Object,
+			target:   deployment,
+			expected: "{}",
+		}, {
+			desc:     "Change replicas",
+			current:  &deploymentWithLastApplied.Object,
+			target:   deploymentWith2Replicas,
+			expected: "{\"metadata\":{\"annotations\":{\"kubectl.kubernetes.io/last-applied-configuration\":\"{\\\"apiVersion\\\":\\\"apps/v1\\\",\\\"kind\\\":\\\"Deployment\\\",\\\"metadata\\\":{\\\"creationTimestamp\\\":null,\\\"labels\\\":{\\\"app\\\":\\\"test-deployment\\\"},\\\"name\\\":\\\"test-deployment\\\",\\\"namespace\\\":\\\"default\\\"},\\\"spec\\\":{\\\"replicas\\\":\\\"2\\\",\\\"selector\\\":{\\\"matchLabels\\\":{\\\"app\\\":\\\"test-deployment\\\"}},\\\"strategy\\\":{},\\\"template\\\":{\\\"metadata\\\":{\\\"creationTimestamp\\\":null,\\\"labels\\\":{\\\"app\\\":\\\"test-deployment\\\"}},\\\"spec\\\":{\\\"containers\\\":[{\\\"image\\\":\\\"nginx\\\",\\\"name\\\":\\\"nginx\\\",\\\"resources\\\":{}}]}}},\\\"status\\\":{}}\\n\"}},\"spec\":{\"replicas\":\"2\"}}",
+		}, {
+			desc:     "Keep annotation if present in current but not in last applied",
+			current:  &createDeployment("current", deployment).Object,
+			target:   deployment,
+			expected: "{}",
+		}, {
+			desc:     "Delete annotation if present in last applied but not in target",
+			current:  &createDeployment("current", createDeployment("current", nil)).Object,
+			target:   deployment,
+			expected: "{\"metadata\":{\"annotations\":{\"current\":null,\"kubectl.kubernetes.io/last-applied-configuration\":\"{\\\"apiVersion\\\":\\\"apps/v1\\\",\\\"kind\\\":\\\"Deployment\\\",\\\"metadata\\\":{\\\"creationTimestamp\\\":null,\\\"labels\\\":{\\\"app\\\":\\\"test-deployment\\\"},\\\"name\\\":\\\"test-deployment\\\",\\\"namespace\\\":\\\"default\\\"},\\\"spec\\\":{\\\"replicas\\\":1,\\\"selector\\\":{\\\"matchLabels\\\":{\\\"app\\\":\\\"test-deployment\\\"}},\\\"strategy\\\":{},\\\"template\\\":{\\\"metadata\\\":{\\\"creationTimestamp\\\":null,\\\"labels\\\":{\\\"app\\\":\\\"test-deployment\\\"}},\\\"spec\\\":{\\\"containers\\\":[{\\\"image\\\":\\\"nginx\\\",\\\"name\\\":\\\"nginx\\\",\\\"resources\\\":{}}]}}},\\\"status\\\":{}}\\n\"}}}",
+		}, {
+			desc:     "Target has priority on current",
+			current:  &deploymentWithDifferentAnnotationValue.Object,
+			target:   createDeployment("current", nil),
+			expected: "{\"metadata\":{\"annotations\":{\"current\":\"value\"}}}",
+		},
+	}
+	for _, tC := range testCases {
+		t.Run(tC.desc, func(t *testing.T) {
+			patch, patchType, err := createPatch(*tC.current, *tC.target)
+
+			require.Equal(t, tC.expected, string(patch))
+			require.Equal(t, patchType, types.StrategicMergePatchType)
+			require.Nil(t, err)
+		})
+	}
 }
 
 func TestEnsureDeployAll(t *testing.T) {
