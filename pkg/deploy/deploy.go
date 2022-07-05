@@ -45,7 +45,7 @@ type k8sClients struct {
 // Run execute the deploy command from cli
 func Run(inputPaths []string, deployConfig utils.DeployConfig, opts *utils.Options) {
 	restConfig, err := opts.Config.ToRESTConfig()
-	utils.CheckError(err)
+	utils.CheckError(err, "")
 
 	// The following two options manage client-side throttling to decrease pressure on api-server
 	// Kubectl sets 300 bursts 50.0 QPS:
@@ -59,24 +59,27 @@ func Run(inputPaths []string, deployConfig utils.DeployConfig, opts *utils.Optio
 	}
 	currentTime := time.Now()
 	err = doRun(clients, opts.Namespace, inputPaths, deployConfig, currentTime)
-	utils.CheckError(err)
+	utils.CheckError(err, "")
 }
 
 func doRun(clients *k8sClients, namespace string, inputPaths []string, deployConfig utils.DeployConfig, currentTime time.Time) error {
 	filePaths, err := utils.ExtractYAMLFiles(inputPaths)
-	utils.CheckError(err)
+	utils.CheckError(err, "Error extracting yaml files")
 
 	resources, err := resourceutil.MakeResources(filePaths, namespace)
 	if err != nil {
+		fmt.Printf("fails to make resources: %s\n", err)
 		return err
 	}
 	err = prepareResources(deployConfig.DeployType, resources, currentTime)
 	if err != nil {
+		fmt.Printf("fails to prepare resources: %s\n", err)
 		return err
 	}
 
 	err = deploy(clients, namespace, resources, deployConfig)
 	if err != nil {
+		fmt.Printf("fails to deploy: %s", err)
 		return err
 	}
 
@@ -85,7 +88,7 @@ func doRun(clients *k8sClients, namespace string, inputPaths []string, deployCon
 
 func prepareResources(deployType string, resources []resourceutil.Resource, currentTime time.Time) error {
 	configMapMap, secretMap, err := resourceutil.MapSecretAndConfigMap(resources)
-	utils.CheckError(err)
+	utils.CheckError(err, "error preparing resources")
 
 	for _, res := range resources {
 		if res.GroupVersionKind.Kind != "Deployment" && res.GroupVersionKind.Kind != "CronJob" {
@@ -93,10 +96,12 @@ func prepareResources(deployType string, resources []resourceutil.Resource, curr
 		}
 		if deployType == deployAll {
 			if err := ensureDeployAll(&res, currentTime); err != nil {
+				fmt.Printf("fails to ensure deploy all: %s\n", err)
 				return err
 			}
 		}
 		if err := insertDependencies(&res, configMapMap, secretMap); err != nil {
+			fmt.Printf("fails to insert dependencies: %s\n", err)
 			return err
 		}
 	}
@@ -116,11 +121,13 @@ func insertDependencies(res *resourceutil.Resource, configMapMap map[string]stri
 	}
 	unstrPodSpec, _, err := unstructured.NestedMap(res.Object.Object, path...)
 	if err != nil {
+		fmt.Printf("fails to get unstructured pod spec %s: %s\n", res.Object.GetName(), err)
 		return err
 	}
 	var podSpec corev1.PodSpec
 	err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstrPodSpec, &podSpec)
 	if err != nil {
+		fmt.Printf("fails to convert unstructured pod %s spec: %s\n", res.Object.GetName(), err)
 		return err
 	}
 	dependencies = resourceutil.GetPodsDependencies(podSpec)

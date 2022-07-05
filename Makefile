@@ -4,7 +4,7 @@ MLP_VERSION ?= $(shell git describe --tags 2>/dev/null || git rev-parse --short 
 DATE_FMT = +%Y-%m-%d
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ifndef ENVTEST_K8S_VERSION
-	ENVTEST_K8S_VERSION = 1.22
+	ENVTEST_K8S_VERSION = 1.23
 endif
 ifdef SOURCE_DATE_EPOCH
     BUILD_DATE ?= $(shell date -u -d "@$(SOURCE_DATE_EPOCH)" "$(DATE_FMT)" 2>/dev/null || date -u -r "$(SOURCE_DATE_EPOCH)" "$(DATE_FMT)" 2>/dev/null || date -u "$(DATE_FMT)")
@@ -57,7 +57,7 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 test: fmt vet envtest
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./... -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) --arch=amd64 use $(ENVTEST_K8S_VERSION) -p path)" go test ./... -coverprofile cover.out
 
 coverage: test
 	go tool cover -func=cover.out

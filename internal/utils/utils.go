@@ -58,9 +58,9 @@ const (
 var fs = &afero.Afero{Fs: afero.NewOsFs()}
 
 // CheckError default error handling function
-func CheckError(err error) {
+func CheckError(err error, msg string) {
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err, msg)
 	}
 }
 
@@ -131,7 +131,7 @@ func WriteYamlsToDisk(objs map[string]runtime.Object, outputDirectory string) {
 	for yamlName, obj := range objs {
 		fileName := outputDirectory + "/" + yamlName + ".yaml"
 		file, err := CreateFile(fileName)
-		CheckError(err)
+		CheckError(err, "")
 		printer.PrintObj(obj, file)
 	}
 }

@@ -55,21 +55,21 @@ func Interpolate(file []byte, prefixes []string, regex string) ([]byte, error) {
 // Run execute the interpolation command from cli
 func Run(prefixes []string, inputPaths []string, outputPath string) {
 	fileNames, err := utils.ExtractYAMLFiles(inputPaths)
-	utils.CheckError(err)
+	utils.CheckError(err, "Error extracting YAML files")
 
 	err = utils.MkdirAll(outputPath)
-	utils.CheckError(err)
+	utils.CheckError(err, "Error creating output directory")
 
 	for _, fp := range fileNames {
 		f, err := utils.ReadFile(fp)
-		utils.CheckError(err)
+		utils.CheckError(err, "Error reading file")
 
 		interpolatedFile, err := Interpolate(f, prefixes, "\\{\\{([A-Z0-9_]+)\\}\\}")
-		utils.CheckError(err)
+		utils.CheckError(err, "Error interpolating file")
 
 		fileName, err := filepath.Abs(filepath.Join(outputPath, filepath.Base(fp)))
 		err = utils.WriteFile(fileName, interpolatedFile)
-		utils.CheckError(err)
+		utils.CheckError(err, "Error writing file")
 	}
 }
 

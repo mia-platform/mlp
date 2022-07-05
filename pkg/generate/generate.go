@@ -33,12 +33,12 @@ import (
 // Run execute the generate command from cli
 func Run(configPath []string, prefixes []string, outputPath string) {
 	fileNames, err := utils.ExtractYAMLFiles(configPath)
-	utils.CheckError(err)
+	utils.CheckError(err, "error extracting yaml files")
 
 	for _, filePath := range fileNames {
 
 		data, err := Generate(filePath, prefixes)
-		utils.CheckError(err)
+		utils.CheckError(err, "error generating resources")
 
 		utils.WriteYamlsToDisk(data, outputPath)
 	}
@@ -91,7 +91,7 @@ func keyValueFromData(data data) map[string][]byte {
 		} else if d.From == "file" {
 			baseName := path.Base(d.File)
 			fileContent, err := utils.ReadFile(d.File)
-			utils.CheckError(err)
+			utils.CheckError(err, "error reading file: "+d.File)
 			keyValue[baseName] = fileContent
 		}
 	}
@@ -104,7 +104,7 @@ func genDockercfg(docker docker) []byte {
 	userPassBase64 := base64.StdEncoding.EncodeToString([]byte(userPassString))
 	cfg := dockerCfg{dockerConfig{docker.Server: dockerConfigEntry{Username: docker.Username, Password: docker.Password, Email: docker.Email, Auth: userPassBase64}}}
 	res, err := json.Marshal(cfg)
-	utils.CheckError(err)
+	utils.CheckError(err, "error generating config")
 	return res
 }
 
@@ -115,7 +115,7 @@ func readTLSData(d tlsData) (out []byte) {
 		return []byte(d.Value)
 	case "file":
 		fileContent, err := utils.ReadFile(d.File)
-		utils.CheckError(err)
+		utils.CheckError(err, "error reading file: "+d.File)
 		return fileContent
 	default:
 		panic("unknown data source:" + d.From)

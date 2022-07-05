@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - new annotation `mia-platform.eu/apply-before-kinds` to override default resources application order
 - support for jobs annotation `mia-platform.eu/await-completion` for waiting job completion after it has been applied on the cluster
 - support for  resource`ExternalSecrets` for the annotation `mia-platform.eu/await-completion`
+- add some debugging logs
+- add support to kubernetes version 1.23
 
 ### Fixed
 
