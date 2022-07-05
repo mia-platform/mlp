@@ -13,9 +13,9 @@ updates:
   - package-ecosystem: "gomod"
     directory: "./cmd/mlp/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
 
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
