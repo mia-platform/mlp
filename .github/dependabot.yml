@@ -6,12 +6,12 @@
 version: 2
 updates:
   - package-ecosystem: "github-actions"
-    directory: "./cmd/mlp/"
+    directory: "/"
     schedule:
       interval: "daily"
 
   - package-ecosystem: "gomod"
-    directory: "/"
+    directory: "./cmd/mlp/"
     schedule:
       interval: "weekly"
 
