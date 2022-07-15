@@ -22,7 +22,7 @@ jobs:
           go-version: ${{ matrix.go_version }}
       - name: Go version
         run: go version
-      - uses: actions/cache@v2
+      - uses: actions/cache@v3
         with:
           # In order:
           # * Module download cache
@@ -92,7 +92,7 @@ jobs:
           password: ${{ secrets.BOT_DOCKER_TOKEN }}
 
       - name: Cache build
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: /tmp/.buildx-cache
           key: ${{ runner.os }}-buildx-${{ github.sha }}
