@@ -42,7 +42,7 @@ jobs:
       - name: Build
         run: make build
       - name: Send the coverage output
-        uses: codecov/codecov-action@v2
+        uses: codecov/codecov-action@v3
         with:
           files: ./cover.out
 
