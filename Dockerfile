@@ -1,5 +1,5 @@
 ################### Build mlp ####################
-FROM golang:1.17.8 AS builder
+FROM golang:1.19.2 AS builder
 
 WORKDIR /build
 
