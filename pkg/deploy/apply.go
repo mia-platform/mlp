@@ -31,12 +31,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/jsonmergepatch"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
+	watchTools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubectl/pkg/scheme"
 )
 
@@ -46,6 +48,18 @@ const (
 	deployChecksum = "deploy-checksum"
 	smartDeploy    = "smart_deploy"
 )
+
+type awaitableResourceSentinel struct {
+	clients   *k8sClients
+	gvr       schema.GroupVersionResource
+	namespace string
+}
+
+func (s *awaitableResourceSentinel) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+	return s.clients.dynamic.Resource(s.gvr).
+		Namespace(s.namespace).
+		Watch(context.TODO(), opts)
+}
 
 var (
 	deleteBeforeApplyAnnotation = resourceutil.GetMiaAnnotation("delete-before-apply")
@@ -101,9 +115,12 @@ func withAwaitableResource(apply applyFunction) applyFunction {
 		startTime := time.Now()
 		awaitCompletionValue, awaitCompletionFound := res.Object.GetAnnotations()[awaitCompletionAnnotation]
 		if awaitCompletionFound {
-			watcher, err := clients.dynamic.Resource(gvr).
-				Namespace(res.Object.GetNamespace()).
-				Watch(context.TODO(), metav1.ListOptions{})
+			watcher, err := watchTools.NewRetryWatcher("1", &awaitableResourceSentinel{
+				gvr:       gvr,
+				namespace: res.Object.GetNamespace(),
+				clients:   clients,
+			})
+
 			if err != nil {
 				return err
 			}
