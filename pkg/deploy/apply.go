@@ -108,7 +108,7 @@ func withAwaitableResource(apply applyFunction) applyFunction {
 				return err
 			}
 			watchEvents = watcher.ResultChan()
-			fmt.Printf("Registered a watcher for resource: %s.%s.%s having name %s\n", gvr.Group, gvr.Version, gvr.Resource, res.Object.GetName())
+			fmt.Printf("Registered a watcher for resource: %s.%s.%s having name %s\n (time: %s)", gvr.Group, gvr.Version, gvr.Resource, res.Object.GetName(), startTime)
 			defer watcher.Stop()
 		}
 
@@ -190,7 +190,7 @@ func handleResourceCompletionEvent(res resourceutil.Resource, event *watch.Event
 			return false, nil
 		}
 		// check if job has completed after start time
-		if completedAt := jobFromEvent.Status.CompletionTime; completedAt != nil && completedAt.Time.After(startTime) {
+		if completedAt := jobFromEvent.Status.CompletionTime; completedAt != nil && !completedAt.Time.Before(startTime) {
 			fmt.Println("Job completed:", jobFromEvent.Name)
 			return true, nil
 		}
@@ -219,7 +219,7 @@ func handleResourceCompletionEvent(res resourceutil.Resource, event *watch.Event
 			return false, nil
 		}
 
-		if refreshedAt := extsecFromEvent.Status.RefreshTime; refreshedAt.Time.After(startTime) || refreshedAt.Time.Equal(startTime) {
+		if refreshedAt := extsecFromEvent.Status.RefreshTime; !refreshedAt.Time.Before(startTime) {
 			fmt.Println("ExternalSecret completed:", extsecFromEvent.Name)
 			return true, nil
 		} else {
