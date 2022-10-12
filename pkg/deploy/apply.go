@@ -98,7 +98,7 @@ func withAwaitableResource(apply applyFunction) applyFunction {
 		// register a watcher and starts to listen for events for the gvr
 		// if res is annotated with awaitCompletionAnnotation
 		var watchEvents <-chan watch.Event
-		startTime := time.Now()
+		startTime := time.Now().Round(time.Second)
 		awaitCompletionValue, awaitCompletionFound := res.Object.GetAnnotations()[awaitCompletionAnnotation]
 		if awaitCompletionFound {
 			watcher, err := clients.dynamic.Resource(gvr).
