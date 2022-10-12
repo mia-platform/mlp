@@ -37,6 +37,7 @@ import (
 	discoveryFake "k8s.io/client-go/discovery/fake"
 	dynamicFake "k8s.io/client-go/dynamic/fake"
 	clientsetFake "k8s.io/client-go/kubernetes/fake"
+	k8stest "k8s.io/client-go/testing"
 )
 
 func TestCheckIfCreateJob(t *testing.T) {
@@ -551,102 +552,101 @@ func TestHandleResourceCompletionEvent(t *testing.T) {
 	}
 }
 
-// func TestWithAwaitableResource(t *testing.T) {
-// 	testCases := []struct {
-// 		desc          string
-// 		resFileName   string
-// 		watcherEvents []unstructured.Unstructured
-// 		errorRequire  func(require.TestingT, interface{}, ...interface{})
-// 	}{
-// 		{
-// 			desc:          "Ignores non annotated resources",
-// 			resFileName:   "testdata/simple-job.yaml",
-// 			watcherEvents: []unstructured.Unstructured{},
-// 			errorRequire:  require.Nil,
-// 		}, {
-// 			desc:        "Awaits annotated resources for completion",
-// 			resFileName: "testdata/awaitable-job.yaml",
-// 			watcherEvents: []unstructured.Unstructured{
-// 				{
-// 					Object: map[string]interface{}{
-// 						"apiVersion": "batch/v1",
-// 						"kind":       "Job",
-// 						"metadata": map[string]string{
-// 							"name":            "awaitable-job",
-// 							"resourceVersion": "1",
-// 						},
-// 						"status": map[string]interface{}{
-// 							"completionTime": time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339),
-// 						},
-// 					},
-// 				},
-// 			},
-// 			errorRequire: require.Nil,
-// 		}, {
-// 			desc:          "Timeout without completion events",
-// 			resFileName:   "testdata/awaitable-job.yaml",
-// 			watcherEvents: []unstructured.Unstructured{},
-// 			errorRequire:  require.NotNil,
-// 		},
-// 	}
+func TestWithAwaitableResource(t *testing.T) {
+	testCases := []struct {
+		desc          string
+		resFileName   string
+		watcherEvents []unstructured.Unstructured
+		errorRequire  func(require.TestingT, interface{}, ...interface{})
+	}{
+		{
+			desc:          "Ignores non annotated resources",
+			resFileName:   "testdata/simple-job.yaml",
+			watcherEvents: []unstructured.Unstructured{},
+			errorRequire:  require.Nil,
+		}, {
+			desc:        "Awaits annotated resources for completion",
+			resFileName: "testdata/awaitable-job.yaml",
+			watcherEvents: []unstructured.Unstructured{
+				{
+					Object: map[string]interface{}{
+						"apiVersion": "batch/v1",
+						"kind":       "Job",
+						"metadata": map[string]string{
+							"name": "awaitable-job",
+						},
+						"status": map[string]interface{}{
+							"completionTime": time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339),
+						},
+					},
+				},
+			},
+			errorRequire: require.Nil,
+		}, {
+			desc:          "Timeout without completion events",
+			resFileName:   "testdata/awaitable-job.yaml",
+			watcherEvents: []unstructured.Unstructured{},
+			errorRequire:  require.NotNil,
+		},
+	}
 
-// 	deployConfig := utils.DeployConfig{}
+	deployConfig := utils.DeployConfig{}
 
-// 	for _, tC := range testCases {
-// 		t.Run(tC.desc, func(t *testing.T) {
-// 			clients := createFakeClientsWithJobs(t)
-// 			resources, err := resourceutil.NewResources(tC.resFileName, "default")
-// 			require.Nil(t, err)
-// 			res := resources[0]
+	for _, tC := range testCases {
+		t.Run(tC.desc, func(t *testing.T) {
+			clients := createFakeClientsWithJobs(t)
+			resources, err := resourceutil.NewResources(tC.resFileName, "default")
+			require.Nil(t, err)
+			res := resources[0]
 
-// 			watcher := watch.NewFakeWithChanSize(len(tC.watcherEvents), false)
-// 			clients.dynamic.(*dynamicFake.FakeDynamicClient).Fake.PrependWatchReactor("jobs", k8stest.DefaultWatchReactor(watcher, nil))
+			watcher := watch.NewFakeWithChanSize(len(tC.watcherEvents), false)
+			clients.dynamic.(*dynamicFake.FakeDynamicClient).Fake.PrependWatchReactor("jobs", k8stest.DefaultWatchReactor(watcher, nil))
 
-// 			for _, e := range tC.watcherEvents {
-// 				watcher.Modify(&e)
-// 			}
+			for _, e := range tC.watcherEvents {
+				watcher.Modify(&e)
+			}
 
-// 			applyCalled := false
-// 			err = withAwaitableResource(func(c *k8sClients, r resourceutil.Resource, d utils.DeployConfig) error {
-// 				applyCalled = true
-// 				require.Exactly(t, &clients, c)
-// 				require.Exactly(t, res, r)
-// 				require.Exactly(t, deployConfig, d)
-// 				return nil
-// 			})(&clients, res, deployConfig)
+			applyCalled := false
+			err = withAwaitableResource(func(c *k8sClients, r resourceutil.Resource, d utils.DeployConfig) error {
+				applyCalled = true
+				require.Exactly(t, &clients, c)
+				require.Exactly(t, res, r)
+				require.Exactly(t, deployConfig, d)
+				return nil
+			})(&clients, res, deployConfig)
 
-// 			require.True(t, applyCalled)
-// 			tC.errorRequire(t, err)
-// 		})
-// 	}
+			require.True(t, applyCalled)
+			tC.errorRequire(t, err)
+		})
+	}
 
-// 	t.Run("Forwards inner apply errors", func(t *testing.T) {
-// 		clients := createFakeClientsWithJobs(t)
-// 		res := resourceutil.Resource{
-// 			GroupVersionKind: &schema.GroupVersionKind{
-// 				Group:   "batch",
-// 				Version: "v1",
-// 				Kind:    "Job",
-// 			},
-// 			Object: unstructured.Unstructured{
-// 				Object: map[string]interface{}{
-// 					"apiVersion": "batch/v1",
-// 					"kind":       "Job",
-// 					"metadata": map[string]string{
-// 						"name": "awaitable-job",
-// 					},
-// 				},
-// 			},
-// 		}
-// 		expectedErr := errors.New("Some apply error")
+	t.Run("Forwards inner apply errors", func(t *testing.T) {
+		clients := createFakeClientsWithJobs(t)
+		res := resourceutil.Resource{
+			GroupVersionKind: &schema.GroupVersionKind{
+				Group:   "batch",
+				Version: "v1",
+				Kind:    "Job",
+			},
+			Object: unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "batch/v1",
+					"kind":       "Job",
+					"metadata": map[string]string{
+						"name": "awaitable-job",
+					},
+				},
+			},
+		}
+		expectedErr := errors.New("Some apply error")
 
-// 		actualErr := withAwaitableResource(func(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
-// 			return expectedErr
-// 		})(&clients, res, deployConfig)
+		actualErr := withAwaitableResource(func(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
+			return expectedErr
+		})(&clients, res, deployConfig)
 
-// 		require.Exactly(t, expectedErr, actualErr)
-// 	})
-// }
+		require.Exactly(t, expectedErr, actualErr)
+	})
+}
 
 func TestWithDeletableResource(t *testing.T) {
 	resName := "res-name"
