@@ -167,6 +167,7 @@ func assertAwaitSupportedForThisResource(res resourceutil.Resource) error {
 // resource has completed in the given event. If the event is nil returns (false, nil)
 // when the resource supports events watching otherwise returns (false, error).
 func handleResourceCompletionEvent(res resourceutil.Resource, event *watch.Event, startTime time.Time) (bool, error) {
+	fmt.Printf("Event received for resource %s: %s", res.Object.GetName(), event)
 	switch res.GroupVersionKind.Kind {
 	case "Job":
 		// only manage watch.Modified events
