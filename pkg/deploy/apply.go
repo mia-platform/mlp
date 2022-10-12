@@ -138,11 +138,13 @@ func withAwaitableResource(apply applyFunction) applyFunction {
 				select {
 				case event, ok := <-watcher.ResultChan():
 					if !ok {
+						fmt.Printf("Watcher channel closed, reopening")
 						watcher.Stop()
 						watcher, err = newWatcher(clients, gvr, res.Object.GetNamespace())
 						if err != nil {
 							return err
 						}
+						continue
 					}
 					isCompleted, err := handleResourceCompletionEvent(res, &event, startTime)
 					if err != nil {
