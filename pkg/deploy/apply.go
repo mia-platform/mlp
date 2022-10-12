@@ -136,7 +136,10 @@ func withAwaitableResource(apply applyFunction) applyFunction {
 		// consume watcher events and wait for the resource to complete or exit because of timeout
 		for {
 			select {
-			case event := <-watchEvents:
+			case event, ok := <-watchEvents:
+				if !ok {
+					return errors.New("Watch channel closed unexpectedly")
+				}
 				isCompleted, err := handleResourceCompletionEvent(res, &event, startTime)
 				if err != nil {
 					msg := "Error while watching resource events"
