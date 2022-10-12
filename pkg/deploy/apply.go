@@ -138,6 +138,7 @@ func withAwaitableResource(apply applyFunction) applyFunction {
 				select {
 				case event, ok := <-watcher.ResultChan():
 					if !ok {
+						watcher.Stop()
 						watcher, err = newWatcher(clients, gvr, res.Object.GetNamespace())
 						if err != nil {
 							return err
