@@ -115,8 +115,7 @@ func withAwaitableResource(apply applyFunction) applyFunction {
 		startTime := time.Now()
 		awaitCompletionValue, awaitCompletionFound := res.Object.GetAnnotations()[awaitCompletionAnnotation]
 		if awaitCompletionFound {
-			resourceVersion := res.Object.GetResourceVersion()
-			watcher, err := watchTools.NewRetryWatcher(resourceVersion, &awaitableResourceSentinel{
+			watcher, err := watchTools.NewRetryWatcher("1", &awaitableResourceSentinel{
 				gvr:       gvr,
 				namespace: res.Object.GetNamespace(),
 				clients:   clients,
