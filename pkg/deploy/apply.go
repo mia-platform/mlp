@@ -115,7 +115,8 @@ func withAwaitableResource(apply applyFunction) applyFunction {
 		startTime := time.Now()
 		awaitCompletionValue, awaitCompletionFound := res.Object.GetAnnotations()[awaitCompletionAnnotation]
 		if awaitCompletionFound {
-			watcher, err := watchTools.NewRetryWatcher("1", &awaitableResourceSentinel{
+			resourceVersion := res.Object.GetResourceVersion()
+			watcher, err := watchTools.NewRetryWatcher(resourceVersion, &awaitableResourceSentinel{
 				gvr:       gvr,
 				namespace: res.Object.GetNamespace(),
 				clients:   clients,
@@ -153,7 +154,10 @@ func withAwaitableResource(apply applyFunction) applyFunction {
 		// consume watcher events and wait for the resource to complete or exit because of timeout
 		for {
 			select {
-			case event := <-watchEvents:
+			case event, ok := <-watchEvents:
+				if !ok {
+					return errors.New("Watch event channel closed")
+				}
 				isCompleted, err := handleResourceCompletionEvent(res, &event, startTime)
 				if err != nil {
 					msg := "Error while watching resource events"

@@ -573,7 +573,8 @@ func TestWithAwaitableResource(t *testing.T) {
 						"apiVersion": "batch/v1",
 						"kind":       "Job",
 						"metadata": map[string]string{
-							"name": "awaitable-job",
+							"name":            "awaitable-job",
+							"resourceVersion": "1",
 						},
 						"status": map[string]interface{}{
 							"completionTime": time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339),

@@ -1,6 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
+  resourceVersion: "1"
   name: awaitable-job
   annotations:
     mia-platform.eu/await-completion: 250ms
