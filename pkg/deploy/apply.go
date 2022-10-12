@@ -37,8 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/dynamic/dynamicinformer"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubectl/pkg/scheme"
 )
 
@@ -97,51 +95,21 @@ func withAwaitableResource(apply applyFunction) applyFunction {
 			return err
 		}
 
-		completionChan := make(chan error)
+		// register a watcher and starts to listen for events for the gvr
+		// if res is annotated with awaitCompletionAnnotation
+		var watchEvents <-chan watch.Event
+		startTime := time.Now()
 		awaitCompletionValue, awaitCompletionFound := res.Object.GetAnnotations()[awaitCompletionAnnotation]
 		if awaitCompletionFound {
-			if err := assertAwaitSupportedForThisResource(res); err != nil {
+			watcher, err := clients.dynamic.Resource(gvr).
+				Namespace(res.Object.GetNamespace()).
+				Watch(context.TODO(), metav1.ListOptions{})
+			if err != nil {
 				return err
 			}
-
-			timeout, err := time.ParseDuration(awaitCompletionValue)
-			if err != nil {
-				msg := fmt.Sprintf("Error in %s annotation value for resource \"%s\": must be a valid duration", awaitCompletionAnnotation, res.Object.GetName())
-				return errors.Wrap(err, msg)
-			}
-			startTime := time.Now()
-			stopChan := make(chan struct{})
-
-			informerFactory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(clients.dynamic, 30*time.Second, res.Object.GetNamespace(), nil)
-			informer := informerFactory.ForResource(gvr).Informer()
-			informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-				UpdateFunc: func(oldObj, newObj interface{}) {
-					event := watch.Event{
-						Type:   watch.Modified,
-						Object: newObj.(runtime.Object),
-					}
-					completed, err := handleResourceCompletionEvent(res, &event, startTime)
-					if err != nil {
-						completionChan <- err
-					}
-					if completed {
-						fmt.Printf("Resource %s successfully completed", res.Object.GetName())
-						completionChan <- nil
-					}
-				},
-			})
-
-			go func() {
-				<-time.NewTimer(timeout).C
-				completionChan <- fmt.Errorf("timeout received while waiting for resource %s completion", res.Object.GetName())
-			}()
-
-			go informer.Run(stopChan)
-
+			watchEvents = watcher.ResultChan()
 			fmt.Printf("Registered a watcher for resource: %s.%s.%s having name %s\n", gvr.Group, gvr.Version, gvr.Resource, res.Object.GetName())
-			defer func() {
-				stopChan <- struct{}{}
-			}()
+			defer watcher.Stop()
 		}
 
 		// actually apply the resource
@@ -149,11 +117,40 @@ func withAwaitableResource(apply applyFunction) applyFunction {
 			return err
 		}
 
-		if awaitCompletionFound {
-			return <-completionChan
+		// return if no event channel has been set
+		if watchEvents == nil {
+			return nil
 		}
 
-		return nil
+		// parse timeout from annotation value
+		timeout, err := time.ParseDuration(awaitCompletionValue)
+		if err != nil {
+			msg := fmt.Sprintf("Error in %s annotation value for resource \"%s\": must be a valid duration", awaitCompletionAnnotation, res.Object.GetName())
+			return errors.Wrap(err, msg)
+		}
+
+		if err := assertAwaitSupportedForThisResource(res); err != nil {
+			return err
+		}
+
+		// consume watcher events and wait for the resource to complete or exit because of timeout
+		for {
+			select {
+			case event := <-watchEvents:
+				isCompleted, err := handleResourceCompletionEvent(res, &event, startTime)
+				if err != nil {
+					msg := "Error while watching resource events"
+					return errors.Wrap(err, msg)
+				}
+
+				if isCompleted {
+					return nil
+				}
+			case <-time.NewTimer(timeout).C:
+				msg := fmt.Sprintf("Timeout received while waiting for resource %s completion", res.Object.GetName())
+				return errors.New(msg)
+			}
+		}
 	}
 }
 
@@ -167,7 +164,6 @@ func assertAwaitSupportedForThisResource(res resourceutil.Resource) error {
 // resource has completed in the given event. If the event is nil returns (false, nil)
 // when the resource supports events watching otherwise returns (false, error).
 func handleResourceCompletionEvent(res resourceutil.Resource, event *watch.Event, startTime time.Time) (bool, error) {
-	fmt.Printf("Event received for resource %s: %s", res.Object.GetName(), event)
 	switch res.GroupVersionKind.Kind {
 	case "Job":
 		// only manage watch.Modified events
@@ -223,9 +219,11 @@ func handleResourceCompletionEvent(res resourceutil.Resource, event *watch.Event
 			return false, nil
 		}
 
-		if refreshedAt := extsecFromEvent.Status.RefreshTime; refreshedAt.Time.After(startTime) {
+		if refreshedAt := extsecFromEvent.Status.RefreshTime; refreshedAt.Time.After(startTime) || refreshedAt.Time.Equal(startTime) {
 			fmt.Println("ExternalSecret completed:", extsecFromEvent.Name)
 			return true, nil
+		} else {
+			fmt.Printf("Found old refresh event: %s\n", refreshedAt)
 		}
 
 		return false, nil
