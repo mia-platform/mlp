@@ -108,7 +108,7 @@ func withAwaitableResource(apply applyFunction) applyFunction {
 				return err
 			}
 			watchEvents = watcher.ResultChan()
-			fmt.Printf("Registered a watcher for resource: %s.%s.%s having name %s (time: %s)\n", gvr.Group, gvr.Version, gvr.Resource, res.Object.GetName(), startTime)
+			fmt.Printf("Registered a watcher for resource: %s.%s.%s having name %s\n", gvr.Group, gvr.Version, gvr.Resource, res.Object.GetName())
 			defer watcher.Stop()
 		}
 
@@ -225,8 +225,6 @@ func handleResourceCompletionEvent(res resourceutil.Resource, event *watch.Event
 		if refreshedAt := extsecFromEvent.Status.RefreshTime; !refreshedAt.Time.Before(startTime) {
 			fmt.Println("ExternalSecret completed:", extsecFromEvent.Name)
 			return true, nil
-		} else {
-			fmt.Printf("Found old refresh event: %s\n", refreshedAt)
 		}
 
 		return false, nil
