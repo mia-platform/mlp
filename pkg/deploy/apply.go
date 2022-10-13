@@ -150,8 +150,8 @@ func withAwaitableResource(apply applyFunction) applyFunction {
 					return nil
 				}
 			case <-time.NewTimer(timeout).C:
-				fmt.Printf("Timeout received while waiting for resource %s completion\n", res.Object.GetName())
-				return nil
+				msg := fmt.Sprintf("Timeout received while waiting for resource %s completion", res.Object.GetName())
+				return errors.New(msg)
 			}
 		}
 	}
