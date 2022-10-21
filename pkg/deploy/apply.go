@@ -51,6 +51,7 @@ var (
 	deleteBeforeApplyAnnotation = resourceutil.GetMiaAnnotation("delete-before-apply")
 	awaitCompletionAnnotation   = resourceutil.GetMiaAnnotation("await-completion")
 	apply                       = decorateApplyResource(withAwaitableResource, withDeletableResource)
+	getTimeNowSeconds           = func() time.Time { return time.Now().Round(time.Second) }
 )
 
 func decorateApplyResource(decorators ...func(applyFunction) applyFunction) applyFunction {
@@ -98,7 +99,7 @@ func withAwaitableResource(apply applyFunction) applyFunction {
 		// register a watcher and starts to listen for events for the gvr
 		// if res is annotated with awaitCompletionAnnotation
 		var watchEvents <-chan watch.Event
-		startTime := time.Now().Round(time.Second)
+		startTime := getTimeNowSeconds()
 		awaitCompletionValue, awaitCompletionFound := res.Object.GetAnnotations()[awaitCompletionAnnotation]
 		if awaitCompletionFound {
 			watcher, err := clients.dynamic.Resource(gvr).

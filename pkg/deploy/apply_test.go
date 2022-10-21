@@ -553,6 +553,12 @@ func TestHandleResourceCompletionEvent(t *testing.T) {
 }
 
 func TestWithAwaitableResource(t *testing.T) {
+	originalgetTimeNowSeconds := getTimeNowSeconds
+	startTime := getTimeNowSeconds()
+	getTimeNowSeconds = func() time.Time {
+		return startTime
+	}
+
 	testCases := []struct {
 		desc          string
 		resFileName   string
@@ -565,6 +571,24 @@ func TestWithAwaitableResource(t *testing.T) {
 			watcherEvents: []unstructured.Unstructured{},
 			errorRequire:  require.Nil,
 		}, {
+			desc:        "Ignores annotated resources compelted before start time",
+			resFileName: "testdata/awaitable-job.yaml",
+			watcherEvents: []unstructured.Unstructured{
+				{
+					Object: map[string]interface{}{
+						"apiVersion": "batch/v1",
+						"kind":       "Job",
+						"metadata": map[string]string{
+							"name": "awaitable-job",
+						},
+						"status": map[string]interface{}{
+							"completionTime": startTime.Add(-time.Second).UTC().Format(time.RFC3339),
+						},
+					},
+				},
+			},
+			errorRequire: require.NotNil,
+		}, {
 			desc:        "Awaits annotated resources for completion",
 			resFileName: "testdata/awaitable-job.yaml",
 			watcherEvents: []unstructured.Unstructured{
@@ -576,7 +600,25 @@ func TestWithAwaitableResource(t *testing.T) {
 							"name": "awaitable-job",
 						},
 						"status": map[string]interface{}{
-							"completionTime": time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339),
+							"completionTime": startTime.Add(24 * time.Hour).UTC().Format(time.RFC3339),
+						},
+					},
+				},
+			},
+			errorRequire: require.Nil,
+		}, {
+			desc:        "Awaits annotated resources for completion - within the same second",
+			resFileName: "testdata/awaitable-job.yaml",
+			watcherEvents: []unstructured.Unstructured{
+				{
+					Object: map[string]interface{}{
+						"apiVersion": "batch/v1",
+						"kind":       "Job",
+						"metadata": map[string]string{
+							"name": "awaitable-job",
+						},
+						"status": map[string]interface{}{
+							"completionTime": startTime.UTC().Format(time.RFC3339),
 						},
 					},
 				},
@@ -619,6 +661,8 @@ func TestWithAwaitableResource(t *testing.T) {
 			tC.errorRequire(t, err)
 		})
 	}
+
+	getTimeNowSeconds = originalgetTimeNowSeconds
 
 	t.Run("Forwards inner apply errors", func(t *testing.T) {
 		clients := createFakeClientsWithJobs(t)
