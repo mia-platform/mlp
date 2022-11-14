@@ -24,7 +24,7 @@ RUN GOOS=linux \
 
 ################## Create image ##################
 
-FROM alpine:3.16.0
+FROM alpine:3.16.3
 
 COPY --from=builder /build/mlp /usr/local/bin/
 
