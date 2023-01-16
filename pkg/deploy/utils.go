@@ -1,4 +1,5 @@
-// Copyright 2020 Mia srl
+// Copyright Mia srl
+// SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,18 +37,15 @@ const (
 )
 
 var (
-	gvrSecrets         = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}
-	gvrNamespaces      = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"}
-	gvrConfigMaps      = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"}
-	gvrDeployments     = schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
-	gvrJobs            = schema.GroupVersionResource{Group: batchv1.SchemeGroupVersion.Group, Version: batchv1.SchemeGroupVersion.Version, Resource: "jobs"}
-	gvrV1beta1Cronjobs = schema.GroupVersionResource{Group: "batch", Version: "v1beta1", Resource: "cronjobs"}
+	gvrSecrets    = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}
+	gvrNamespaces = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"}
+	gvrJobs       = schema.GroupVersionResource{Group: batchv1.SchemeGroupVersion.Group, Version: batchv1.SchemeGroupVersion.Version, Resource: "jobs"}
 )
 
 // ResourceList is the base block used to build the secret containing
 // the resources deployed in the cluster.
 type ResourceList struct {
-	Gvk       *schema.GroupVersionKind `json:"kind"`
+	Gvk       *schema.GroupVersionKind `json:"gvk"`
 	Resources []string                 `json:"resources"`
 }
 
@@ -71,7 +69,6 @@ func makeResourceMap(resources []resourceutil.Resource) map[string]*ResourceList
 // Resources secrets created with helper/builer version of mlp is incompatible with newer versions
 // this function convert old format in the new one
 func convertSecretFormat(resources []byte) (map[string]*ResourceList, error) {
-
 	type oldResourceList struct {
 		Kind      string `json:"kind"`
 		Mapping   schema.GroupVersionResource

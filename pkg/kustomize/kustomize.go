@@ -1,4 +1,5 @@
-// Copyright 2020 Mia srl
+// Copyright Mia srl
+// SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -45,7 +46,6 @@ func (s fileType) GetCommand() []string {
 }
 
 func findFiles(fs afero.Fs, overlay string) (map[fileType][]string, error) {
-
 	output := make(map[fileType][]string)
 
 	fileInfos, err := afero.ReadDir(fs, overlay)
@@ -53,15 +53,11 @@ func findFiles(fs afero.Fs, overlay string) (map[fileType][]string, error) {
 		return nil, err
 	}
 
-	r, err := regexp.Compile(`(^|\.)patch\.ya?ml$`)
-	if err != nil {
-		return nil, err
-	}
-
+	r := regexp.MustCompile(`(^|\.)patch\.ya?ml$`)
 	for _, f := range fileInfos {
 		name := strings.ToLower(f.Name())
-		extention := filepath.Ext(name)
-		if name == "kustomization.yaml" || (extention != ".yml" && extention != ".yaml") {
+		extension := filepath.Ext(name)
+		if name == "kustomization.yaml" || (extension != ".yml" && extension != ".yaml") {
 			continue
 		}
 
@@ -79,12 +75,14 @@ func findFiles(fs afero.Fs, overlay string) (map[fileType][]string, error) {
 }
 
 // execute kustomize edit add command
-func execAdd(fsys filesys.FileSystem, path string, AllTypesFiles map[fileType][]string) error {
+func execAdd(fsys filesys.FileSystem, path string, allTypesFiles map[fileType][]string) error {
 	pwd, err := os.Getwd()
 	if err != nil {
 		return err
 	}
-	defer os.Chdir(pwd)
+	defer func() {
+		err = os.Chdir(pwd)
+	}()
 
 	err = os.Chdir(path)
 	if err != nil {
@@ -94,7 +92,7 @@ func execAdd(fsys filesys.FileSystem, path string, AllTypesFiles map[fileType][]
 	// Cycle through each types of files ( patch, resource ) and for each file launch the correct edit command for that resource:
 	// Patch: kustomize resource add patch --path f
 	// Resource: kustomize resource add resource f
-	for resType, files := range AllTypesFiles {
+	for resType, files := range allTypesFiles {
 		kustomizeCmd := resType.GetCommand()
 		if resType == Patch {
 			// Removes patches already present in kustomization.yaml

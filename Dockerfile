@@ -1,31 +1,9 @@
-################### Build mlp ####################
-FROM golang:1.17.8 AS builder
+FROM --platform=${TARGETPLATFORM} alpine:3.17
 
-WORKDIR /build
+ARG TARGETPLATFORM
+ARG CMD_NAME
+ENV COMMAND_NAME=${CMD_NAME}
 
-COPY go.mod .
-COPY go.sum .
+COPY ${TARGETPLATFORM}/${CMD_NAME} /usr/local/bin/
 
-RUN go mod download
-RUN go mod verify
-
-ARG VERSION="DEV"
-ARG BUILDTIME=""
-
-COPY . .
-
-ENV GO_LDFLAGS="-w -s -X github.com/mia-platform/mlp/internal/cli.BuildDate=${BUILDTIME} -X github.com/mia-platform/mlp/internal/cli.Version=${VERSION}"
-RUN GOOS=linux \
-    CGO_ENABLED=0 \
-    GOARCH=amd64 \
-    go build -trimpath \
-    -ldflags="${GO_LDFLAGS}" \
-    -o "mlp" ./cmd/mlp
-
-################## Create image ##################
-
-FROM alpine:3.16.0
-
-COPY --from=builder /build/mlp /usr/local/bin/
-
-CMD ["mlp"]
+CMD ["/bin/sh", "-c", "${COMMAND_NAME}"]

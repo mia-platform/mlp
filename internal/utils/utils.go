@@ -1,4 +1,5 @@
-// Copyright 2020 Mia srl
+// Copyright Mia srl
+// SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -132,7 +133,8 @@ func WriteYamlsToDisk(objs map[string]runtime.Object, outputDirectory string) {
 		fileName := outputDirectory + "/" + yamlName + ".yaml"
 		file, err := CreateFile(fileName)
 		CheckError(err, "")
-		printer.PrintObj(obj, file)
+		err = printer.PrintObj(obj, file)
+		CheckError(err, "")
 	}
 }
 

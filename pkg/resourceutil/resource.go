@@ -1,4 +1,5 @@
-// Copyright 2020 Mia srl
+// Copyright Mia srl
+// SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +20,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"regexp"
 	"strings"
@@ -75,7 +76,7 @@ func NewResources(filepath, namespace string) ([]Resource, error) {
 	var err error
 
 	if filepath == utils.StdinToken {
-		stream, err = ioutil.ReadAll(os.Stdin)
+		stream, err = io.ReadAll(os.Stdin)
 	} else {
 		stream, err = utils.ReadFile(filepath)
 	}
@@ -86,7 +87,6 @@ func NewResources(filepath, namespace string) ([]Resource, error) {
 	// split resources on --- yaml document delimiter
 	re := regexp.MustCompile(`\n---\n`)
 	for _, resourceYAML := range re.Split(string(stream), -1) {
-
 		if len(resourceYAML) == 0 {
 			continue
 		}
@@ -111,10 +111,8 @@ func NewResources(filepath, namespace string) ([]Resource, error) {
 // MakeResources creates a resource list and sorts them according to
 // the standard ordering strategy
 func MakeResources(filePaths []string, namespace string) ([]Resource, error) {
-
 	resources := []Resource{}
 	for _, path := range filePaths {
-
 		res, err := NewResources(path, namespace)
 		if err != nil {
 			return nil, err
@@ -222,7 +220,6 @@ func GetPodsDependencies(podSpec corev1.PodSpec) map[string][]string {
 
 	for _, container := range podSpec.Containers {
 		for _, env := range container.Env {
-
 			if env.ValueFrom == nil {
 				continue
 			}
@@ -281,7 +278,7 @@ func GetMiaAnnotation(name string) string {
 	return fmt.Sprintf("mia-platform.eu/%s", strings.ReplaceAll(name, " ", "-"))
 }
 
-//GetPodSpec get a podSpec
+// GetPodSpec get a podSpec
 func GetPodSpec(volumes *[]corev1.Volume, containers *[]corev1.Container) corev1.PodSpec {
 	podSpec := corev1.PodSpec{}
 

@@ -1,4 +1,5 @@
-// Copyright 2020 Mia srl
+// Copyright Mia srl
+// SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,13 +16,12 @@
 package cli
 
 import (
-	"github.com/mia-platform/mlp/internal/utils"
 	"github.com/mia-platform/mlp/pkg/interpolate"
 	"github.com/spf13/cobra"
 )
 
 // InterpolateSubcommand add interpolate subcommand to the main command
-func InterpolateSubcommand(cmd *cobra.Command, options *utils.Options) {
+func InterpolateSubcommand(cmd *cobra.Command) {
 	var prefixes []string
 	var inputPaths []string
 	var outputPath string

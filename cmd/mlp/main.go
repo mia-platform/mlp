@@ -1,4 +1,5 @@
-// Copyright 2020 Mia srl
+// Copyright Mia srl
+// SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -53,9 +54,9 @@ func main() {
 	})
 
 	cli.AddGlobalFlags(rootCmd, options)
-	cli.InterpolateSubcommand(rootCmd, options)
+	cli.InterpolateSubcommand(rootCmd)
 	cli.DeploySubcommand(rootCmd, options)
-	cli.GenerateSubcommand(rootCmd, options)
+	cli.GenerateSubcommand(rootCmd)
 	cli.KustomizeSubcommand(rootCmd)
 	cli.HydrateSubcommand(rootCmd)
 

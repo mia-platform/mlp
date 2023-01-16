@@ -1,4 +1,5 @@
-// Copyright 2020 Mia srl
+// Copyright Mia srl
+// SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -67,7 +68,7 @@ func Run(prefixes []string, inputPaths []string, outputPath string) {
 		interpolatedFile, err := Interpolate(f, prefixes, "\\{\\{([A-Z0-9_]+)\\}\\}")
 		utils.CheckError(err, "Error interpolating file")
 
-		fileName, err := filepath.Abs(filepath.Join(outputPath, filepath.Base(fp)))
+		fileName, _ := filepath.Abs(filepath.Join(outputPath, filepath.Base(fp)))
 		err = utils.WriteFile(fileName, interpolatedFile)
 		utils.CheckError(err, "Error writing file")
 	}

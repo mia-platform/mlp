@@ -1,4 +1,5 @@
-// Copyright 2020 Mia srl
+// Copyright Mia srl
+// SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -48,7 +49,6 @@ func New() *utils.Options {
 
 // AddGlobalFlags add to the cobra command all the global flags
 func AddGlobalFlags(cmd *cobra.Command, options *utils.Options) {
-
 	flags := cmd.PersistentFlags()
 	flags.StringVarP(&options.CertificateAuthority, "certificate-authority", "", "", "Path to a cert file for the certificate authority")
 	flags.StringVarP(&options.ClientCertificate, "client-certificate", "", "", "Path to a client certificate file for TLS")

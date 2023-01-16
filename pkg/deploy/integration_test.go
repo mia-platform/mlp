@@ -1,4 +1,5 @@
-// Copyright 2020 Mia srl
+// Copyright Mia srl
+// SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,6 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build integration
+
 package deploy
 
 import (
@@ -24,6 +27,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 
 	. "github.com/onsi/ginkgo"
@@ -35,10 +39,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
-var testEnv *envtest.Environment
-var cfg *rest.Config
-var clients *k8sClients
-
+var (
+	testEnv        *envtest.Environment
+	cfg            *rest.Config
+	clients        *k8sClients
+	gvrConfigMaps  = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"}
+	gvrDeployments = schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
+	gvrCronjobs    = schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "cronjobs"}
+)
 var _ = BeforeSuite(func() {
 
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
@@ -140,7 +148,7 @@ var _ = Describe("deploy on mock kubernetes", func() {
 			Expect(err).NotTo(HaveOccurred())
 			err = doRun(clients, "test3", []string{"testdata/integration/apply-resources/test-cronjob-2.yaml"}, deployConfig, currentTime)
 			Expect(err).NotTo(HaveOccurred())
-			cron, err := clients.dynamic.Resource(gvrV1beta1Cronjobs).
+			cron, err := clients.dynamic.Resource(gvrCronjobs).
 				Namespace("test3").
 				Get(context.Background(), "test-cronjob", metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())

@@ -10,7 +10,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: busybox
-          image: busybox 
+          image: busybox
           command:
             - sleep
           args:

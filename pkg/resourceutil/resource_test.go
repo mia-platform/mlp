@@ -1,4 +1,5 @@
-// Copyright 2020 Mia srl
+// Copyright Mia srl
+// SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -95,7 +96,6 @@ func TestMakeResources(t *testing.T) {
 }
 
 func TestGetKeysFromMap(t *testing.T) {
-
 	testcases := []struct {
 		description string
 		input       map[string]bool
@@ -118,7 +118,6 @@ func TestGetKeysFromMap(t *testing.T) {
 }
 
 func TestGetMiaAnnotation(t *testing.T) {
-
 	testcases := []struct {
 		description string
 		input       string
@@ -145,14 +144,13 @@ func TestGetMiaAnnotation(t *testing.T) {
 	}
 }
 func TestGetChecksum(t *testing.T) {
-
 	testcases := []struct {
 		description string
 		input       []byte
 		expected    string
 	}{
 		{
-			description: "Correclty calculate checksum from bytes as input",
+			description: "Correctly calculate checksum from bytes as input",
 			input:       []byte("convert me in bytes"),
 			expected:    "1a61c4caa88712cef548ed807e55822e7ae20fcd9f9d4f0ae135c064f20a7ebd",
 		},
@@ -194,7 +192,6 @@ func TestMapSecretAndConfigMap(t *testing.T) {
 }
 
 func TestGetPodsDependencies(t *testing.T) {
-
 	secretVolume := corev1.Volume{
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{

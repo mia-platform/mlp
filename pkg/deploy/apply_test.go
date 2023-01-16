@@ -1,4 +1,5 @@
-// Copyright 2020 Mia srl
+// Copyright Mia srl
+// SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -172,10 +173,10 @@ func TestCreatePatch(t *testing.T) {
 				annotations = make(map[string]string)
 			}
 
-			lastAppliedJson, err := lastApplied.Object.MarshalJSON()
+			lastAppliedJSON, err := lastApplied.Object.MarshalJSON()
 			require.Nil(t, err)
 
-			annotations[corev1.LastAppliedConfigAnnotation] = string(lastAppliedJson)
+			annotations[corev1.LastAppliedConfigAnnotation] = string(lastAppliedJSON)
 			deployment.Object.SetAnnotations(annotations)
 		}
 
@@ -239,7 +240,6 @@ func TestCreatePatch(t *testing.T) {
 }
 
 func TestEnsureDeployAll(t *testing.T) {
-
 	mockTime := time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
 	expectedCheckSum := "6ab733c74e26e73bca78aa9c4c9db62664f339d9eefac51dd503c9ff0cf0c329"
 
