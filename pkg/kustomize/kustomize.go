@@ -113,23 +113,20 @@ func execAdd(fsys filesys.FileSystem, path string, AllTypesFiles map[fileType][]
 	return nil
 }
 
-func remove(s []string, i int) []string {
-	s[i] = s[len(s)-1]
-	return s[:len(s)-1]
-}
-
 func filterPatchFiles(files []string, fsys filesys.FileSystem) ([]string, error) {
 	// we are in the current directory
 	fileCont, err := fsys.ReadFile("kustomization.yaml")
 	if err != nil {
 		return nil, fmt.Errorf("error reading kustomization.yaml")
 	}
-	for k, f := range files {
-		if strings.Contains(string(fileCont), f) {
-			files = remove(files, k)
+
+	var filesToAdd []string
+	for _, f := range files {
+		if !strings.Contains(string(fileCont), f) {
+			filesToAdd = append(filesToAdd, f)
 		}
 	}
-	return files, nil
+	return filesToAdd, nil
 }
 
 func executeCmd(file string, kustomizeCmd []string, fsys filesys.FileSystem) error {
