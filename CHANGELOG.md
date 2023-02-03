@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - fixed a bug in `createPatch` that caused all annotations to be deleted in the resulting patch if the target resource was annotated with `kubectl.kubernetes.io/last-applied-configuration`
+- fixed a bug that will panic if multiple patch files would be filtered out when hydrating kustomize files
 
 ## [1.1.0] - 2022-03-17
 
