@@ -186,3 +186,29 @@ func TestFilterPatchFiles(t *testing.T) {
 		})
 	}
 }
+
+func TestFilterPatchFilesWithMultilePatches(t *testing.T) {
+	testCases := []struct {
+		desc          string
+		expected      []string
+		input         []string
+		kustomization string
+	}{
+		{
+			desc:          "some res in kustomization.yaml",
+			expected:      []string{"res-not-present.yaml"},
+			input:         []string{"res-not-present.yaml", "deployment.PATCH.yml", "service.PATCH.yaml", "job.PATCH.yaml"},
+			kustomization: "apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\npatches:\n- path: deployment.PATCH.yml\n- path: service.PATCH.yaml\n- path: job.PATCH.yaml",
+		},
+	}
+	for _, tC := range testCases {
+		t.Run(tC.desc, func(t *testing.T) {
+			fsys := filesys.MakeFsInMemory()
+			err := fsys.WriteFile("kustomization.yaml", []byte(tC.kustomization))
+			require.Nil(t, err)
+			actual, err := filterPatchFiles(tC.input, fsys)
+			require.Nil(t, err)
+			require.Equal(t, tC.expected, actual)
+		})
+	}
+}
