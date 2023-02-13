@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2023-02-13
+
 ### Added
 
 - default order for `SecretProviderClass` resource kind
@@ -124,7 +126,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial Release 🎉🎉🎉
 
-[Unreleased]: https://github.com/mia-platform/mlp/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/mia-platform/mlp/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/mia-platform/mlp/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/mia-platform/mlp/compare/v1.0.3...v1.1.0
 [1.0.3]: https://github.com/mia-platform/mlp/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/mia-platform/mlp/compare/v1.0.1...v1.0.2
