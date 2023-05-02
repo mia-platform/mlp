@@ -242,7 +242,6 @@ func TestCreatePatch(t *testing.T) {
 func TestEnsureDeployAll(t *testing.T) {
 	mockTime := time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
 	expectedCheckSum := "6ab733c74e26e73bca78aa9c4c9db62664f339d9eefac51dd503c9ff0cf0c329"
-
 	t.Run("Add deployment annotation", func(t *testing.T) {
 		deployment, err := resourceutil.NewResources("testdata/test-deployment.yaml", "default")
 		require.Nil(t, err)
