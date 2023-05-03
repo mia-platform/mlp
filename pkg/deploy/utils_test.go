@@ -1,4 +1,5 @@
-// Copyright 2020 Mia srl
+// Copyright Mia srl
+// SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,9 +31,8 @@ import (
 )
 
 func TestMakeResourceMap(t *testing.T) {
-
-	gvk_secret := schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Secret"}
-	gvk_cm := schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ConfigMap"}
+	gvkSecret := schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Secret"}
+	gvkCm := schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ConfigMap"}
 
 	testcases := []struct {
 		description string
@@ -44,15 +44,15 @@ func TestMakeResourceMap(t *testing.T) {
 			input: []resourceutil.Resource{
 				{
 					Object:           unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "v1", "metadata": map[string]interface{}{"name": "secret1"}}},
-					GroupVersionKind: &gvk_secret,
+					GroupVersionKind: &gvkSecret,
 				},
 				{
 					Object:           unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "v1", "metadata": map[string]interface{}{"name": "secret2"}}},
-					GroupVersionKind: &gvk_secret,
+					GroupVersionKind: &gvkSecret,
 				},
 			},
 			expected: map[string]*ResourceList{"Secret": {
-				Gvk:       &gvk_secret,
+				Gvk:       &gvkSecret,
 				Resources: []string{"secret1", "secret2"},
 			}},
 		},
@@ -61,19 +61,19 @@ func TestMakeResourceMap(t *testing.T) {
 			input: []resourceutil.Resource{
 				{
 					Object:           unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "v1", "metadata": map[string]interface{}{"name": "secret1"}}},
-					GroupVersionKind: &gvk_secret,
+					GroupVersionKind: &gvkSecret,
 				},
 				{
 					Object:           unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "v1", "metadata": map[string]interface{}{"name": "cm1"}}},
-					GroupVersionKind: &gvk_cm,
+					GroupVersionKind: &gvkCm,
 				},
 			},
 			expected: map[string]*ResourceList{"Secret": {
-				Gvk:       &gvk_secret,
+				Gvk:       &gvkSecret,
 				Resources: []string{"secret1"},
 			},
 				"ConfigMap": {
-					Gvk:       &gvk_cm,
+					Gvk:       &gvkCm,
 					Resources: []string{"cm1"},
 				},
 			},
@@ -89,7 +89,6 @@ func TestMakeResourceMap(t *testing.T) {
 }
 
 func TestGetOldResourceMap(t *testing.T) {
-
 	testcases := []struct {
 		description string
 		input       *corev1.Secret

@@ -1,4 +1,5 @@
-// Copyright 2020 Mia srl
+// Copyright Mia srl
+// SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,7 +23,6 @@ import (
 
 	"github.com/mia-platform/mlp/internal/utils"
 	"github.com/mia-platform/mlp/pkg/resourceutil"
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -91,7 +91,8 @@ func prepareResources(deployType string, resources []resourceutil.Resource, curr
 	utils.CheckError(err, "error preparing resources")
 
 	for _, res := range resources {
-		if res.GroupVersionKind.Kind != "Deployment" && res.GroupVersionKind.Kind != "CronJob" {
+		res := res
+		if res.GroupVersionKind.Kind != deploymentKind && res.GroupVersionKind.Kind != cronJobKind {
 			continue
 		}
 		if deployType == deployAll {
@@ -110,13 +111,12 @@ func prepareResources(deployType string, resources []resourceutil.Resource, curr
 }
 
 func insertDependencies(res *resourceutil.Resource, configMapMap map[string]string, secretMap map[string]string) error {
-	var dependencies = map[string][]string{}
 	var path []string
 	var err error
 	switch res.GroupVersionKind.Kind {
-	case "Deployment":
+	case deploymentKind:
 		path = []string{"spec", "template", "spec"}
-	case "CronJob":
+	case cronJobKind:
 		path = []string{"spec", "jobTemplate", "spec", "template", "spec"}
 	}
 	unstrPodSpec, _, err := unstructured.NestedMap(res.Object.Object, path...)
@@ -130,9 +130,9 @@ func insertDependencies(res *resourceutil.Resource, configMapMap map[string]stri
 		fmt.Printf("fails to convert unstructured pod %s spec: %s\n", res.Object.GetName(), err)
 		return err
 	}
-	dependencies = resourceutil.GetPodsDependencies(podSpec)
+	dependencies := resourceutil.GetPodsDependencies(podSpec)
 
-	// NOTE: ConfigMaps and Secrets that are used as depedency for the resource but do not exist
+	// NOTE: ConfigMaps and Secrets that are used as dependency for the resource but do not exist
 	// in the resource files provided are ignored and no annotation is created for them.
 	var checksumMap = map[string]string{}
 	for _, configMapName := range dependencies[resourceutil.ConfigMap] {
@@ -152,9 +152,9 @@ func insertDependencies(res *resourceutil.Resource, configMapMap map[string]stri
 	}
 
 	switch res.GroupVersionKind.Kind {
-	case "Deployment":
+	case deploymentKind:
 		path = []string{"spec", "template", "metadata", "annotations"}
-	case "CronJob":
+	case cronJobKind:
 		path = []string{"spec", "jobTemplate", "spec", "template", "metadata", "annotations"}
 	}
 	currentAnnotations, found, err := unstructured.NestedStringMap(res.Object.Object,
@@ -235,7 +235,6 @@ func updateResourceSecret(dynamic dynamic.Interface, namespace string, resources
 }
 
 func prune(clients *k8sClients, namespace string, resourceGroup *ResourceList) error {
-
 	for _, res := range resourceGroup.Resources {
 		fmt.Printf("Deleting: %v %v\n", resourceGroup.Gvk.Kind, res)
 
@@ -249,9 +248,8 @@ func prune(clients *k8sClients, namespace string, resourceGroup *ResourceList) e
 			if apierrors.IsNotFound(err) {
 				fmt.Printf("already not present on cluster\n")
 				continue
-			} else {
-				return err
 			}
+			return err
 		}
 		// delete the object only if the resource has the managed by MIA label
 		if onClusterObj.GetLabels()[resourceutil.ManagedByLabel] != resourceutil.ManagedByMia {
@@ -268,7 +266,6 @@ func prune(clients *k8sClients, namespace string, resourceGroup *ResourceList) e
 }
 
 func deploy(clients *k8sClients, namespace string, resources []resourceutil.Resource, deployConfig utils.DeployConfig) error {
-
 	// for each resource ensure namespace if a namespace is not passed to mlp ensure namespace in the resource, gives error
 	// on no namespace passed to mlp and no namespace in yaml
 	// The namespace given to mlp overrides yaml namespace
@@ -280,7 +277,7 @@ func deploy(clients *k8sClients, namespace string, resources []resourceutil.Reso
 					return err
 				}
 			} else if resourceNamespace == "" {
-				return errors.New(fmt.Sprintf("no namespace passed and no namespace in resource: %s %s", res.GroupVersionKind.Kind, res.Object.GetName()))
+				return fmt.Errorf("no namespace passed and no namespace in resource: %s %s", res.GroupVersionKind.Kind, res.Object.GetName())
 			}
 		} else {
 			res.Object.SetNamespace(namespace)

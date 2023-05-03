@@ -1,4 +1,5 @@
-// Copyright 2020 Mia srl
+// Copyright Mia srl
+// SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,7 +37,6 @@ func createTestFiles(fs afero.Fs, files []string) error {
 }
 
 func TestFindFiles(t *testing.T) {
-
 	testCases := []struct {
 		desc     string
 		input    []string
@@ -51,7 +51,7 @@ func TestFindFiles(t *testing.T) {
 			},
 		},
 		{
-			desc:  "yaml yml and others extentions and kustomization.yaml",
+			desc:  "yaml yml and others extensions and kustomization.yaml",
 			input: []string{"kustomization.yaml", "default.certificate.yaml", "mlp.yml", "deployment1.patch.xyz"},
 			expected: map[fileType][]string{
 				Resource: {"default.certificate.yaml", "mlp.yml"},
@@ -73,7 +73,7 @@ func TestFindFiles(t *testing.T) {
 			},
 		},
 		{
-			desc:  "patch with both extentions",
+			desc:  "patch with both extensions",
 			input: []string{"myresource.patch.yml", "myresource.patch.yaml"},
 			expected: map[fileType][]string{
 				Patch: {"myresource.patch.yaml", "myresource.patch.yml"},
@@ -97,7 +97,6 @@ func TestFindFiles(t *testing.T) {
 			require.Equal(t, tC.expected, actual)
 		})
 	}
-
 }
 
 func setup(t *testing.T, fsys filesys.FileSystem) filesys.ConfirmedDir {

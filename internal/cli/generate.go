@@ -1,4 +1,5 @@
-// Copyright 2020 Mia srl
+// Copyright Mia srl
+// SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,13 +16,12 @@
 package cli
 
 import (
-	"github.com/mia-platform/mlp/internal/utils"
 	"github.com/mia-platform/mlp/pkg/generate"
 	"github.com/spf13/cobra"
 )
 
 // GenerateSubcommand add generate subcommand to the main command
-func GenerateSubcommand(cmd *cobra.Command, options *utils.Options) {
+func GenerateSubcommand(cmd *cobra.Command) {
 	var configPath []string
 	var prefixes []string
 	var outputPath string

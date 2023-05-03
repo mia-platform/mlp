@@ -1,4 +1,5 @@
-// Copyright 2020 Mia srl
+// Copyright Mia srl
+// SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,8 +35,8 @@ import (
 	fakeclientset "k8s.io/client-go/kubernetes/fake"
 )
 
-func TestEnsureNamespaceExistance(t *testing.T) {
-	t.Run("Ensure Namespace existance", func(t *testing.T) {
+func TestEnsureNamespaceexistence(t *testing.T) {
+	t.Run("Ensure Namespace existence", func(t *testing.T) {
 		namespaceName := "foo"
 		scheme := runtime.NewScheme()
 		_ = corev1.AddToScheme(scheme)
@@ -59,7 +60,7 @@ func TestEnsureNamespaceExistance(t *testing.T) {
 
 func TestUpdateResourceSecret(t *testing.T) {
 	expected := corev1.Secret{
-		Data: map[string][]byte{"resources": []byte(`{"CronJob":{"kind":{"Group":"batch","Version":"v1beta1","Kind":"CronJob"},"resources":["bar"]}}`)},
+		Data: map[string][]byte{"resources": []byte(`{"CronJob":{"gvk":{"Group":"batch","Version":"v1beta1","Kind":"CronJob"},"resources":["bar"]}}`)},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      resourceSecretName,
 			Namespace: "foo",

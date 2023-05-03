@@ -1,4 +1,5 @@
-// Copyright 2022 Mia srl
+// Copyright Mia srl
+// SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -45,6 +46,8 @@ type applyFunction func(clients *k8sClients, res resourceutil.Resource, deployCo
 const (
 	deployChecksum = "deploy-checksum"
 	smartDeploy    = "smart_deploy"
+	cronJobKind    = "CronJob"
+	deploymentKind = "Deployment"
 )
 
 var (
@@ -167,6 +170,7 @@ func assertAwaitSupportedForThisResource(res resourceutil.Resource) error {
 // the initial watch time as arguments. It returns (true, nil) when the given
 // resource has completed in the given event. If the event is nil returns (false, nil)
 // when the resource supports events watching otherwise returns (false, error).
+// nolint gocyclo
 func handleResourceCompletionEvent(res resourceutil.Resource, event *watch.Event, startTime time.Time) (bool, error) {
 	switch res.GroupVersionKind.Kind {
 	case "Job":
@@ -235,8 +239,8 @@ func handleResourceCompletionEvent(res resourceutil.Resource, event *watch.Event
 	}
 }
 
+// nolint gocyclo
 func applyResource(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
-
 	gvr, err := resourceutil.FromGVKtoGVR(clients.discovery, res.Object.GroupVersionKind())
 	if err != nil {
 		return err
@@ -257,11 +261,11 @@ func applyResource(clients *k8sClients, res resourceutil.Resource, deployConfig 
 				if orignAnn == nil {
 					orignAnn = make(map[string]string)
 				}
-				objJson, err := res.Object.MarshalJSON()
+				objJSON, err := res.Object.MarshalJSON()
 				if err != nil {
 					return err
 				}
-				orignAnn[corev1.LastAppliedConfigAnnotation] = string(objJson)
+				orignAnn[corev1.LastAppliedConfigAnnotation] = string(objJSON)
 				res.Object.SetAnnotations(orignAnn)
 			}
 
@@ -280,7 +284,6 @@ func applyResource(clients *k8sClients, res resourceutil.Resource, deployConfig 
 
 	// Do not modify the resource if is already present on cluster and the annotation is set to "once"
 	if res.Object.GetAnnotations()[resourceutil.GetMiaAnnotation("deploy")] != "once" {
-
 		// Replace only if it is a Secret or configmap otherwise patch the resource
 		if res.Object.GetKind() == "Secret" || res.Object.GetKind() == "ConfigMap" {
 			fmt.Printf("Replacing %s: %s\n", res.Object.GetKind(), res.Object.GetName())
@@ -290,12 +293,10 @@ func applyResource(clients *k8sClients, res resourceutil.Resource, deployConfig 
 				Update(context.Background(),
 					&res.Object,
 					metav1.UpdateOptions{})
-
 		} else {
-
 			fmt.Printf("Updating %s: %s\n", res.Object.GetKind(), res.Object.GetName())
 
-			if deployConfig.DeployType == smartDeploy && (res.Object.GetKind() == "CronJob" || res.Object.GetKind() == "Deployment") {
+			if deployConfig.DeployType == smartDeploy && (res.Object.GetKind() == cronJobKind || res.Object.GetKind() == deploymentKind) {
 				isNotUsingSemver, err := resourceutil.IsNotUsingSemver(&res)
 				if err != nil {
 					return errors.Wrap(err, "failed semver check")
@@ -312,7 +313,7 @@ func applyResource(clients *k8sClients, res resourceutil.Resource, deployConfig 
 				}
 			}
 
-			if res.Object.GetKind() == "CronJob" {
+			if res.Object.GetKind() == cronJobKind {
 				if err := checkIfCreateJob(clients.dynamic, onClusterObj, res); err != nil {
 					return errors.Wrap(err, "failed check if create job")
 				}
@@ -349,12 +350,12 @@ func annotateWithLastApplied(res resourceutil.Resource) (unstructured.Unstructur
 		annotatedRes.SetAnnotations(annotations)
 	}
 
-	resJson, err := annotatedRes.MarshalJSON()
+	resJSON, err := annotatedRes.MarshalJSON()
 	if err != nil {
 		return unstructured.Unstructured{}, err
 	}
 
-	annotations[corev1.LastAppliedConfigAnnotation] = string(resJson)
+	annotations[corev1.LastAppliedConfigAnnotation] = string(resJSON)
 	annotatedRes.SetAnnotations(annotations)
 
 	return *annotatedRes, nil
@@ -366,20 +367,20 @@ func annotateWithLastApplied(res resourceutil.Resource) (unstructured.Unstructur
 // the update.
 func createPatch(currentObj unstructured.Unstructured, target resourceutil.Resource) ([]byte, types.PatchType, error) {
 	// Get last applied config from current object annotation
-	lastAppliedConfigJson := currentObj.GetAnnotations()[corev1.LastAppliedConfigAnnotation]
+	lastAppliedConfigJSON := currentObj.GetAnnotations()[corev1.LastAppliedConfigAnnotation]
 
 	// Get the desired configuration
 	annotatedTarget, err := annotateWithLastApplied(target)
 	if err != nil {
 		return nil, types.StrategicMergePatchType, err
 	}
-	targetJson, err := annotatedTarget.MarshalJSON()
+	targetJSON, err := annotatedTarget.MarshalJSON()
 	if err != nil {
 		return nil, types.StrategicMergePatchType, err
 	}
 
 	// Get the resource in the cluster
-	currentJson, err := currentObj.MarshalJSON()
+	currentJSON, err := currentObj.MarshalJSON()
 	if err != nil {
 		return nil, types.StrategicMergePatchType, errors.Wrap(err, "serializing live configuration")
 	}
@@ -393,7 +394,7 @@ func createPatch(currentObj unstructured.Unstructured, target resourceutil.Resou
 		patchType := types.MergePatchType
 		preconditions := []mergepatch.PreconditionFunc{mergepatch.RequireKeyUnchanged("apiVersion"),
 			mergepatch.RequireKeyUnchanged("kind"), mergepatch.RequireMetadataKeyUnchanged("name")}
-		patch, err := jsonmergepatch.CreateThreeWayJSONMergePatch([]byte(lastAppliedConfigJson), targetJson, currentJson, preconditions...)
+		patch, err := jsonmergepatch.CreateThreeWayJSONMergePatch([]byte(lastAppliedConfigJSON), targetJSON, currentJSON, preconditions...)
 		return patch, patchType, err
 	} else if err != nil {
 		return nil, types.StrategicMergePatchType, err
@@ -404,16 +405,16 @@ func createPatch(currentObj unstructured.Unstructured, target resourceutil.Resou
 		return nil, types.StrategicMergePatchType, errors.Wrap(err, "unable to create patch metadata from object")
 	}
 
-	patch, err := strategicpatch.CreateThreeWayMergePatch([]byte(lastAppliedConfigJson), targetJson, currentJson, patchMeta, true)
+	patch, err := strategicpatch.CreateThreeWayMergePatch([]byte(lastAppliedConfigJSON), targetJSON, currentJSON, patchMeta, true)
 	return patch, types.StrategicMergePatchType, err
 }
 
 func ensureDeployAll(res *resourceutil.Resource, currentTime time.Time) error {
 	var path []string
 	switch res.GroupVersionKind.Kind {
-	case "Deployment":
+	case deploymentKind:
 		path = []string{"spec", "template", "metadata", "annotations"}
-	case "CronJob":
+	case cronJobKind:
 		path = []string{"spec", "jobTemplate", "spec", "template", "metadata", "annotations"}
 	}
 	currentAnnotations, found, err := unstructured.NestedStringMap(res.Object.Object, path...)
@@ -432,9 +433,9 @@ func ensureDeployAll(res *resourceutil.Resource, currentTime time.Time) error {
 func ensureSmartDeploy(onClusterResource *unstructured.Unstructured, target *resourceutil.Resource) error {
 	var path []string
 	switch target.GroupVersionKind.Kind {
-	case "Deployment":
+	case deploymentKind:
 		path = []string{"spec", "template", "metadata", "annotations"}
-	case "CronJob":
+	case cronJobKind:
 		path = []string{"spec", "jobTemplate", "spec", "template", "metadata", "annotations"}
 	}
 
@@ -494,7 +495,7 @@ func checkIfCreateJob(k8sClient dynamic.Interface, currentObj *unstructured.Unst
 
 // Create a Job from every CronJob having the mia-platform.eu/autocreate annotation set to true
 func cronJobAutoCreate(k8sClient dynamic.Interface, res *unstructured.Unstructured) error {
-	if res.GetKind() != "CronJob" {
+	if res.GetKind() != cronJobKind {
 		return nil
 	}
 	val, ok := res.GetAnnotations()[resourceutil.GetMiaAnnotation("autocreate")]
@@ -509,7 +510,6 @@ func cronJobAutoCreate(k8sClient dynamic.Interface, res *unstructured.Unstructur
 }
 
 func createJobFromCronjob(k8sClient dynamic.Interface, res *unstructured.Unstructured) (string, error) {
-
 	var cronjobObj batchv1beta1.CronJob
 	err := runtime.DefaultUnstructuredConverter.
 		FromUnstructured(res.Object, &cronjobObj)

@@ -1,22 +1,17 @@
-# EditorConfig is awesome: http://EditorConfig.org
-# Uses editorconfig to maintain consistent coding styles
-
-# top-most EditorConfig file
 root = true
 
-# Unix-style newlines with a newline ending every file
 [*]
-charset = utf-8
+indent_style = tab
+indent_size = tab
 end_of_line = lf
-indent_size = 2
-indent_style = space
+charset = utf-8
+trim_trailing_whitespace = true
 insert_final_newline = true
 max_line_length = 120
-trim_trailing_whitespace = true
-
-[Makefile]
-tab_width = 2
-indent_style = tab
 
 [*.md]
 trim_trailing_whitespace = false
+
+[*.{yaml,yml}]
+indent_style = space
+tab_width = 2

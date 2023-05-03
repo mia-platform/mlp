@@ -1,4 +1,5 @@
-// Copyright 2020 Mia srl
+// Copyright Mia srl
+// SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,7 +37,6 @@ func Run(configPath []string, prefixes []string, outputPath string) {
 	utils.CheckError(err, "error extracting yaml files")
 
 	for _, filePath := range fileNames {
-
 		data, err := Generate(filePath, prefixes)
 		utils.CheckError(err, "error generating resources")
 
@@ -46,7 +46,6 @@ func Run(configPath []string, prefixes []string, outputPath string) {
 
 // Generate Secrets and ConfigMaps files from a configuration file
 func Generate(configuration string, prefixes []string) (map[string]runtime.Object, error) {
-
 	rawConfiguration, err := utils.ReadFile(configuration)
 	if err != nil {
 		return nil, err
@@ -65,13 +64,13 @@ func Generate(configuration string, prefixes []string) (map[string]runtime.Objec
 
 	resources := make(map[string]runtime.Object)
 
-	for _, secret := range configurationData.Secret {
+	for _, secret := range configurationData.Secrets {
 		object := generateSecret(secret)
 		fileName := fmt.Sprintf("%s.secret", secret.Name)
 		resources[fileName] = object
 	}
 
-	for _, configmap := range configurationData.ConfigMap {
+	for _, configmap := range configurationData.ConfigMaps {
 		object := generateConfigMap(configmap)
 		fileName := fmt.Sprintf("%s.configmap", configmap.Name)
 		resources[fileName] = object
@@ -141,7 +140,6 @@ func generateConfigMap(cm configMap) *apiv1.ConfigMap {
 
 // generateSecret generates a Secret starting from configurations stored in `Secret` struct
 func generateSecret(secret secret) *apiv1.Secret {
-
 	var secretType apiv1.SecretType
 	typeMeta := metav1.TypeMeta{Kind: "Secret", APIVersion: "v1"}
 	var keyValue = make(map[string][]byte)

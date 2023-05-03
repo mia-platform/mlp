@@ -1,4 +1,5 @@
-// Copyright 2020 Mia srl
+// Copyright Mia srl
+// SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,6 +16,7 @@
 package generate
 
 import (
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -64,7 +66,6 @@ func TestTLSSecretGenerate(t *testing.T) {
 }
 
 func TestDockerSecretGenerate(t *testing.T) {
-
 	s := secret{
 		Name: "foo",
 		When: "always",
@@ -173,5 +174,6 @@ func TestGenerate(t *testing.T) {
 
 	require.Nil(t, err, "No error when function return corrrectly")
 	require.NotNil(t, data, "Data must be not nil")
+	fmt.Println(data)
 	require.Equal(t, 5, len(data), "must contains 5 elements")
 }

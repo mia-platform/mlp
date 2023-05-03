@@ -1,5 +1,12 @@
-# Created by https://www.toptal.com/developers/gitignore/api/go,linux,macos,windows,visualstudiocode
-# Edit at https://www.toptal.com/developers/gitignore?templates=go,linux,macos,windows,visualstudiocode
+# Custom gitignore rules
+
+bin/
+coverage.txt
+
+# End of Custom gitignore rules
+
+# Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode,linux,windows,macos,go
+# Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode,linux,windows,macos,go
 
 ### Go ###
 # If you prefer the allow list template instead of the deny list, see community template:
@@ -23,10 +30,6 @@
 
 # Go workspace file
 go.work
-
-### Go Patch ###
-/vendor/
-/Godeps/
 
 ### Linux ###
 *~
@@ -72,6 +75,10 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
+### macOS Patch ###
+# iCloud generated files
+*.icloud
+
 ### VisualStudioCode ###
 .vscode/*
 !.vscode/settings.json
@@ -90,8 +97,6 @@ Temporary Items
 # Ignore all local history of files
 .history
 .ionide
-
-# Support for Project snippet scope
 
 ### Windows ###
 # Windows thumbnail cache files
@@ -119,8 +124,4 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
-# End of https://www.toptal.com/developers/gitignore/api/go,linux,macos,windows,visualstudiocode
-
-# Custom Rules
-bin/*
-# End of Custom Rules
+# End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,linux,windows,macos,go

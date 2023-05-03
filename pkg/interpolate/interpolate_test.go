@@ -1,4 +1,5 @@
-// Copyright 2020 Mia srl
+// Copyright Mia srl
+// SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,7 +16,6 @@
 package interpolate
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -207,17 +207,17 @@ func TestStringifiedObjectWithSingleApex(t *testing.T) {
 
 	out, err := Interpolate(in, prefixes, re)
 	require.Nil(t, err)
-	require.Equal(t, string(expout[:]), string(out[:]))
+	require.Equal(t, string(expout), string(out))
 }
 
 func TestJSONConfigmap(t *testing.T) {
 	os.Setenv("DEV_THIRD_ENV", `{"type":"a type","project_id":"something","private_key_id":"my-key","private_key":"-----BEGIN PRIVATE KEY-----\nfooo\nbar\n-----END PRIVATE KEY-----\n","client_email":"my@email.com","client_id":"client-id","auth_uri":"https://auth-uri.com","token_uri":"https://auth-uri.com","auth_provider_x509_cert_url":"https://api.com/certs","client_x509_cert_url":"https://api.com/certs/fooo%40bar"}`)
 	defer os.Unsetenv("DEV_THIRD_ENV")
 
-	in, err := ioutil.ReadFile("testdata/file.json")
+	in, err := os.ReadFile("testdata/file.json")
 	require.NoError(t, err)
 
-	expout, err := ioutil.ReadFile("testdata/outFile.json")
+	expout, err := os.ReadFile("testdata/outFile.json")
 	require.NoError(t, err)
 
 	out, err := Interpolate(in, prefixes, re)
@@ -229,14 +229,14 @@ func TestJSONWithEscapes(t *testing.T) {
 	os.Setenv("DEV_THIRD_ENV", `"{\"type\":\"a type\"}"`)
 	defer os.Unsetenv("DEV_THIRD_ENV")
 
-	in, err := ioutil.ReadFile("testdata/file.json")
+	in, err := os.ReadFile("testdata/file.json")
 	require.NoError(t, err)
 
 	expout := `"{\"type\":\"a type\"}"`
 
 	out, err := Interpolate(in, prefixes, re)
 	require.Nil(t, err)
-	require.Equal(t, string(expout), string(out))
+	require.Equal(t, expout, string(out))
 }
 
 func TestCertificateInString(t *testing.T) {
@@ -287,10 +287,10 @@ func TestConvertReplicas(t *testing.T) {
 	os.Setenv("MY_REPLICAS", `4`)
 	defer os.Unsetenv("MY_REPLICAS")
 
-	in, err := ioutil.ReadFile("testdata/deployment_tointerpolate.yaml")
+	in, err := os.ReadFile("testdata/deployment_tointerpolate.yaml")
 	require.NoError(t, err)
 
-	expout, err := ioutil.ReadFile("testdata/deployment_interpolated.yaml")
+	expout, err := os.ReadFile("testdata/deployment_interpolated.yaml")
 	require.NoError(t, err)
 
 	out, err := Interpolate(in, prefixes, re)

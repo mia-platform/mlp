@@ -1,4 +1,5 @@
-// Copyright 2020 Mia srl
+// Copyright Mia srl
+// SPDX-License-Identifier: Apache-2.0
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,8 +19,11 @@ package generate
 
 // cfgCmapsSecrets top level configuration file keys
 type generateConfiguration struct {
-	Secret    []secret    `json:"secrets,omitempty"`
-	ConfigMap []configMap `json:"config-maps,omitempty"`
+	Secrets []secret `json:"secrets,omitempty"`
+	// exclude tagliatelle for this one because config-maps is a public interface and cannot be changed without
+	// a breaking version
+	//nolint:tagliatelle
+	ConfigMaps []configMap `json:"config-maps,omitempty"`
 }
 
 // secret contains secrets configurations
