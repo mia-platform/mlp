@@ -23,7 +23,7 @@ import (
 	"github.com/mia-platform/mlp/pkg/resourceutil"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +35,7 @@ import (
 	fakeclientset "k8s.io/client-go/kubernetes/fake"
 )
 
-func TestEnsureNamespaceexistence(t *testing.T) {
+func TestEnsureNamespaceExistence(t *testing.T) {
 	t.Run("Ensure Namespace existence", func(t *testing.T) {
 		namespaceName := "foo"
 		scheme := runtime.NewScheme()
@@ -59,8 +59,10 @@ func TestEnsureNamespaceexistence(t *testing.T) {
 }
 
 func TestUpdateResourceSecret(t *testing.T) {
+	const namespace = "foo"
+
 	expected := corev1.Secret{
-		Data: map[string][]byte{"resources": []byte(`{"CronJob":{"gvk":{"Group":"batch","Version":"v1beta1","Kind":"CronJob"},"resources":["bar"]}}`)},
+		Data: map[string][]byte{"resources": []byte(`{"CronJob":{"gvk":{"Group":"batch","Version":"v1","Kind":"CronJob"},"resources":["bar"]}}`)},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      resourceSecretName,
 			Namespace: "foo",
@@ -70,7 +72,7 @@ func TestUpdateResourceSecret(t *testing.T) {
 
 	resources := map[string]*ResourceList{
 		"CronJob": {
-			Gvk:       &schema.GroupVersionKind{Group: "batch", Version: "v1beta1", Kind: "CronJob"},
+			Gvk:       &schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "CronJob"},
 			Resources: []string{"bar"},
 		},
 	}
@@ -91,7 +93,7 @@ func TestUpdateResourceSecret(t *testing.T) {
 	})
 	t.Run("Update resource-deployed", func(t *testing.T) {
 		existingSecret := &corev1.Secret{
-			Data: map[string][]byte{"resources": []byte(`{"CronJob":{"kind":{"Group":"batch","Version":"v1beta1","Kind":"CronJob"},"resources":["foo", "sss"]}}`)},
+			Data: map[string][]byte{"resources": []byte(`{"CronJob":{"kind":{"Group":"batch","Version":"v1","Kind":"CronJob"},"resources":["foo", "sss"]}}`)},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      resourceSecretName,
 				Namespace: "foo",
@@ -105,6 +107,28 @@ func TestUpdateResourceSecret(t *testing.T) {
 		var actual corev1.Secret
 		expUnstr, err := dynamicClient.Resource(gvrSecrets).
 			Namespace("foo").
+			Get(context.Background(), resourceSecretName, metav1.GetOptions{})
+		require.Nil(t, err)
+		runtime.DefaultUnstructuredConverter.FromUnstructured(expUnstr.Object, &actual)
+		require.Equal(t, string(expected.Data["resources"]), string(actual.Data["resources"]))
+	})
+
+	t.Run("Update resource-deployed when empty namespace on cluster", func(t *testing.T) {
+		existingSecret := &corev1.Secret{
+			Data: map[string][]byte{"resources": []byte(`{}`)},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      resourceSecretName,
+				Namespace: namespace,
+			},
+			TypeMeta: metav1.TypeMeta{Kind: "Secret", APIVersion: "v1"},
+		}
+		dynamicClient := dynamicFake.NewSimpleDynamicClient(scheme, existingSecret)
+
+		err := updateResourceSecret(dynamicClient, namespace, resources)
+		require.Nil(t, err)
+		var actual corev1.Secret
+		expUnstr, err := dynamicClient.Resource(gvrSecrets).
+			Namespace(namespace).
 			Get(context.Background(), resourceSecretName, metav1.GetOptions{})
 		require.Nil(t, err)
 		runtime.DefaultUnstructuredConverter.FromUnstructured(expUnstr.Object, &actual)
@@ -135,7 +159,7 @@ func TestPrune(t *testing.T) {
 			},
 		},
 		{
-			GroupVersion: "batch/v1beta1",
+			GroupVersion: "batch/v1",
 			APIResources: []metav1.APIResource{
 				{
 					Kind: "CronJob",
@@ -287,7 +311,7 @@ func TestInsertDependencies(t *testing.T) {
 	t.Run("Test CronJob", func(t *testing.T) {
 		cronJobRes, err := resourceutil.NewResources("testdata/cronjob-test.cronjob.yml", "default")
 		require.Nil(t, err)
-		var cronJob batchv1beta1.CronJob
+		var cronJob batchv1.CronJob
 		err = runtime.DefaultUnstructuredConverter.
 			FromUnstructured(cronJobRes[0].Object.Object, &cronJob)
 		require.Nil(t, err)
@@ -306,5 +330,53 @@ func TestInsertDependencies(t *testing.T) {
 		require.Nil(t, err)
 		require.True(t, found)
 		require.Equal(t, expected, currentAnnotations[resourceutil.GetMiaAnnotation(dependenciesChecksum)])
+	})
+}
+
+func TestCleanup(t *testing.T) {
+	const namespace = "foo"
+	expected := corev1.Secret{
+		Data: map[string][]byte{"resources": []byte(`{"Deployment":{"gvk":{"Group":"apps","Version":"v1","Kind":"Deployment"},"resources":["test-deployment"]}}`)},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      resourceSecretName,
+			Namespace: "foo",
+		},
+		TypeMeta: metav1.TypeMeta{Kind: "Secret", APIVersion: "v1"},
+	}
+
+	deployObject := unstructured.Unstructured{}
+	deployObject.SetName("test-deployment")
+
+	resources := []resourceutil.Resource{
+		{
+			Filepath:         "./testdata/test-deployment.yaml",
+			GroupVersionKind: &schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
+			Object:           deployObject,
+		},
+	}
+	scheme := runtime.NewScheme()
+	_ = corev1.AddToScheme(scheme)
+
+	t.Run("Update resource-deployed when empty namespace on cluster", func(t *testing.T) {
+		existingSecret := &corev1.Secret{
+			Data: map[string][]byte{"resources": []byte(`{}`)},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      resourceSecretName,
+				Namespace: namespace,
+			},
+			TypeMeta: metav1.TypeMeta{Kind: "Secret", APIVersion: "v1"},
+		}
+		dynamicClient := dynamicFake.NewSimpleDynamicClient(scheme, existingSecret)
+		client := &k8sClients{dynamic: dynamicClient}
+
+		err := cleanup(client, namespace, resources)
+		require.Nil(t, err)
+		var actual corev1.Secret
+		expUnstr, err := dynamicClient.Resource(gvrSecrets).
+			Namespace(namespace).
+			Get(context.Background(), resourceSecretName, metav1.GetOptions{})
+		require.Nil(t, err)
+		runtime.DefaultUnstructuredConverter.FromUnstructured(expUnstr.Object, &actual)
+		require.Equal(t, string(expected.Data["resources"]), string(actual.Data["resources"]))
 	})
 }

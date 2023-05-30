@@ -131,7 +131,7 @@ var _ = Describe("deploy on mock kubernetes", func() {
 			By("No annotation last applied for configmap and secrets")
 			Expect(sec.GetLabels()[corev1.LastAppliedConfigAnnotation]).To(Equal(""))
 		})
-		It("creates and updates depoyment", func() {
+		It("creates and updates deployment", func() {
 			err := doRun(clients, "test3", []string{"testdata/integration/apply-resources/test-deployment-1.yaml"}, deployConfig, currentTime)
 			Expect(err).NotTo(HaveOccurred())
 			err = doRun(clients, "test3", []string{"testdata/integration/apply-resources/test-deployment-2.yaml"}, deployConfig, currentTime)
@@ -164,6 +164,21 @@ var _ = Describe("deploy on mock kubernetes", func() {
 				List(context.Background(), metav1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(jobList.Items[0].GetLabels()["job-name"]).To(ContainSubstring("test-cronjob"))
+		})
+		It("update secrets also if empty namespace released before", func() {
+			namespace := "test-empty-resource"
+			err := doRun(clients, namespace, []string{}, deployConfig, currentTime)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = doRun(clients, namespace, []string{"testdata/integration/apply-resources/test-deployment-1.yaml"}, deployConfig, currentTime)
+			Expect(err).NotTo(HaveOccurred())
+
+			dep, err := clients.dynamic.Resource(gvrDeployments).
+				Namespace(namespace).
+				Get(context.Background(), "test-deployment", metav1.GetOptions{})
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(dep.GetAnnotations()[corev1.LastAppliedConfigAnnotation]).NotTo(Equal(""))
 		})
 	})
 	Context("smart deploy", func() {

@@ -82,6 +82,26 @@ script:
 
 Note that `mlp` suppose that the output directory already exists so it needs to be created before using the command.
 
+## Testin
+
+To run the tests use the command:
+
+```sh
+make test
+```
+
+There are also some integration test, which you can run with
+
+```sh
+make test-integration
+```
+
+Before sending a PR be sure that all the linter pass with success:
+
+```sh
+make lint
+```
+
 ## Contributing
 
 Participation to the project is governed by the [Code of Conduct](./CODE_OF_CONDUCT.md) and you can read

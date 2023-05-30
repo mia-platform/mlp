@@ -96,7 +96,7 @@ func TestGetOldResourceMap(t *testing.T) {
 		error       func(t *testing.T, err error)
 	}{
 		{
-			description: "resources field is unmarshaled correctly",
+			description: "resources field unmarshal is correct",
 			input: &corev1.Secret{
 				Data: map[string][]byte{"resources": []byte(`{"Secret":{"resources":["foo", "bar"]}, "ConfigMap": {"resources":[]}}`)},
 				ObjectMeta: metav1.ObjectMeta{
@@ -135,10 +135,9 @@ func TestGetOldResourceMap(t *testing.T) {
 				},
 				TypeMeta: metav1.TypeMeta{Kind: "Secret", APIVersion: "v1"},
 			},
-			expected: nil,
+			expected: map[string]*ResourceList{},
 			error: func(t *testing.T, err error) {
-				require.NotNil(t, err)
-				require.EqualError(t, err, "resource field is empty")
+				require.Nil(t, err)
 			},
 		},
 		{

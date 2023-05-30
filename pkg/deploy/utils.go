@@ -18,7 +18,6 @@ package deploy
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"strings"
 
 	"github.com/mia-platform/mlp/pkg/resourceutil"
@@ -125,10 +124,6 @@ func getOldResourceMap(clients *k8sClients, namespace string) (map[string]*Resou
 	}
 	if err != nil {
 		return nil, err
-	}
-
-	if len(res) == 0 {
-		return nil, errors.New("resource field is empty")
 	}
 
 	return res, nil
