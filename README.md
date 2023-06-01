@@ -82,7 +82,7 @@ script:
 
 Note that `mlp` suppose that the output directory already exists so it needs to be created before using the command.
 
-## Testin
+## Testing
 
 To run the tests use the command:
 
