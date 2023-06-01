@@ -181,7 +181,7 @@ func cleanup(clients *k8sClients, namespace string, resources []resourceutil.Res
 		return err
 	}
 
-	// Prune only if it is not the first release
+	// Prune only if it is not the first release or after an empty release
 	if len(old) != 0 {
 		deleteMap := deletedResources(actual, old)
 
