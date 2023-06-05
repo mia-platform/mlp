@@ -62,7 +62,7 @@ func TestUpdateResourceSecret(t *testing.T) {
 	const namespace = "foo"
 
 	expected := corev1.Secret{
-		Data: map[string][]byte{"resources": []byte(`{"CronJob":{"gvk":{"Group":"batch","Version":"v1","Kind":"CronJob"},"resources":["bar"]}}`)},
+		Data: map[string][]byte{"resources": []byte(`{"CronJob":{"kind":{"Group":"batch","Version":"v1","Kind":"CronJob"},"resources":["bar"]}}`)},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      resourceSecretName,
 			Namespace: "foo",
@@ -336,7 +336,7 @@ func TestInsertDependencies(t *testing.T) {
 func TestCleanup(t *testing.T) {
 	const namespace = "foo"
 	expected := corev1.Secret{
-		Data: map[string][]byte{"resources": []byte(`{"Deployment":{"gvk":{"Group":"apps","Version":"v1","Kind":"Deployment"},"resources":["test-deployment"]}}`)},
+		Data: map[string][]byte{"resources": []byte(`{"Deployment":{"kind":{"Group":"apps","Version":"v1","Kind":"Deployment"},"resources":["test-deployment"]}}`)},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      resourceSecretName,
 			Namespace: "foo",

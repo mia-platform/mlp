@@ -68,7 +68,8 @@ func Run(prefixes []string, inputPaths []string, outputPath string) {
 		interpolatedFile, err := Interpolate(f, prefixes, "\\{\\{([A-Z0-9_]+)\\}\\}")
 		utils.CheckError(err, "Error interpolating file")
 
-		fileName, _ := filepath.Abs(filepath.Join(outputPath, filepath.Base(fp)))
+		fileName, err := filepath.Abs(filepath.Join(outputPath, filepath.Base(fp)))
+		utils.CheckError(err, "filepath error")
 		err = utils.WriteFile(fileName, interpolatedFile)
 		utils.CheckError(err, "Error writing file")
 	}
