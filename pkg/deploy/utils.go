@@ -44,7 +44,7 @@ var (
 // ResourceList is the base block used to build the secret containing
 // the resources deployed in the cluster.
 type ResourceList struct {
-	Gvk       *schema.GroupVersionKind `json:"kind"`
+	Gvk       *schema.GroupVersionKind `json:"kind"` //nolint:tagliatelle
 	Resources []string                 `json:"resources"`
 }
 
