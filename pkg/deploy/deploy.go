@@ -236,6 +236,10 @@ func updateResourceSecret(dynamic dynamic.Interface, namespace string, resources
 
 func prune(clients *k8sClients, namespace string, resourceGroup *ResourceList) error {
 	for _, res := range resourceGroup.Resources {
+		if resourceGroup.Gvk == nil {
+			fmt.Printf("Debug nil Gvk %+v", res)
+			return fmt.Errorf("invalid resource without Gvk: %v", res)
+		}
 		fmt.Printf("Deleting: %v %v\n", resourceGroup.Gvk.Kind, res)
 
 		gvr, err := resourceutil.FromGVKtoGVR(clients.discovery, *resourceGroup.Gvk)
