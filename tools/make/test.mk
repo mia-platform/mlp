@@ -27,7 +27,7 @@ ENVTEST_K8S_VERSION?= $(shell cat $(TOOLS_DIR)/ENVTEST_K8S_VERSION)
 .PHONY: test/unit
 test/unit:
 	$(info Running tests...)
-	go test $(GO_TEST_DEBUG_FLAG) -race ./...
+	go test $(GO_TEST_DEBUG_FLAG) -race ./... -cover
 
 .PHONY: test/integration
 test/integration:

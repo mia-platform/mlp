@@ -89,6 +89,11 @@ func TestMakeResourceMap(t *testing.T) {
 }
 
 func TestGetOldResourceMap(t *testing.T) {
+	secretGvk := &schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Secret"}
+	configMapGvk := &schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ConfigMap"}
+	deploymentGvk := &schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}
+	certGvk := &schema.GroupVersionKind{Group: "cert-manager.io", Version: "v1", Kind: "Certificate"}
+
 	testcases := []struct {
 		description string
 		input       *corev1.Secret
@@ -98,14 +103,24 @@ func TestGetOldResourceMap(t *testing.T) {
 		{
 			description: "resources field unmarshal is correct",
 			input: &corev1.Secret{
-				Data: map[string][]byte{"resources": []byte(`{"Secret":{"resources":["foo", "bar"]}, "ConfigMap": {"resources":[]}}`)},
+				Data: map[string][]byte{"resources": []byte(`{
+					"Secret":{"kind":{"Group": "", "Version": "v1", "Kind": "Secret"}, "resources":["foo", "bar"]},
+					"ConfigMap": {"kind":{"Group": "", "Version": "v1", "Kind": "ConfigMap"}, "resources":[]},
+					"Deployment":{"kind":{"Group":"apps","Version":"v1","Kind":"Deployment"}, "resources":["foo"]},
+					"Certificate":{"kind":{"Group":"cert-manager.io","Version":"v1","Kind":"Certificate"},"resources":["my-cert"]}
+				}`)},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceSecretName,
 					Namespace: "foo",
 				},
 				TypeMeta: metav1.TypeMeta{Kind: "Secret", APIVersion: "v1"},
 			},
-			expected: map[string]*ResourceList{"Secret": {Resources: []string{"foo", "bar"}}, "ConfigMap": {Resources: []string{}}},
+			expected: map[string]*ResourceList{
+				"Secret":      {Gvk: secretGvk, Resources: []string{"foo", "bar"}},
+				"ConfigMap":   {Gvk: configMapGvk, Resources: []string{}},
+				"Deployment":  {Gvk: deploymentGvk, Resources: []string{"foo"}},
+				"Certificate": {Gvk: certGvk, Resources: []string{"my-cert"}},
+			},
 			error: func(t *testing.T, err error) {
 				require.Nil(t, err)
 			},

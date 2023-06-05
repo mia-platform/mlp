@@ -16,7 +16,6 @@
 package generate
 
 import (
-	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -174,6 +173,5 @@ func TestGenerate(t *testing.T) {
 
 	require.Nil(t, err, "No error when function return corrrectly")
 	require.NotNil(t, data, "Data must be not nil")
-	fmt.Println(data)
 	require.Equal(t, 5, len(data), "must contains 5 elements")
 }
