@@ -18,7 +18,7 @@ package deploy
 import (
 	"context"
 	"encoding/json"
-	"strings"
+	"fmt"
 
 	"github.com/mia-platform/mlp/pkg/resourceutil"
 	batchv1 "k8s.io/api/batch/v1"
@@ -117,15 +117,14 @@ func getOldResourceMap(clients *k8sClients, namespace string) (map[string]*Resou
 	res := make(map[string]*ResourceList)
 
 	resources := secret.Data[resourceField]
-	if strings.Contains(string(resources), "\"Mapping\":{") {
-		res, err = convertSecretFormat(resources)
-	} else {
-		err = json.Unmarshal(resources, &res)
-	}
-	if err != nil {
-		return nil, err
-	}
 
+	if err := json.Unmarshal(resources, &res); err != nil {
+		var convertError error
+		res, convertError = convertSecretFormat(resources)
+		if convertError != nil {
+			return nil, fmt.Errorf("error unmarshalling resource map in secret %s: %s in namespace %s. Try to convert format from v0, but fails", resourceSecretName, err, namespace)
+		}
+	}
 	return res, nil
 }
 

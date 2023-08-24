@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- correctly manage resources with kind Mapping
+
+## [1.2.2] - 2023-06-05
+
+### Fixed
+
+- gvk field tag to kind in resource-deployment secret
+
 ## [1.2.1] - 2023-06-01
 
 ### Fixed
@@ -133,6 +143,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial Release 🎉🎉🎉
 
 [Unreleased]: https://github.com/mia-platform/mlp/compare/v1.2.1...HEAD
+[1.2.2]: https://github.com/mia-platform/mlp/compare/v1.2.0...v1.2.1
 [1.2.1]: https://github.com/mia-platform/mlp/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/mia-platform/mlp/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/mia-platform/mlp/compare/v1.0.3...v1.1.0
