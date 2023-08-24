@@ -93,6 +93,7 @@ func TestGetOldResourceMap(t *testing.T) {
 	configMapGvk := &schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ConfigMap"}
 	deploymentGvk := &schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}
 	certGvk := &schema.GroupVersionKind{Group: "cert-manager.io", Version: "v1", Kind: "Certificate"}
+	mappingGvk := &schema.GroupVersionKind{Group: "getambassador.io", Version: "v2", Kind: "Mapping"}
 
 	testcases := []struct {
 		description string
@@ -120,6 +121,23 @@ func TestGetOldResourceMap(t *testing.T) {
 				"ConfigMap":   {Gvk: configMapGvk, Resources: []string{}},
 				"Deployment":  {Gvk: deploymentGvk, Resources: []string{"foo"}},
 				"Certificate": {Gvk: certGvk, Resources: []string{"my-cert"}},
+			},
+			error: func(t *testing.T, err error) {
+				require.Nil(t, err)
+			},
+		},
+		{
+			description: "with a Mapping kind",
+			input: &corev1.Secret{
+				Data: map[string][]byte{"resources": []byte(`{"Mapping":{"kind":{"Group":"getambassador.io","Version":"v2","Kind":"Mapping"},"resources":["a-resource","another-resource"]}}`)},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      resourceSecretName,
+					Namespace: "foo",
+				},
+				TypeMeta: metav1.TypeMeta{Kind: "Secret", APIVersion: "v1"},
+			},
+			expected: map[string]*ResourceList{
+				"Mapping": {Gvk: mappingGvk, Resources: []string{"a-resource", "another-resource"}},
 			},
 			error: func(t *testing.T, err error) {
 				require.Nil(t, err)
@@ -194,8 +212,8 @@ func TestGetOldResourceMap(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			dynamicClient := fake.NewSimpleDynamicClient(scheme, tt.input)
 			actual, err := getOldResourceMap(&k8sClients{dynamic: dynamicClient}, "foo")
-			require.Equal(t, tt.expected, actual)
 			tt.error(t, err)
+			require.Equal(t, tt.expected, actual)
 		})
 	}
 }
