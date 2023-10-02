@@ -123,6 +123,7 @@ func TestGetOldResourceMap(t *testing.T) {
 				"Certificate": {Gvk: certGvk, Resources: []string{"my-cert"}},
 			},
 			error: func(t *testing.T, err error) {
+				t.Helper()
 				require.Nil(t, err)
 			},
 		},
@@ -140,6 +141,7 @@ func TestGetOldResourceMap(t *testing.T) {
 				"Mapping": {Gvk: mappingGvk, Resources: []string{"a-resource", "another-resource"}},
 			},
 			error: func(t *testing.T, err error) {
+				t.Helper()
 				require.Nil(t, err)
 			},
 		},
@@ -155,6 +157,7 @@ func TestGetOldResourceMap(t *testing.T) {
 			},
 			expected: map[string]*ResourceList{"Deployment": {Resources: []string{"test-deployment", "test-deployment-2"}, Gvk: &schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}}},
 			error: func(t *testing.T, err error) {
+				t.Helper()
 				require.Nil(t, err)
 			},
 		},
@@ -170,6 +173,7 @@ func TestGetOldResourceMap(t *testing.T) {
 			},
 			expected: map[string]*ResourceList{},
 			error: func(t *testing.T, err error) {
+				t.Helper()
 				require.Nil(t, err)
 			},
 		},
@@ -185,6 +189,7 @@ func TestGetOldResourceMap(t *testing.T) {
 			},
 			expected: nil,
 			error: func(t *testing.T, err error) {
+				t.Helper()
 				require.NotNil(t, err)
 			},
 		},
@@ -200,6 +205,7 @@ func TestGetOldResourceMap(t *testing.T) {
 			},
 			expected: map[string]*ResourceList{},
 			error: func(t *testing.T, err error) {
+				t.Helper()
 				require.Nil(t, err)
 			},
 		},

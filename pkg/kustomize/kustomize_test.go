@@ -100,6 +100,7 @@ func TestFindFiles(t *testing.T) {
 }
 
 func setup(t *testing.T, fsys filesys.FileSystem) filesys.ConfirmedDir {
+	t.Helper()
 	dir, err := filesys.NewTmpConfirmedDir()
 	require.Nil(t, err)
 	fsys.Mkdir(dir.Join(overlay))
@@ -124,6 +125,7 @@ func TestExecAdd(t *testing.T) {
 				Resource: {"resource1.service.yaml"},
 			},
 			check: func(t *testing.T, dir filesys.ConfirmedDir) {
+				t.Helper()
 				kustomization, err := fsys.ReadFile(dir.Join(overlay + "kustomization.yaml"))
 				require.Nil(t, err)
 				require.YAMLEq(t, "apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\npatches:\n- path: deployment1.PATCH.yml\nresources:\n- resource1.service.yaml", string(kustomization))
@@ -137,6 +139,7 @@ func TestExecAdd(t *testing.T) {
 				Resource: {"resource1.service.yaml"},
 			},
 			check: func(t *testing.T, dir filesys.ConfirmedDir) {
+				t.Helper()
 				kustomization, err := fsys.ReadFile(dir.Join(overlay + "kustomization.yaml"))
 				require.Nil(t, err)
 				require.YAMLEq(t, "apiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\npatches:\n- path: deployment1.PATCH.yml\nresources:\n- resource1.service.yaml", string(kustomization))

@@ -695,6 +695,7 @@ func TestWithDeletableResource(t *testing.T) {
 	resName := "res-name"
 	requireResourceExists := func(shouldExist bool) func(t *testing.T, clients *k8sClients, res resourceutil.Resource) {
 		return func(t *testing.T, clients *k8sClients, res resourceutil.Resource) {
+			t.Helper()
 			gvr, err := resourceutil.FromGVKtoGVR(clients.discovery, *res.GroupVersionKind)
 			require.Nil(t, err)
 			_, err = clients.dynamic.Resource(gvr).
@@ -720,6 +721,7 @@ func TestWithDeletableResource(t *testing.T) {
 				deleteBeforeApplyAnnotation: "true",
 			},
 			setup: func(t *testing.T, clients *k8sClients, res resourceutil.Resource) {
+				t.Helper()
 				gvr, err := resourceutil.FromGVKtoGVR(clients.discovery, *res.GroupVersionKind)
 				require.Nil(t, err)
 				_, err = clients.dynamic.Resource(gvr).
@@ -731,6 +733,7 @@ func TestWithDeletableResource(t *testing.T) {
 			desc:        "Ignores non annotated resources",
 			annotations: map[string]interface{}{},
 			setup: func(t *testing.T, clients *k8sClients, res resourceutil.Resource) {
+				t.Helper()
 				gvr, err := resourceutil.FromGVKtoGVR(clients.discovery, *res.GroupVersionKind)
 				require.Nil(t, err)
 				_, err = clients.dynamic.Resource(gvr).
@@ -743,7 +746,7 @@ func TestWithDeletableResource(t *testing.T) {
 			annotations: map[string]interface{}{
 				deleteBeforeApplyAnnotation: "true",
 			},
-			setup:     func(t *testing.T, clients *k8sClients, res resourceutil.Resource) {},
+			setup:     func(t *testing.T, clients *k8sClients, res resourceutil.Resource) { t.Helper() },
 			requireFn: requireResourceExists(false),
 		},
 	}

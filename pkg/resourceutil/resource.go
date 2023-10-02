@@ -71,7 +71,7 @@ func FromGVKtoGVR(discoveryClient discovery.DiscoveryInterface, gvk schema.Group
 // NewResources creates new Resources from a file at `filepath`
 // support multiple documents inside a single file
 func NewResources(filepath, namespace string) ([]Resource, error) {
-	var resources []Resource
+	resources := make([]Resource, 0)
 	var stream []byte
 	var err error
 

@@ -170,7 +170,8 @@ func assertAwaitSupportedForThisResource(res resourceutil.Resource) error {
 // the initial watch time as arguments. It returns (true, nil) when the given
 // resource has completed in the given event. If the event is nil returns (false, nil)
 // when the resource supports events watching otherwise returns (false, error).
-// nolint gocyclo
+//
+//gocyclo:ignore
 func handleResourceCompletionEvent(res resourceutil.Resource, event *watch.Event, startTime time.Time) (bool, error) {
 	switch res.GroupVersionKind.Kind {
 	case "Job":
@@ -239,7 +240,7 @@ func handleResourceCompletionEvent(res resourceutil.Resource, event *watch.Event
 	}
 }
 
-// nolint gocyclo
+//gocyclo:ignore
 func applyResource(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
 	gvr, err := resourceutil.FromGVKtoGVR(clients.discovery, res.Object.GroupVersionKind())
 	if err != nil {

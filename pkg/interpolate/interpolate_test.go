@@ -26,8 +26,7 @@ var re = "{{([A-Z0-9_]+)}}"
 var prefixes = []string{"DEV_"}
 
 func TestEmptyVariable(t *testing.T) {
-	os.Setenv("FIRST_ENV", "test")
-	defer os.Unsetenv("FIRST_ENV")
+	t.Setenv("FIRST_ENV", "test")
 
 	in := []byte(`
   "first": "{{FIRST_ENV}}",
@@ -44,8 +43,7 @@ func TestEmptyVariable(t *testing.T) {
 }
 
 func TestDollar(t *testing.T) {
-	os.Setenv("FIRST_ENV", "$contains$dollars$")
-	defer os.Unsetenv("FIRST_ENV")
+	t.Setenv("FIRST_ENV", "$contains$dollars$")
 
 	in := []byte(`
   "first": "field",
@@ -64,13 +62,12 @@ func TestDollar(t *testing.T) {
 }
 
 func TestNewLines(t *testing.T) {
-	os.Setenv("DEV_SECOND_ENV", `{
+	t.Setenv("DEV_SECOND_ENV", `{
     "first": "field",
     "second": "field",
     "third": "field",
     "fourth": "field"
   }`)
-	defer os.Unsetenv("DEV_SECOND_ENV")
 
 	in := []byte(`
   "first": "field",
@@ -87,16 +84,11 @@ func TestNewLines(t *testing.T) {
 }
 
 func TestEscapeQuote(t *testing.T) {
-	os.Setenv("DEV_SECOND_ENV", `{ "foo": "bar" }`)
-	defer os.Unsetenv("DEV_SECOND_ENV")
-	os.Setenv("DEV_STRING_ESCAPED_ENV", `abd\def`)
-	defer os.Unsetenv("DEV_STRING_ESCAPED_ENV")
-	os.Setenv("JSON_ESCAPED_ENV", `{ \"foo\": \"bar\" }`)
-	defer os.Unsetenv("JSON_ESCAPED_ENV")
-	os.Setenv("NAMESPACE", `my-namespace`)
-	defer os.Unsetenv("NAMESPACE")
-	os.Setenv("DEV_THIRD_ENV", `{ "foo": "bar\ntaz" }`)
-	defer os.Unsetenv("DEV_THIRD_ENV")
+	t.Setenv("DEV_SECOND_ENV", `{ "foo": "bar" }`)
+	t.Setenv("DEV_STRING_ESCAPED_ENV", `abd\def`)
+	t.Setenv("JSON_ESCAPED_ENV", `{ \"foo\": \"bar\" }`)
+	t.Setenv("NAMESPACE", `my-namespace`)
+	t.Setenv("DEV_THIRD_ENV", `{ "foo": "bar\ntaz" }`)
 
 	in := []byte(`
 	"noEscape_singleQuote": '{{SECOND_ENV}}',
@@ -129,11 +121,8 @@ func TestEscapeQuote(t *testing.T) {
 }
 
 func TestSpecialChars(t *testing.T) {
-	os.Setenv("DEV_FIRST_ENV", `env\\first\line`)
-	os.Setenv("DEV_SECOND_ENV", "env\\\\first\\line\nenv\tsecondline\nenvthirdline\n")
-
-	defer os.Unsetenv("DEV_SECOND_ENV")
-	defer os.Unsetenv("DEV_FIRST_ENV")
+	t.Setenv("DEV_FIRST_ENV", `env\\first\line`)
+	t.Setenv("DEV_SECOND_ENV", "env\\\\first\\line\nenv\tsecondline\nenvthirdline\n")
 
 	in := []byte(`
   "first": "field",
@@ -181,8 +170,7 @@ func TestVarWithSpaces(t *testing.T) {
 }
 
 func TestNonExistingVar(t *testing.T) {
-	os.Setenv("DEV_FIRST_ENV", "first")
-	defer os.Unsetenv("DEV_FIRST_ENV")
+	t.Setenv("DEV_FIRST_ENV", "first")
 
 	envs := make(map[string]envVar)
 	envs["FIRST_ENV"] = envVar{name: "{{FIRST_ENV}}"}
@@ -193,8 +181,7 @@ func TestNonExistingVar(t *testing.T) {
 }
 
 func TestStringifiedObjectWithSingleApex(t *testing.T) {
-	os.Setenv("DEV_SECOND_ENV", `{"piatti-json":"platform-development.development.piatti-json"}`)
-	defer os.Unsetenv("DEV_SECOND_ENV")
+	t.Setenv("DEV_SECOND_ENV", `{"piatti-json":"platform-development.development.piatti-json"}`)
 
 	in := []byte(`
   "first": 'field',
@@ -211,8 +198,7 @@ func TestStringifiedObjectWithSingleApex(t *testing.T) {
 }
 
 func TestJSONConfigmap(t *testing.T) {
-	os.Setenv("DEV_THIRD_ENV", `{"type":"a type","project_id":"something","private_key_id":"my-key","private_key":"-----BEGIN PRIVATE KEY-----\nfooo\nbar\n-----END PRIVATE KEY-----\n","client_email":"my@email.com","client_id":"client-id","auth_uri":"https://auth-uri.com","token_uri":"https://auth-uri.com","auth_provider_x509_cert_url":"https://api.com/certs","client_x509_cert_url":"https://api.com/certs/fooo%40bar"}`)
-	defer os.Unsetenv("DEV_THIRD_ENV")
+	t.Setenv("DEV_THIRD_ENV", `{"type":"a type","project_id":"something","private_key_id":"my-key","private_key":"-----BEGIN PRIVATE KEY-----\nfooo\nbar\n-----END PRIVATE KEY-----\n","client_email":"my@email.com","client_id":"client-id","auth_uri":"https://auth-uri.com","token_uri":"https://auth-uri.com","auth_provider_x509_cert_url":"https://api.com/certs","client_x509_cert_url":"https://api.com/certs/fooo%40bar"}`)
 
 	in, err := os.ReadFile("testdata/file.json")
 	require.NoError(t, err)
@@ -226,8 +212,7 @@ func TestJSONConfigmap(t *testing.T) {
 }
 
 func TestJSONWithEscapes(t *testing.T) {
-	os.Setenv("DEV_THIRD_ENV", `"{\"type\":\"a type\"}"`)
-	defer os.Unsetenv("DEV_THIRD_ENV")
+	t.Setenv("DEV_THIRD_ENV", `"{\"type\":\"a type\"}"`)
 
 	in, err := os.ReadFile("testdata/file.json")
 	require.NoError(t, err)
@@ -240,12 +225,11 @@ func TestJSONWithEscapes(t *testing.T) {
 }
 
 func TestCertificateInString(t *testing.T) {
-	os.Setenv("DEV_SECOND_ENV", `-----BEGIN RSA PRIVATE KEY-----
+	t.Setenv("DEV_SECOND_ENV", `-----BEGIN RSA PRIVATE KEY-----
 XXXXXXXXXXXXXXXXXXXXXXXXX
 YYYYYYYYYYYYYYYYYYYYYYYYYY
 ZZZZZZZZZZZZZZZZZZZZZZZZZZ
 -----END RSA PRIVATE KEY-----`)
-	defer os.Unsetenv("DEV_SECOND_ENV")
 
 	in := []byte(`
   "doubleQuote": "{{SECOND_ENV}}"
@@ -260,12 +244,11 @@ ZZZZZZZZZZZZZZZZZZZZZZZZZZ
 }
 
 func TestCertificateInFile(t *testing.T) {
-	os.Setenv("SECOND_ENV", `-----BEGIN RSA PRIVATE KEY-----
+	t.Setenv("SECOND_ENV", `-----BEGIN RSA PRIVATE KEY-----
 XXXXXXXXXXXXXXXXXXXXXXXXX
 YYYYYYYYYYYYYYYYYYYYYYYYYY
 ZZZZZZZZZZZZZZZZZZZZZZZZZZ
 -----END RSA PRIVATE KEY-----`)
-	defer os.Unsetenv("SECOND_ENV")
 
 	in := []byte(`
 {{SECOND_ENV}}
@@ -284,8 +267,7 @@ ZZZZZZZZZZZZZZZZZZZZZZZZZZ
 }
 
 func TestConvertReplicas(t *testing.T) {
-	os.Setenv("MY_REPLICAS", `4`)
-	defer os.Unsetenv("MY_REPLICAS")
+	t.Setenv("MY_REPLICAS", `4`)
 
 	in, err := os.ReadFile("testdata/deployment_tointerpolate.yaml")
 	require.NoError(t, err)
