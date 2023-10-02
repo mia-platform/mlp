@@ -79,6 +79,7 @@ func withDeletableResource(apply applyFunction) applyFunction {
 			fmt.Printf("Deleting resource %s before apply\n", res.Object.GetName())
 
 			err = clients.dynamic.Resource(gvr).
+				Namespace(res.Object.GetNamespace()).
 				Delete(context.TODO(), res.Object.GetName(), metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
