@@ -20,8 +20,8 @@ package deploy_test
 import (
 	"testing"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo" //revive:disable-line:dot-imports
+	. "github.com/onsi/gomega" //revive:disable-line:dot-imports
 )
 
 func TestDeploy(t *testing.T) {
