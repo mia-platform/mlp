@@ -49,8 +49,8 @@ func Run(inputPaths []string, deployConfig utils.DeployConfig, opts *utils.Optio
 
 	// The following two options manage client-side throttling to decrease pressure on api-server
 	// Kubectl sets 300 bursts 50.0 QPS:
-	// https://github.com/kubernetes/kubectl/blob/0862c57c87184432986c85674a237737dabc53fa/pkg/cmd/cmd.go#L92
-	restConfig.QPS = 500.0
+	// https: //github.com/kubernetes/kubectl/blob/master/pkg/cmd/cmd.go#L96
+	restConfig.QPS = 100.0
 	restConfig.Burst = 500
 
 	clients := &k8sClients{
