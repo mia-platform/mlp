@@ -33,10 +33,10 @@ lint-deps:
 lint: golangci-lint
 golangci-lint: $(GOLANGCI_PATH)
 	$(info Running golangci-lint with .golangci.yaml config file...)
-	$(GOLANGCI_PATH) run --out-format=$(GOLANGCI_LINT_MODE) --config=.golangci.yaml --build-tags=conformance,integration
+	$(GOLANGCI_PATH) run --out-format=$(GOLANGCI_LINT_MODE) --config=.golangci.yaml
 
 lint-deps: $(GOLANGCI_PATH)
-$(GOLANGCI_PATH): $(TOOLS_DIR)/GOLANGCI_LINT_VERSION
+$(TOOLS_BIN)/golangci-lint: $(TOOLS_DIR)/GOLANGCI_LINT_VERSION
 	$(eval GOLANGCI_LINT_VERSION:= $(shell cat $<))
 	mkdir -p $(TOOLS_BIN)
 	$(info Installing golangci-lint $(GOLANGCI_LINT_VERSION) bin in $(TOOLS_BIN))
@@ -47,7 +47,7 @@ lint: gomod-lint
 gomod-lint:
 	$(info Running go mod tidy)
 # Always keep this version to latest -1 version of Go
-	go mod tidy -compat=1.18
+	go mod tidy -compat=1.20
 
 .PHONY: ci-lint
 ci-lint: lint

@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
@@ -33,14 +33,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - default order for `SecretProviderClass` resource kind
 - new annotation `mia-platform.eu/apply-before-kinds` to override default resources application order
-- support for jobs annotation `mia-platform.eu/await-completion` for waiting job completion after it has been applied on the cluster
+- support for jobs annotation `mia-platform.eu/await-completion` for waiting job completion after it has been applied
+	on the cluster
 - support for resource `ExternalSecrets` for the annotation `mia-platform.eu/await-completion`
 - add some debugging logs
 - add support to kubernetes version 1.23
 
 ### Fixed
 
-- fixed a bug in `createPatch` that caused all annotations to be deleted in the resulting patch if the target resource was annotated with `kubectl.kubernetes.io/last-applied-configuration`
+- fixed a bug in `createPatch` that caused all annotations to be deleted in the resulting patch if the target resource
+	was annotated with `kubectl.kubernetes.io/last-applied-configuration`
 - fixed a bug that will panic if multiple patch files would be filtered out when hydrating kustomize files
 
 ## [1.1.0] - 2022-03-17
@@ -96,7 +98,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- [BMP-940](https://makeitapp.atlassian.net/browse/BMP-940): fix annotation length by using an unique name, `mia-platform.eu/dependenciesChecksum`, for all dependencies and its value is a object of key-values of all the dependencies.
+- [BMP-940](https://makeitapp.atlassian.net/browse/BMP-940): fix annotation length by using an unique name,
+	`mia-platform.eu/dependenciesChecksum`, for all dependencies and its value is a object of key-values of all
+	the dependencies.
 
 ## [0.4.0] - 2021-03-17
 

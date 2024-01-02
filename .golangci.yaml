@@ -1,5 +1,8 @@
 run:
-  deadline: 10m
+  timeout: 10m
+  build-tags:
+  - conformance
+  - integration
 
 linters:
   enable:
