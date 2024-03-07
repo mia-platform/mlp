@@ -683,7 +683,7 @@ func TestWithAwaitableResource(t *testing.T) {
 		}
 		expectedErr := errors.New("Some apply error")
 
-		actualErr := withAwaitableResource(func(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
+		actualErr := withAwaitableResource(func(_ *k8sClients, _ resourceutil.Resource, _ utils.DeployConfig) error {
 			return expectedErr
 		})(&clients, res, deployConfig)
 
@@ -746,7 +746,7 @@ func TestWithDeletableResource(t *testing.T) {
 			annotations: map[string]interface{}{
 				deleteBeforeApplyAnnotation: "true",
 			},
-			setup:     func(t *testing.T, clients *k8sClients, res resourceutil.Resource) { t.Helper() },
+			setup:     func(t *testing.T, _ *k8sClients, _ resourceutil.Resource) { t.Helper() },
 			requireFn: requireResourceExists(false),
 		},
 	}
@@ -776,7 +776,7 @@ func TestWithDeletableResource(t *testing.T) {
 			tC.setup(t, &clients, res)
 
 			applyCalled := false
-			err := withDeletableResource(func(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
+			err := withDeletableResource(func(clients *k8sClients, res resourceutil.Resource, _ utils.DeployConfig) error {
 				applyCalled = true
 				tC.requireFn(t, clients, res)
 				return nil
@@ -806,7 +806,7 @@ func TestWithDeletableResource(t *testing.T) {
 		}
 		expectedErr := errors.New("Some apply error")
 
-		actualErr := withAwaitableResource(func(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
+		actualErr := withAwaitableResource(func(_ *k8sClients, _ resourceutil.Resource, _ utils.DeployConfig) error {
 			return expectedErr
 		})(&clients, res, deployConfig)
 

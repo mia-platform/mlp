@@ -50,7 +50,7 @@ func HydrateSubcommand(cmd *cobra.Command) {
 		Short:   "Adds passed resource and patches to kustomization.yaml",
 		Long:    "Adds passed resource and patches to kustomization.yaml. The PATH argument must be a path to a directory containing 'kustomization.yaml'",
 		Example: "$ mlp hydrate configuration/ overlays/production/",
-		Args: func(cmd *cobra.Command, args []string) error {
+		Args: func(_ *cobra.Command, args []string) error {
 			if len(args) < 1 {
 				return errors.New("at least one directory is required")
 			}
@@ -65,7 +65,7 @@ func HydrateSubcommand(cmd *cobra.Command) {
 			}
 			return nil
 		},
-		RunE: func(cmd *cobra.Command, paths []string) error {
+		RunE: func(_ *cobra.Command, paths []string) error {
 			return kustomize.HydrateRun(paths)
 		},
 	}

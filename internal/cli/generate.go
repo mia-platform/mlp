@@ -30,7 +30,7 @@ func GenerateSubcommand(cmd *cobra.Command) {
 		Use:   "generate",
 		Short: "Generate configmaps and secrets",
 		Long:  `Generate configmaps and secrets described in YAML files passed as input`,
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			generate.Run(configPath, prefixes, outputPath)
 		},
 	}

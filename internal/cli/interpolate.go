@@ -30,7 +30,7 @@ func InterpolateSubcommand(cmd *cobra.Command) {
 		Use:   "interpolate",
 		Short: "Interpolate variables in file",
 		Long:  "Interpolate the environment variables inside {{}} in file and substitutes them with the corresponding value",
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			interpolate.Run(prefixes, inputPaths, outputPath)
 		},
 	}

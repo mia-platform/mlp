@@ -30,7 +30,7 @@ func DeploySubcommand(cmd *cobra.Command, options *utils.Options) {
 		Use:   "deploy",
 		Short: "deploy Mia-Platform created resource on K8S",
 		Long:  "",
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			deploy.Run(inputPaths, deployConfig, options)
 		},
 	}

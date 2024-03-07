@@ -48,7 +48,7 @@ func main() {
 		Use:   "version",
 		Short: "Show mlp version",
 		Long:  "Show mlp version",
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			fmt.Println(versionOutput)
 		},
 	})
