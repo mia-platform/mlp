@@ -93,6 +93,8 @@ func withDeletableResource(apply applyFunction) applyFunction {
 // withAwaitableResource is an apply function decorator that awaits resources
 // decorated with awaitCompletionAnnotation for completion after they are
 // applied on the cluster
+//
+//gocyclo:ignore
 func withAwaitableResource(apply applyFunction) applyFunction {
 	return func(clients *k8sClients, res resourceutil.Resource, deployConfig utils.DeployConfig) error {
 		gvr, err := resourceutil.FromGVKtoGVR(clients.discovery, res.Object.GroupVersionKind())
