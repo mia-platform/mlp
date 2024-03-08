@@ -155,6 +155,7 @@ func withAwaitableResource(apply applyFunction) applyFunction {
 					return nil
 				}
 			case <-time.NewTimer(timeout).C:
+				// timeout generates a new event
 				obj, err := clients.dynamic.Resource(gvr).
 					Namespace(res.Object.GetNamespace()).
 					Get(context.TODO(), res.Object.GetName(), metav1.GetOptions{})
