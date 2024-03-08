@@ -570,7 +570,7 @@ func TestWithAwaitableResource(t *testing.T) {
 			watcherEvents: []unstructured.Unstructured{},
 			errorRequire:  require.Nil,
 		}, {
-			desc:        "Ignores annotated resources compelted before start time",
+			desc:        "Ignores annotated resources completed before start time",
 			resFileName: "testdata/awaitable-job.yaml",
 			watcherEvents: []unstructured.Unstructured{
 				{

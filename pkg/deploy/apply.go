@@ -159,16 +159,18 @@ func withAwaitableResource(apply applyFunction) applyFunction {
 				obj, err := clients.dynamic.Resource(gvr).
 					Namespace(res.Object.GetNamespace()).
 					Get(context.TODO(), res.Object.GetName(), metav1.GetOptions{})
-				isCompleted, err := handleResourceCompletionEvent(res, &watch.Event{
-					Type:   watch.Modified,
-					Object: obj,
-				}, startTime)
-				if err != nil {
-					return err
-				}
+				if err == nil {
+					isCompleted, err := handleResourceCompletionEvent(res, &watch.Event{
+						Type:   watch.Modified,
+						Object: obj,
+					}, startTime)
+					if err != nil {
+						return err
+					}
 
-				if isCompleted {
-					return nil
+					if isCompleted {
+						return nil
+					}
 				}
 
 				msg := fmt.Sprintf("Timeout received while waiting for resource %s completion", res.Object.GetName())
