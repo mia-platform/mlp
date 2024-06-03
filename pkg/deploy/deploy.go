@@ -91,7 +91,6 @@ func prepareResources(deployType string, resources []resourceutil.Resource, curr
 	utils.CheckError(err, "error preparing resources")
 
 	for _, res := range resources {
-		res := res
 		if res.GroupVersionKind.Kind != deploymentKind && res.GroupVersionKind.Kind != cronJobKind {
 			continue
 		}

@@ -15,9 +15,9 @@
 
 ##@ Deepcopy Goals
 
-.PHONY: generate
-generate:
-	go generate -x -ldflags "$(GO_LDFLAGS)" ./...
-
 .PHONY: generate-deps
 generate-deps:
+
+.PHONY: generate
+generate: generate-deps
+	go generate -x -ldflags "$(GO_LDFLAGS)" ./...
