@@ -14,7 +14,7 @@ on:
     - examples/**
 
 env:
-  GORELEASER_VERSION: v2.0.0
+  GORELEASER_VERSION: v2.0.1
 jobs:
   lint:
     name: Lint Code
@@ -52,9 +52,6 @@ jobs:
         - ubuntu-latest
         - macos-latest
         k8s_version:
-        - "1.24"
-        - "1.25"
-        - "1.26"
         - "1.27"
         - "1.28"
         - "1.29"
