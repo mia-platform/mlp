@@ -22,26 +22,7 @@ import (
 
 	"github.com/mia-platform/mlp/pkg/kustomize"
 	"github.com/spf13/cobra"
-	"k8s.io/kubectl/pkg/util/i18n"
-	"k8s.io/kubectl/pkg/util/templates"
-	"sigs.k8s.io/kustomize/kustomize/v4/commands/build"
-	"sigs.k8s.io/kustomize/kyaml/filesys"
 )
-
-// KustomizeSubcommand runs kustomize
-func KustomizeSubcommand(cmd *cobra.Command) {
-	h := build.MakeHelp("mlp", "kustomize")
-	KustomizeCmd := build.NewCmdBuild(
-		filesys.MakeFsOnDisk(),
-		&build.Help{
-			Use:     h.Use,
-			Short:   i18n.T(h.Short),
-			Long:    templates.LongDesc(i18n.T(h.Long)),
-			Example: templates.Examples(i18n.T(h.Example)),
-		},
-		os.Stdout)
-	cmd.AddCommand(KustomizeCmd)
-}
 
 // HydrateSubcommand add resources and patches to kustomization.yaml
 func HydrateSubcommand(cmd *cobra.Command) {
