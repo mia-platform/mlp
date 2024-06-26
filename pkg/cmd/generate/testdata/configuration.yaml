@@ -1,0 +1,9 @@
+config-maps:
+- name: "literal"
+  data:
+  - from: "literal"
+    key: key
+    value: value
+  - from: "literal"
+    key: otherKey
+    value: value

@@ -49,7 +49,7 @@ endif
 
 # Set here the name of the package you want to build
 CMDNAME:= mlp
-BUILD_PATH:= ./cmd/$(CMDNAME)
+BUILD_PATH:= .
 CONFORMANCE_TEST_PATH:= $(PROJECT_DIR)/tests/e2e
 IS_LIBRARY:=
 
@@ -63,7 +63,7 @@ GOARM:= $(shell go env GOARM)
 GIT_REV:= $(shell git rev-parse --short HEAD 2>/dev/null)
 VERSION:= $(shell git describe --tags --exact-match 2>/dev/null || (echo $(GIT_REV) | cut -c1-12))
 # insert here the go module where to add the version metadata
-VERSION_MODULE_NAME:= github.com/mia-platform/mlp/internal/cli
+VERSION_MODULE_NAME:= github.com/mia-platform/mlp/pkg/cmd
 
 # supported platforms for container creation, these are a subset of the supported
 # platforms of the base image.
@@ -106,3 +106,10 @@ include tools/make/release.mk
 ci: test-integration-coverage
 
 ### Put your custom import, define or goals under here ###
+
+generate-deps: $(TOOLS_BIN)/deepcopy-gen
+$(TOOLS_BIN)/deepcopy-gen: $(TOOLS_DIR)/DEEPCOPY_GEN_VERSION
+	$(eval DEEPCOPY_GEN_VERSION:= $(shell cat $<))
+	mkdir -p $(TOOLS_BIN)
+	$(info Installing deepcopy-gen $(DEEPCOPY_GEN_VERSION) bin in $(TOOLS_BIN))
+	GOBIN=$(TOOLS_BIN) go install k8s.io/code-generator/cmd/deepcopy-gen@$(DEEPCOPY_GEN_VERSION)

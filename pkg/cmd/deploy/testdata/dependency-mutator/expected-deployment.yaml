@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example
+  namespace: test
+spec:
+  selector:
+    matchLabels:
+      app: example
+  template:
+    metadata:
+      annotations:
+        mia-platform.eu/dependencies-checksum: 1e41cd0078be2ed7ec826419c5368e8f9cb924e9d4cc089e201746d514b64bd5
+      labels:
+        app: example
+    spec:
+      initContainers:
+      - name: example
+        image: busybox
+        env:
+        - name: ENV
+          valueFrom:
+            secretKeyRef:
+              key: data
+              name: example
+      containers:
+      - name: example
+        image: busybox
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+      volumes:
+      - name: volume
+        configMap:
+          name: example

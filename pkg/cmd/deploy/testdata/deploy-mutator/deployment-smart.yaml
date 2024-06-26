@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example
+  namespace: test
+spec:
+  selector:
+    matchLabels:
+      app: example
+  template:
+    metadata:
+      labels:
+        app: example
+    spec:
+      initContainers:
+      - name: example
+        image: busybox:stable
+        env:
+        - name: ENV
+          valueFrom:
+            secretKeyRef:
+              key: key
+              name: example
+            key: key
+      containers:
+      - name: example
+        image: busybox:1.35.0@sha256:5be7104a4306abe768359a5379e6050ef69a29e9a5f99fcf7f46d5f7e9ba29a2
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+      volumes:
+      - name: volume
+        configMap:
+          name: example

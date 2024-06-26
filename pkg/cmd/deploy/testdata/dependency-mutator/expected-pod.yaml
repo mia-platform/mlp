@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: example
+  namespace: test
+  labels:
+    name: example
+  annotations:
+    mia-platform.eu/dependencies-checksum: 33b16f57da9917f60f04c1016f69c5dd1cc722842cc3df711acc7ee1f7b3579f
+spec:
+  initContainers:
+  - name: init
+    image: busybox
+    env:
+    - name: ENV
+      valueFrom:
+        secretKeyRef:
+          key: otherData
+          name: example
+    - name: ENV2
+      valueFrom:
+        configMapKeyRef:
+          key: example
+          name: missing
+  containers:
+  - name: example
+    image: busybox
+    resources:
+      limits:
+        memory: "128Mi"
+        cpu: "500m"

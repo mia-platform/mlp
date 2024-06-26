@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test
+  namespace: {{SIMPLE_ENV}}
+spec:
+  selector:
+    matchLabels:
+      app: test
+  template:
+    replicas: {{NUMBER_ENV}}
+    metadata:
+      labels:
+        app: test
+    spec:
+      containers:
+      - name: test
+        image: nginx:latest
+        env:
+        - name: env1
+          value: '{{MULTILINE_STRING_ESCAPED_ENV}}'
+        - name: env2
+          value: '{{SPECIAL_JSON_ENV}}'
+        - name: env3
+          value: "{{JSON_MULTILINE_ENV}}"
+        - name: env4
+          value: "abc{{JSON_ESCAPED_ENV}}def"
+        - name: env5
+          value: '{{HTML}}'
+        - name: env6
+          value: "{{NUMBER_ENV}}"
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"

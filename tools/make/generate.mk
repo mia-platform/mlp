@@ -21,3 +21,4 @@ generate-deps:
 .PHONY: generate
 generate: generate-deps
 	go generate -x -ldflags "$(GO_LDFLAGS)" ./...
+	${TOOLS_BIN}/deepcopy-gen --output-file zz_generated.deepcopy.go --go-header-file ${TOOLS_DIR}/boilerplate.go.txt ./pkg/apis/mlp.mia-platform.eu/v1

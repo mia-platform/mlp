@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example
+  namespace: test
+data:
+  config: value
+binaryData:
+  bconfig: //0=

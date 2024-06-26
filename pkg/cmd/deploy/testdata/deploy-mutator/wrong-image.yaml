@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: example
+  namespace: test
+spec:
+  selector:
+    matchLabels:
+      app: example
+  serviceName: example
+  replicas: 2
+  template:
+    metadata:
+      annotations:
+        existing: annotation
+      labels:
+        app: example
+    spec:
+      containers:
+      - name: example
+        image: busybox:sha256:5be7104a4306abe768359a5379e6050ef69a29e9a5f99fcf7f46d5f7e9ba29a2
+      volumes:
+      - name: volume
+        secret:
+          secretName: missing
+  volumeClaimTemplates:
+  - metadata:
+      name: www
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi

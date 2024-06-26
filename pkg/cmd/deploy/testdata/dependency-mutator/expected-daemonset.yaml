@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: example
+  namespace: test
+spec:
+  selector:
+    matchLabels:
+      name: example
+  template:
+    metadata:
+      annotations:
+        existing: annotation
+        mia-platform.eu/dependencies-checksum: 8c957b7db2280ebf67554d2b65ec30199e6e3a6a15648533f9aee370623e9e14
+      labels:
+        name: example
+    spec:
+      containers:
+      - name: example
+        image: busybox
+      volumes:
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: example
+        secret:
+          secretName: example
+          optional: true

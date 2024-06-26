@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example
+  namespace: other-ns
+data:
+  config: othervalue
