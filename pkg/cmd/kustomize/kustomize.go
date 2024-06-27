@@ -33,7 +33,8 @@ const (
 	cmdLong  = `Build a set of KRM resources using a 'kustomization.yaml' file.
 	The DIR argument must be a path to a directory containing a
 	'kustomization.yaml' file.
-	If DIR is omitted, '.' is assumed.`
+	If DIR is omitted, '.' is assumed.
+	`
 	cmdExamples = `# Build the current working directory
 	mlp kustomize
 

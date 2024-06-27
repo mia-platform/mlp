@@ -22,6 +22,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/go-logr/logr"
+	"github.com/mia-platform/mlp/pkg/cmd/hydrate"
 	"github.com/mia-platform/mlp/pkg/cmd/kustomize"
 	"github.com/spf13/cobra"
 )
@@ -72,6 +73,7 @@ func NewRootCommand() *cobra.Command {
 	cmd.AddCommand(
 		versionCommand(),
 		kustomize.NewCommand(),
+		hydrate.NewCommand(),
 	)
 	return cmd
 }
