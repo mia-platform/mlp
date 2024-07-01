@@ -95,7 +95,7 @@ func (*Flags) ToOptions(args []string, fSys filesys.FileSystem) (*Options, error
 	}, nil
 }
 
-// Run execute the kustomize command
+// Run execute the hydrate command
 func (o *Options) Run(context.Context) error {
 	for _, path := range o.paths {
 		if err := o.hydrateKustomize(path); err != nil {
@@ -106,6 +106,7 @@ func (o *Options) Run(context.Context) error {
 	return nil
 }
 
+// hydrateKustomize will read the folder at path and insert the files as resources or patches based on a regex
 func (o *Options) hydrateKustomize(path string) error {
 	files, err := o.fSys.ReadDir(path)
 	if err != nil {
@@ -136,13 +137,15 @@ func (o *Options) hydrateKustomize(path string) error {
 	return updateKustomize(o.fSys, path, resources, patches)
 }
 
+// updateKustomize will read the kustomization file at path and will add resources and patches if not already
+// present in the file
 func updateKustomize(fSys filesys.FileSystem, path string, resources, patches []string) error {
 	kf, err := newKustomizationFile(fSys, path)
 	if err != nil {
 		return err
 	}
 
-	k, err := kf.Read()
+	k, err := kf.read()
 	if err != nil {
 		return err
 	}

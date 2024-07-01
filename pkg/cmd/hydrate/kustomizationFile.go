@@ -26,12 +26,13 @@ import (
 	yaml "sigs.k8s.io/yaml/goyaml.v3"
 )
 
+// kustomizationFile is a struct for incapsulating operations on a kustomization file
 type kustomizationFile struct {
 	path string
 	fSys filesys.FileSystem
 }
 
-// newKustomizationFile returns a new instance.
+// newKustomizationFile returns a new instance for the given FileSystem and path
 func newKustomizationFile(fSys filesys.FileSystem, path string) (*kustomizationFile, error) {
 	kf := &kustomizationFile{fSys: fSys}
 	err := kf.validate(path)
@@ -41,10 +42,12 @@ func newKustomizationFile(fSys filesys.FileSystem, path string) (*kustomizationF
 	return kf, nil
 }
 
+// GetPath return the full path of the kustomization file including its name
 func (kf *kustomizationFile) GetPath() string {
 	return kf.path
 }
 
+// validate will validate that only one kustomization file exists at path and is not a folder
 func (kf *kustomizationFile) validate(path string) error {
 	match := 0
 	var paths []string
@@ -71,7 +74,8 @@ func (kf *kustomizationFile) validate(path string) error {
 	return nil
 }
 
-func (kf *kustomizationFile) Read() (*types.Kustomization, error) {
+// read will return the Kustomization struct from file
+func (kf *kustomizationFile) read() (*types.Kustomization, error) {
 	data, err := kf.fSys.ReadFile(kf.path)
 	if err != nil {
 		return nil, err
@@ -87,26 +91,20 @@ func (kf *kustomizationFile) Read() (*types.Kustomization, error) {
 	return &k, nil
 }
 
+// write will save the data in the kustomization structure overriding the previous content
 func (kf *kustomizationFile) write(kustomization *types.Kustomization) error {
-	data, err := kf.marshal(kustomization)
-	if err != nil {
-		return err
-	}
-	return kf.fSys.WriteFile(kf.path, data)
-}
-
-func (kf *kustomizationFile) marshal(k *types.Kustomization) ([]byte, error) {
 	buffer := new(bytes.Buffer)
 	encoder := yaml.NewEncoder(buffer)
 	encoder.SetIndent(2)
 	encoder.CompactSeqIndent()
 
-	if err := encoder.Encode(k); err != nil {
-		return nil, err
-	}
-	if err := encoder.Close(); err != nil {
-		return nil, err
+	if err := encoder.Encode(kustomization); err != nil {
+		return err
 	}
 
-	return buffer.Bytes(), nil
+	if err := encoder.Close(); err != nil {
+		return err
+	}
+
+	return kf.fSys.WriteFile(kf.path, buffer.Bytes())
 }
