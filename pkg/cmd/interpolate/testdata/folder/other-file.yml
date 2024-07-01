@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example
+data:
+  key: "{{JSON_SINGLELINE_ENV}}"
+  key2: {{MULTILINE_STRING}}
+  key3: {{STRING_ESCAPED_ENV}}
+  key4: {{DOLLAR_ENV}}

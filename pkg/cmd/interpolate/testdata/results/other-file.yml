@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example
+data:
+  key: "{\"type\":\"type\",\"project_id\":\"id\",\"private_key_id\":\"key\",\"private_key\":\"-----BEGIN CERTIFICATE-----\nXXXXXXXXXXXXXXXXXXXXXXXXX\nYYYYYYYYYYYYYYY/4YYYYYYYYY\n-----END CERTIFICATE-----\n\",\"client_email\":\"email@example.com\",\"client_id\":\"client-id\",\"auth_uri\":\"https://example.com/auth\",\"token_uri\":\"https://example.com/token\",\"auth_provider_x509_cert_url\":\"https://example.com/certs\",\"client_x509_cert_url\":\"https://example.com/certs/fooo%40bar\"}"
+  key2: -----BEGIN CERTIFICATE-----\nXXXXXXXXXXXXXXXXXXXXXXXXX\nYYYYYYYYYYYYYYY/4YYYYYYYYY\nZZZZZZZZZZZZZZZZZZZZZZZZZZ\n-----END CERTIFICATE-----
+  key3: env\\first\line
+  key4: $contains$dollars$
