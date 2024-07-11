@@ -16,11 +16,14 @@
 package deploy
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/blang/semver/v4"
 	dockerref "github.com/distribution/reference"
+	"github.com/mia-platform/jpl/pkg/client/cache"
 	"github.com/mia-platform/jpl/pkg/mutator"
+	"github.com/mia-platform/jpl/pkg/resource"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -65,7 +68,7 @@ func (m *deployMutator) CanHandleResource(obj *metav1.PartialObjectMetadata) boo
 }
 
 // Mutate implement mutator.Interface interface
-func (m *deployMutator) Mutate(obj *unstructured.Unstructured) error {
+func (m *deployMutator) Mutate(obj *unstructured.Unstructured, getter cache.RemoteResourceGetter) error {
 	podSpecFields, podAnnotationsFields, err := podFieldsForGroupKind(obj.GroupVersionKind())
 	if err != nil {
 		return err
@@ -75,7 +78,7 @@ func (m *deployMutator) Mutate(obj *unstructured.Unstructured) error {
 	value := ""
 	switch m.deployType {
 	case deploySmart:
-		addAnnotation, value, err = m.smartDeployAnnotation(obj, podSpecFields)
+		addAnnotation, value, err = m.smartDeployAnnotation(obj, podSpecFields, podAnnotationsFields, getter)
 		if err != nil {
 			return err
 		}
@@ -88,7 +91,7 @@ func (m *deployMutator) Mutate(obj *unstructured.Unstructured) error {
 		return nil
 	}
 
-	annotations, err := annotationsFromUnstructuredFilds(obj, podAnnotationsFields)
+	annotations, err := annotationsFromUnstructuredFields(obj, podAnnotationsFields)
 	if err != nil {
 		return err
 	}
@@ -98,7 +101,7 @@ func (m *deployMutator) Mutate(obj *unstructured.Unstructured) error {
 }
 
 // smartDeployAnnotation return if the object needs a deploy-checksum annotation and the value to set
-func (m *deployMutator) smartDeployAnnotation(obj *unstructured.Unstructured, podSpecPath []string) (bool, string, error) {
+func (m *deployMutator) smartDeployAnnotation(obj *unstructured.Unstructured, podSpecPath, podAnnotationsFields []string, getter cache.RemoteResourceGetter) (bool, string, error) {
 	if m.forceNoSemver {
 		noSemverInPod, err := m.checkNoSemverInPod(obj, podSpecPath)
 		if noSemverInPod || err != nil {
@@ -107,7 +110,22 @@ func (m *deployMutator) smartDeployAnnotation(obj *unstructured.Unstructured, po
 	}
 
 	// controlla in remoto
-	return false, "", nil
+	remoteObj, err := getter.Get(context.Background(), resource.ObjectMetadataFromUnstructured(obj))
+	if err != nil {
+		return false, "", err
+	}
+
+	if remoteObj == nil {
+		return false, "", nil
+	}
+
+	annotations, err := annotationsFromUnstructuredFields(remoteObj, podAnnotationsFields)
+	if err != nil {
+		return false, "", nil
+	}
+
+	value, found := annotations[deployChecksumAnnotation]
+	return found, value, nil
 }
 
 // checkNoSemverInPod return if at least one container inside a pod spec contains an image without a tag that is

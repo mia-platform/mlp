@@ -100,8 +100,8 @@ func podSpecFromUnstructured(obj *unstructured.Unstructured, fields []string) (c
 	return podSpec, nil
 }
 
-// annotationsFromUnstructuredFilds return the annotation present at fields in the obj or an empty map
-func annotationsFromUnstructuredFilds(obj *unstructured.Unstructured, fields []string) (map[string]string, error) {
+// annotationsFromUnstructuredFields return the annotation present at fields in the obj or an empty map
+func annotationsFromUnstructuredFields(obj *unstructured.Unstructured, fields []string) (map[string]string, error) {
 	annotations, _, err := unstructured.NestedStringMap(obj.Object, fields...)
 	if err != nil {
 		return nil, err

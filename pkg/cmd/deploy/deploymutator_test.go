@@ -16,9 +16,13 @@
 package deploy
 
 import (
+	"context"
+	"fmt"
 	"path/filepath"
 	"testing"
 
+	"github.com/mia-platform/jpl/pkg/client/cache"
+	"github.com/mia-platform/jpl/pkg/resource"
 	jpltesting "github.com/mia-platform/jpl/pkg/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -99,6 +103,8 @@ func TestDeployMutatorMutate(t *testing.T) {
 	t.Parallel()
 
 	testdata := filepath.Join("testdata", "deploy-mutator")
+	remoteObject := jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "remote-status.yaml"))
+	remoteErrorObject := jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "error-remote.yaml"))
 
 	tests := map[string]struct {
 		resource       *unstructured.Unstructured
@@ -135,6 +141,18 @@ func TestDeployMutatorMutate(t *testing.T) {
 			forceNoSemver:  true,
 			expectedResult: jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "expected-deployment-smart.yaml")),
 		},
+		"deployment smart deploy with remote annotation": {
+			resource:       jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "deployment-smart-remote.yaml")),
+			deployType:     deploySmart,
+			forceNoSemver:  true,
+			expectedResult: jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "expected-deployment-smart-remote.yaml")),
+		},
+		"error getting resource from remote": {
+			resource:       remoteErrorObject,
+			deployType:     deploySmart,
+			expectedResult: jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "error-remote.yaml")),
+			expectedError:  "error from remote",
+		},
 		"wrong resource": {
 			resource:       jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "wrong-resource.yaml")),
 			expectedResult: jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "wrong-resource.yaml")),
@@ -157,7 +175,16 @@ func TestDeployMutatorMutate(t *testing.T) {
 				identifier:    "test-identifier",
 			}
 
-			err := mutator.Mutate(test.resource)
+			getter := &testGetter{
+				availableObjects: map[resource.ObjectMetadata]*unstructured.Unstructured{
+					resource.ObjectMetadataFromUnstructured(remoteObject): remoteObject,
+				},
+				errors: map[resource.ObjectMetadata]error{
+					resource.ObjectMetadataFromUnstructured(remoteErrorObject): fmt.Errorf("error from remote"),
+				},
+			}
+
+			err := mutator.Mutate(test.resource, getter)
 			switch len(test.expectedError) {
 			case 0:
 				require.NoError(t, err)
@@ -169,3 +196,22 @@ func TestDeployMutatorMutate(t *testing.T) {
 		})
 	}
 }
+
+type testGetter struct {
+	availableObjects map[resource.ObjectMetadata]*unstructured.Unstructured
+	errors           map[resource.ObjectMetadata]error
+}
+
+func (g *testGetter) Get(_ context.Context, id resource.ObjectMetadata) (*unstructured.Unstructured, error) {
+	if obj, found := g.availableObjects[id]; found {
+		return obj, nil
+	}
+
+	if err, found := g.errors[id]; found {
+		return nil, err
+	}
+
+	return nil, nil
+}
+
+var _ cache.RemoteResourceGetter = &testGetter{}

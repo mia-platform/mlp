@@ -163,7 +163,7 @@ func TestRun(t *testing.T) {
 					expectedFilePath: filepath.Join(testdata, "expectations", "job.yaml"),
 				},
 			},
-			expectedCallsNumber: 7,
+			expectedCallsNumber: 6,
 		},
 		"error reading files": {
 			options: &Options{

@@ -198,7 +198,7 @@ func TestDependenciesMutatorMutate(t *testing.T) {
 				checksumsMap: checksumsMap,
 			}
 
-			err := mutator.Mutate(test.resource)
+			err := mutator.Mutate(test.resource, nil)
 			switch len(test.expectedError) {
 			case 0:
 				require.NoError(t, err)

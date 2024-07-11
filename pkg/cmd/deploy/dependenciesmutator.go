@@ -18,6 +18,7 @@ package deploy
 import (
 	"maps"
 
+	"github.com/mia-platform/jpl/pkg/client/cache"
 	"github.com/mia-platform/jpl/pkg/mutator"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -70,7 +71,7 @@ func (m *dependenciesMutator) CanHandleResource(obj *metav1.PartialObjectMetadat
 }
 
 // Mutate implement mutator.Interface interface
-func (m *dependenciesMutator) Mutate(obj *unstructured.Unstructured) error {
+func (m *dependenciesMutator) Mutate(obj *unstructured.Unstructured, _ cache.RemoteResourceGetter) error {
 	podSpecFields, podAnnotationsFields, err := podFieldsForGroupKind(obj.GroupVersionKind())
 	if err != nil {
 		return err
@@ -86,7 +87,7 @@ func (m *dependenciesMutator) Mutate(obj *unstructured.Unstructured) error {
 		return nil
 	}
 
-	annotations, err := annotationsFromUnstructuredFilds(obj, podAnnotationsFields)
+	annotations, err := annotationsFromUnstructuredFields(obj, podAnnotationsFields)
 	if err != nil {
 		return err
 	}
