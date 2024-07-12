@@ -20,8 +20,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mia-platform/jpl/pkg/filter"
-	inventoryfake "github.com/mia-platform/jpl/pkg/inventory/fake"
+	"github.com/mia-platform/jpl/pkg/client/cache"
+	"github.com/mia-platform/jpl/pkg/resource"
 	jpltesting "github.com/mia-platform/jpl/pkg/testing"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -32,47 +32,52 @@ func TestFilter(t *testing.T) {
 	testdata := filepath.Join("testdata", "filter")
 	filtered := jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "filtered.yaml"))
 
-	inventory := &inventoryfake.Inventory{InventoryObjects: []*unstructured.Unstructured{filtered}}
-	testFilter := NewDeployOnceFilter(inventory)
-
 	tests := map[string]struct {
-		filter        filter.Interface
 		object        *unstructured.Unstructured
+		getter        cache.RemoteResourceGetter
 		expected      bool
 		expectedError string
 	}{
 		"no filtering if no config map or secret": {
-			filter: testFilter,
 			object: jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "deployment.yaml")),
 		},
 		"no filtering if config map use labels and not annotations": {
-			filter: testFilter,
 			object: jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "configmap.yaml")),
 		},
 		"no filtering if annotations with other value": {
-			filter: testFilter,
 			object: jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "secret.yaml")),
 		},
-		"filtering if annotation is present and in remote inventory": {
-			filter:   testFilter,
-			object:   jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "filtered.yaml")),
+		"filtering if annotation is present and remote object is found": {
+			object: jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "filtered.yaml")),
+			getter: &testGetter{
+				availableObjects: map[resource.ObjectMetadata]*unstructured.Unstructured{
+					resource.ObjectMetadataFromUnstructured(filtered): filtered,
+				},
+			},
 			expected: true,
 		},
-		"no filtering if annotation is present but not in remote inventory": {
-			filter:   testFilter,
-			object:   jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "filtered.yaml")),
-			expected: true,
+		"no filtering if annotation is present but no remote object is found": {
+			object: jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "filtered.yaml")),
+			getter: &testGetter{
+				availableObjects: map[resource.ObjectMetadata]*unstructured.Unstructured{},
+			},
 		},
-		"error getting inventory": {
-			filter:        NewDeployOnceFilter(&inventoryfake.Inventory{LoadErr: fmt.Errorf("error on load")}),
-			object:        jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "filtered.yaml")),
+		"error getting remote object": {
+			object: jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "filtered.yaml")),
+			getter: &testGetter{
+				availableObjects: map[resource.ObjectMetadata]*unstructured.Unstructured{},
+				errors: map[resource.ObjectMetadata]error{
+					resource.ObjectMetadataFromUnstructured(filtered): fmt.Errorf("error on load"),
+				},
+			},
 			expectedError: "error on load",
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			filtered, err := test.filter.Filter(test.object)
+			filter := NewDeployOnceFilter()
+			filtered, err := filter.Filter(test.object, test.getter)
 			switch len(test.expectedError) {
 			case 0:
 				assert.NoError(t, err)

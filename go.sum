@@ -100,8 +100,8 @@ github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de h1:9TO3cAIGXtEhn
 github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de/go.mod h1:zAbeS9B/r2mtpb6U+EI2rYA5OAXxsYw6wTamcNW+zcE=
 github.com/mailru/easyjson v0.7.7 h1:UGYAvKxe3sBsEDzO8ZeWOSlIQfWFlxbzLZe7hwFURr0=
 github.com/mailru/easyjson v0.7.7/go.mod h1:xzfreul335JAWq5oZzymOObrkdz5UnU4kGfJJLY9Nlc=
-github.com/mia-platform/jpl v0.2.1-0.20240711104504-8bd92797d29a h1:NNqpeSIvRFtPxDvQd9YTlZXfO0yGqJNdOPPofHVkxRQ=
-github.com/mia-platform/jpl v0.2.1-0.20240711104504-8bd92797d29a/go.mod h1:T3T29QoV/bkaMU4mbCB2kJJVdPtR1rgESKHJRbnNz8c=
+github.com/mia-platform/jpl v0.3.0 h1:CCBlz6nPTxbbwEmWUMz7fE1063IjgngEKGyddld19T8=
+github.com/mia-platform/jpl v0.3.0/go.mod h1:T3T29QoV/bkaMU4mbCB2kJJVdPtR1rgESKHJRbnNz8c=
 github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd h1:TRLaZ9cD/w8PVh93nsPXa1VrQ6jlwL5oN8l14QlcNfg=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=

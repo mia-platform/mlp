@@ -8,7 +8,7 @@ require (
 	github.com/distribution/reference v0.6.0
 	github.com/go-logr/logr v1.4.2
 	github.com/go-logr/stdr v1.2.2
-	github.com/mia-platform/jpl v0.2.1-0.20240711104504-8bd92797d29a
+	github.com/mia-platform/jpl v0.3.0
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.9.0

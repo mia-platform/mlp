@@ -17,34 +17,25 @@ package deploy
 
 import (
 	"context"
-	"sync"
 
+	"github.com/mia-platform/jpl/pkg/client/cache"
 	"github.com/mia-platform/jpl/pkg/filter"
-	"github.com/mia-platform/jpl/pkg/inventory"
 	"github.com/mia-platform/jpl/pkg/resource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // deployOnceFilter will implement a filter that will remove a Secret or ConfigMap if they have a value
 // of deployFilterValue in the deployFilterAnnotation and the resource metadata is found in the remote inventory.
 // In any other cases the resources are kept.
-type deployOnceFilter struct {
-	inventory       inventory.Store
-	serverObjsCache sets.Set[resource.ObjectMetadata]
-
-	cacheLock sync.Mutex
-}
+type deployOnceFilter struct{}
 
 // NewDeployOnceFilter return a new filter for avoiding to apply a resource more than once in its lifetime
-func NewDeployOnceFilter(inventory inventory.Store) filter.Interface {
-	return &deployOnceFilter{
-		inventory: inventory,
-	}
+func NewDeployOnceFilter() filter.Interface {
+	return &deployOnceFilter{}
 }
 
 // Filter implement filter.Interface interface
-func (f *deployOnceFilter) Filter(obj *unstructured.Unstructured) (bool, error) {
+func (f *deployOnceFilter) Filter(obj *unstructured.Unstructured, getter cache.RemoteResourceGetter) (bool, error) {
 	objGK := obj.GroupVersionKind().GroupKind()
 
 	switch objGK {
@@ -61,30 +52,8 @@ func (f *deployOnceFilter) Filter(obj *unstructured.Unstructured) (bool, error) 
 		return false, nil
 	}
 
-	f.cacheLock.Lock()
-	defer f.cacheLock.Unlock()
-
-	if err := f.populateCache(context.TODO()); err != nil {
-		return false, err
-	}
-
-	return f.serverObjsCache.Has(resource.ObjectMetadataFromUnstructured(obj)), nil
-}
-
-// populateCache will call once the remote server for retrieving the actual inventory, and then return always the
-// loaded cache
-func (f *deployOnceFilter) populateCache(ctx context.Context) error {
-	if f.serverObjsCache != nil {
-		return nil
-	}
-
-	set, err := f.inventory.Load(ctx)
-	if err != nil {
-		return err
-	}
-
-	f.serverObjsCache = set
-	return nil
+	remoteObj, err := getter.Get(context.Background(), resource.ObjectMetadataFromUnstructured(obj))
+	return remoteObj != nil, err
 }
 
 // keep it to always check if deployOnceFilter implement correctly the filter.Interface interface

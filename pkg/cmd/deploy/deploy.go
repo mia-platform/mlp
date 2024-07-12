@@ -230,7 +230,7 @@ func (o *Options) Run(ctx context.Context) error {
 			NewDependenciesMutator(resources),
 			NewDeployMutator(o.deployType, o.forceDeploy, checksumFromData(deployIdentifier)),
 		).
-		WithFilters(NewDeployOnceFilter(inventory)).
+		WithFilters(NewDeployOnceFilter()).
 		Build()
 	if err != nil {
 		return err
