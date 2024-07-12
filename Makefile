@@ -102,8 +102,8 @@ include tools/make/release.mk
 
 # Uncomment the correct test suite to run during CI
 .PHONY: ci
-# ci: test-coverage
-ci: test-integration-coverage
+ci: test-coverage
+# ci: test-integration-coverage
 
 ### Put your custom import, define or goals under here ###
 
