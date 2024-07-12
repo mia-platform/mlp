@@ -18,11 +18,13 @@ package deploy
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -163,7 +165,7 @@ func TestRun(t *testing.T) {
 					expectedFilePath: filepath.Join(testdata, "expectations", "job.yaml"),
 				},
 			},
-			expectedCallsNumber: 6,
+			expectedCallsNumber: 7,
 		},
 		"error reading files": {
 			options: &Options{
@@ -234,6 +236,7 @@ func validationRoundTripper(t *testing.T, resources []*resourceValidation, r *ht
 	path := r.URL.Path
 	method := r.Method
 	inventoryPath := fmt.Sprintf("/api/v1/namespaces/mlp-deploy-test/configmaps/%s", inventoryName)
+	oldInventoryPath := fmt.Sprintf("/api/v1/namespaces/mlp-deploy-test/secrets/%s", oldInventoryName)
 	codec := jpltesting.Codecs.LegacyCodec(jpltesting.Scheme.PrioritizedVersionsAllGroups()...)
 
 	if r.Body != nil {
@@ -242,17 +245,26 @@ func validationRoundTripper(t *testing.T, resources []*resourceValidation, r *ht
 
 	switch {
 	case path == inventoryPath && method == http.MethodGet:
-		cm := &corev1.ConfigMap{Data: map[string]string{
-			"mlp-deploy-test_example__Secret": "",
+		return &http.Response{StatusCode: http.StatusNotFound, Header: jpltesting.DefaultHeaders()}, nil
+	case path == oldInventoryPath && method == http.MethodGet:
+		list := &resourceList{
+			Gvk:       corev1.SchemeGroupVersion.WithKind(reflect.TypeOf(corev1.Secret{}).Name()),
+			Resources: []string{"example"},
+		}
+		data, err := json.Marshal(map[string]*resourceList{
+			"Secret": list,
+		})
+		require.NoError(t, err)
+		sec := &corev1.Secret{Data: map[string][]byte{
+			oldInventoryKey: data,
 		}}
-		body := io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, cm))))
+		body := io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, sec))))
 		return &http.Response{StatusCode: http.StatusOK, Body: body, Header: jpltesting.DefaultHeaders()}, nil
 	case path == inventoryPath && method == http.MethodPatch:
 		bodyData, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
 		cm := new(corev1.ConfigMap)
 		require.NoError(t, runtime.DecodeInto(codec, bodyData, cm))
-		t.Log(cm.Data)
 		assert.Equal(t, 5, len(cm.Data))
 		return &http.Response{
 			StatusCode: http.StatusOK,

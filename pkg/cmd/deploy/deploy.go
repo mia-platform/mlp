@@ -27,7 +27,6 @@ import (
 	"github.com/mia-platform/jpl/pkg/client"
 	"github.com/mia-platform/jpl/pkg/flowcontrol"
 	"github.com/mia-platform/jpl/pkg/generator"
-	"github.com/mia-platform/jpl/pkg/inventory"
 	"github.com/mia-platform/jpl/pkg/resourcereader"
 	"github.com/mia-platform/jpl/pkg/util"
 	"github.com/spf13/cobra"
@@ -205,7 +204,7 @@ func (o *Options) Run(ctx context.Context) error {
 		return err
 	}
 
-	inventory, err := inventory.NewConfigMapStore(o.clientFactory, inventoryName, namespace, fieldManager)
+	inventory, err := NewInventory(o.clientFactory, inventoryName, namespace, fieldManager)
 	if err != nil {
 		return err
 	}
