@@ -26,6 +26,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/go-logr/logr"
 	v1 "github.com/mia-platform/mlp/pkg/apis/mlp.mia-platform.eu/v1"
 	"github.com/mia-platform/mlp/pkg/cmd/interpolate"
 	"github.com/spf13/cobra"
@@ -136,19 +137,22 @@ func (o *Options) Validate() error {
 }
 
 // Run execute the generate command
-func (o *Options) Run(context.Context) error {
+func (o *Options) Run(ctx context.Context) error {
+	logger := logr.FromContextOrDiscard(ctx)
+
 	if err := o.fSys.MkdirAll(o.outputPath); err != nil {
 		return err
 	}
 
 	pathsToInterpolate := o.filterYAMLFiles()
 	for _, path := range pathsToInterpolate {
-		configuration, err := o.readConfiguration(path)
+		logger.V(3).Info("generating resource from configuaration", "path", path)
+		configuration, err := o.readConfiguration(ctx, path)
 		if err != nil {
 			return err
 		}
 
-		err = o.generateResources(configuration)
+		err = o.generateResources(ctx, configuration)
 		if err != nil {
 			return err
 		}
@@ -169,24 +173,29 @@ func (o *Options) filterYAMLFiles() []string {
 	return filteredPaths
 }
 
-func (o *Options) readConfiguration(path string) (*v1.GenerateConfiguration, error) {
+func (o *Options) readConfiguration(ctx context.Context, path string) (*v1.GenerateConfiguration, error) {
+	logger := logr.FromContextOrDiscard(ctx)
+
 	data, err := o.fSys.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 
+	logger.V(8).Info("interpolating configuration file", "path", path)
 	interpolatedData, err := interpolate.Interpolate(data, o.prefixes, filepath.Base(path))
 	if err != nil {
 		return nil, err
 	}
 
+	logger.V(5).Info("parsing configuration file", "path", path)
 	configuration := new(v1.GenerateConfiguration)
 	err = yaml.Unmarshal(interpolatedData, configuration)
-	println(configuration)
 	return configuration, err
 }
 
-func (o *Options) generateResources(config *v1.GenerateConfiguration) error {
+func (o *Options) generateResources(ctx context.Context, config *v1.GenerateConfiguration) error {
+	logger := logr.FromContextOrDiscard(ctx)
+
 	resources := make(map[string]runtime.Object, len(config.Secrets)+len(config.ConfigMaps))
 	for _, obj := range config.ConfigMaps {
 		cm, err := o.configMapFromConfig(obj)
@@ -194,6 +203,7 @@ func (o *Options) generateResources(config *v1.GenerateConfiguration) error {
 			return err
 		}
 
+		logger.V(7).Info("generated configmap", "name", cm.Name)
 		name := fmt.Sprintf("%s.configmap.yaml", obj.Name)
 		resources[name] = cm
 	}
@@ -204,6 +214,7 @@ func (o *Options) generateResources(config *v1.GenerateConfiguration) error {
 			return err
 		}
 
+		logger.V(7).Info("generated secret", "name", sec.Name)
 		name := fmt.Sprintf("%s.secret.yaml", obj.Name)
 		resources[name] = sec
 	}
@@ -214,7 +225,9 @@ func (o *Options) generateResources(config *v1.GenerateConfiguration) error {
 			return err
 		}
 
-		if err := o.fSys.WriteFile(filepath.Join(o.outputPath, name), data); err != nil {
+		path := filepath.Join(o.outputPath, name)
+		logger.V(5).Info("writing resource", "path", path)
+		if err := o.fSys.WriteFile(path, data); err != nil {
 			return err
 		}
 	}

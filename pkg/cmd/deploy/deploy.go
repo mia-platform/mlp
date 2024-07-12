@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/MakeNowJust/heredoc/v2"
@@ -199,6 +200,8 @@ func (o *Options) Validate() error {
 
 // Run execute the interpolate command
 func (o *Options) Run(ctx context.Context) error {
+	logger := logr.FromContextOrDiscard(ctx)
+
 	namespace, _, err := o.clientFactory.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
@@ -209,7 +212,7 @@ func (o *Options) Run(ctx context.Context) error {
 		return err
 	}
 
-	resources, err := o.readResources()
+	resources, err := o.readResources(ctx)
 	if err != nil {
 		return err
 	}
@@ -240,8 +243,10 @@ func (o *Options) Run(ctx context.Context) error {
 		DryRun:       o.dryRun,
 	}
 
+	logger.V(3).Info("start applying resources")
 	eventCh := applyClient.Run(ctx, resources, opts)
 
+	errorsDuringApplying := make([]error, 0)
 loop:
 	for {
 		select {
@@ -250,20 +255,36 @@ loop:
 				break loop
 			}
 
+			if event.IsErrorEvent() {
+				errorsDuringApplying = append(errorsDuringApplying, fmt.Errorf(event.String()))
+			}
+
 			fmt.Fprintln(o.writer, event.String())
 		case <-ctx.Done():
 			return ctx.Err()
 		}
 	}
 
-	return nil
+	if len(errorsDuringApplying) == 0 {
+		return nil
+	}
+
+	builder := new(strings.Builder)
+	builder.WriteString(fmt.Sprintf("applying process has encountered %d error(s):\n", len(errorsDuringApplying)))
+	for _, err := range errorsDuringApplying {
+		builder.WriteString(fmt.Sprintf("\t- %s\n", err))
+	}
+
+	return fmt.Errorf(builder.String())
 }
 
 func deployTypeFlagCompletionfunc(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return validDeployTypeValues, cobra.ShellCompDirectiveDefault
 }
 
-func (o *Options) readResources() ([]*unstructured.Unstructured, error) {
+func (o *Options) readResources(ctx context.Context) ([]*unstructured.Unstructured, error) {
+	logger := logr.FromContextOrDiscard(ctx)
+
 	readerBuilder := resourcereader.NewResourceReaderBuilder(o.clientFactory)
 	var accumulatedResources []*unstructured.Unstructured
 
@@ -273,6 +294,7 @@ func (o *Options) readResources() ([]*unstructured.Unstructured, error) {
 			return nil, err
 		}
 
+		logger.V(5).Info("reading resources", "path", "path")
 		resources, err := reader.Read()
 		if err != nil {
 			return nil, err
@@ -285,6 +307,8 @@ func (o *Options) readResources() ([]*unstructured.Unstructured, error) {
 }
 
 func (o *Options) ensuringNamespace(ctx context.Context, namespace string) error {
+	logger := logr.FromContextOrDiscard(ctx)
+
 	if !o.ensureNamespace {
 		return nil
 	}
@@ -302,6 +326,7 @@ func (o *Options) ensuringNamespace(ctx context.Context, namespace string) error
 		return err
 	}
 
+	logger.V(10).Info("ensuring existence of namespace", "namespace", namespace)
 	namespaceApply := corev1.Namespace(namespace)
 	_, err = clientSet.CoreV1().Namespaces().Apply(ctx, namespaceApply, opts)
 	return err

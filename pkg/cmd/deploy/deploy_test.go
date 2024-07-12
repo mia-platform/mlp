@@ -29,6 +29,7 @@ import (
 	"testing"
 	"time"
 
+	jplresource "github.com/mia-platform/jpl/pkg/resource"
 	jpltesting "github.com/mia-platform/jpl/pkg/testing"
 	"github.com/mia-platform/jpl/pkg/util"
 	"github.com/stretchr/testify/assert"
@@ -54,6 +55,8 @@ func TestCommand(t *testing.T) {
 		case "/livez/ping":
 			w.WriteHeader(http.StatusOK)
 			w.Header().Add(fcv1beta3.ResponseHeaderMatchedFlowSchemaUID, "unused")
+		case "/api/v1/namespaces/mlp-test-deploy/secrets/resources-deployed":
+			w.WriteHeader(http.StatusNotFound)
 		default:
 			for key, values := range jpltesting.DefaultHeaders() {
 				for _, v := range values {
@@ -71,10 +74,13 @@ func TestCommand(t *testing.T) {
 	cmd := NewCommand(flags)
 	assert.NotNil(t, cmd)
 
+	buffer := new(bytes.Buffer)
+	cmd.SetOut(buffer)
 	cmd.SetArgs([]string{
 		"--filename=-",
 		"--namespace=mlp-test-deploy",
 	})
+
 	cmd.Execute()
 }
 
@@ -229,6 +235,75 @@ func TestRun(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestApplyingEncounteringErrors(t *testing.T) {
+	t.Parallel()
+
+	namespace := "mlp-deploy-error-test"
+	testdata := "testdata"
+	expectedError := `applying process has encountered 4 error(s):
+	- ConfigMap example: failed to apply: unknown (patch configmaps example)
+	- Deployment.apps example: failed to apply: unknown (patch deployments example)
+	- CronJob.batch example: failed to apply: unknown (patch cronjobs example)
+	- inventory: failed to apply: failed to save inventory: unknown (patch configmaps eu.mia-platform.mlp)
+`
+
+	codec := jpltesting.Codecs.LegacyCodec(jpltesting.Scheme.PrioritizedVersionsAllGroups()...)
+	configMapPath := fmt.Sprintf("/api/v1/namespaces/%s/configmaps/%s", namespace, inventoryName)
+	fakeClock := clocktesting.NewFakePassiveClock(time.Date(1970, time.January, 0, 0, 0, 0, 0, time.UTC))
+	options := &Options{
+		inputPaths: []string{filepath.Join(testdata, "error-resources")},
+		deployType: "deploy_all",
+		dryRun:     true,
+		clock:      fakeClock,
+	}
+	timeout := 1 * time.Second
+	secret := jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "resources", "secret.yaml"))
+	secret.SetNamespace(namespace)
+	fakeDynamicClient := dynamicfake.NewSimpleDynamicClient(jpltesting.Scheme, secret)
+	deployResource := jplresource.ObjectMetadata{
+		Kind:      "Deployment",
+		Group:     "apps",
+		Name:      "example",
+		Namespace: namespace,
+	}
+
+	stringBuilder := new(strings.Builder)
+	ctx, cancel := context.WithTimeout(context.TODO(), timeout)
+	defer cancel()
+
+	tf := jpltesting.NewTestClientFactory().
+		WithNamespace(namespace)
+	tf.Client = &restfake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: restfake.CreateHTTPClient(func(r *http.Request) (*http.Response, error) {
+			path := r.URL.Path
+			method := r.Method
+			switch {
+			case path == configMapPath && method == http.MethodGet:
+				cm := &corev1.ConfigMap{
+					Data: map[string]string{
+						deployResource.ToString(): "",
+					},
+				}
+				body := io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, cm))))
+				return &http.Response{StatusCode: http.StatusOK, Body: body, Header: jpltesting.DefaultHeaders()}, nil
+			case method == http.MethodPatch:
+				return &http.Response{StatusCode: http.StatusForbidden, Body: r.Body, Header: jpltesting.DefaultHeaders()}, nil
+			}
+
+			return nil, fmt.Errorf("unexpected call: %q, method %s", path, method)
+		}),
+	}
+	tf.FakeDynamicClient = fakeDynamicClient
+
+	options.clientFactory = tf
+	options.writer = stringBuilder
+
+	err := options.Run(ctx)
+	assert.ErrorContains(t, err, expectedError)
+	t.Log(stringBuilder.String())
 }
 
 func validationRoundTripper(t *testing.T, resources []*resourceValidation, r *http.Request) (*http.Response, error) {

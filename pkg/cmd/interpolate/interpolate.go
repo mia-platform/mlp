@@ -30,6 +30,7 @@ import (
 	"text/template"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
@@ -156,12 +157,13 @@ func (o *Options) Validate() error {
 }
 
 // Run execute the interpolate command
-func (o *Options) Run(context.Context) error {
+func (o *Options) Run(ctx context.Context) error {
+	logger := logr.FromContextOrDiscard(ctx)
 	if err := o.fSys.MkdirAll(o.outputPath); err != nil {
 		return err
 	}
 
-	pathsToInterpolate, err := o.filesToInterpolate()
+	pathsToInterpolate, err := o.filesToInterpolate(ctx)
 	if err != nil {
 		return err
 	}
@@ -172,11 +174,13 @@ func (o *Options) Run(context.Context) error {
 			return err
 		}
 
+		logger.V(5).Info("intepolating file", "path", path)
 		interpolatedData, err := Interpolate(data, o.prefixes, name)
 		if err != nil {
 			return err
 		}
 
+		logger.V(10).Info("saving interpolated file", "path", path)
 		if err := o.fSys.WriteFile(filepath.Join(o.outputPath, name), interpolatedData); err != nil {
 			return err
 		}
@@ -185,31 +189,44 @@ func (o *Options) Run(context.Context) error {
 	return nil
 }
 
-func (o *Options) filesToInterpolate() ([]string, error) {
+func (o *Options) filesToInterpolate(ctx context.Context) ([]string, error) {
+	logger := logr.FromContextOrDiscard(ctx)
+
 	if o.inputPaths[0] == stdinToken {
+		logger.V(10).Info("no paths provided, switch to stdin")
 		return []string{stdinToken}, nil
 	}
 
+	logger.V(5).Info("accumulating files", "paths", strings.Join(o.inputPaths, ", "))
 	yamlExtensions := []string{".yaml", ".yml"}
 	var paths []string
-	for _, path := range o.inputPaths {
-		if !o.fSys.IsDir(path) && slices.Contains(yamlExtensions, filepath.Ext(path)) {
+	addOnlyYAMLFiles := func(path string) {
+		logger.V(10).Info("considering file", "path", path)
+		if slices.Contains(yamlExtensions, filepath.Ext(path)) {
+			logger.V(10).Info("file has correct extension", "path", path)
 			paths = append(paths, path)
+		}
+	}
+	for _, path := range o.inputPaths {
+		if !o.fSys.Exists(path) {
+			return nil, fmt.Errorf("no such file or directory: %s", path)
+		}
+		if !o.fSys.IsDir(path) {
+			addOnlyYAMLFiles(path)
 			continue
 		}
 
+		logger.V(10).Info("considering folder", "path", path)
 		err := o.fSys.Walk(path, func(path string, info fs.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
 			if info.IsDir() {
+				logger.V(10).Info("ignore folder inside a folder", "path", path)
 				return nil
 			}
 
-			if slices.Contains(yamlExtensions, filepath.Ext(path)) {
-				paths = append(paths, path)
-			}
-
+			addOnlyYAMLFiles(path)
 			return nil
 		})
 		if err != nil {
@@ -217,6 +234,7 @@ func (o *Options) filesToInterpolate() ([]string, error) {
 		}
 	}
 
+	logger.V(5).Info("accumulated result", "paths", strings.Join(paths, ", "))
 	return paths, nil
 }
 

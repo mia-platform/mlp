@@ -19,7 +19,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sync"
 
 	"github.com/mia-platform/jpl/pkg/inventory"
 	"github.com/mia-platform/jpl/pkg/resource"
@@ -47,9 +46,6 @@ type Inventory struct {
 
 	clientset kubernetes.Interface
 	mapper    meta.RESTMapper
-
-	cachedRemoteSet sets.Set[resource.ObjectMetadata]
-	lock            sync.Mutex
 }
 
 func NewInventory(factory util.ClientFactory, name, namespace, filedManager string) (inventory.Store, error) {
@@ -80,13 +76,6 @@ func NewInventory(factory util.ClientFactory, name, namespace, filedManager stri
 }
 
 func (s *Inventory) Load(ctx context.Context) (sets.Set[resource.ObjectMetadata], error) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	if s.compatibilityMode && s.cachedRemoteSet != nil {
-		return s.cachedRemoteSet, nil
-	}
-
 	objs, err := s.delegate.Load(ctx)
 	if err != nil || len(objs) > 0 {
 		s.compatibilityMode = false
@@ -120,6 +109,7 @@ func (s *Inventory) oldInventoryObjects(ctx context.Context) (sets.Set[resource.
 	sec, err := s.clientset.CoreV1().Secrets(s.namespace).Get(ctx, oldInventoryName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
+			s.compatibilityMode = false
 			return metadataSet, nil
 		}
 		return nil, fmt.Errorf("failed to find inventory: %w", err)
@@ -159,7 +149,6 @@ func (s *Inventory) oldInventoryObjects(ctx context.Context) (sets.Set[resource.
 		}
 	}
 
-	s.cachedRemoteSet = set
 	return set, nil
 }
 
@@ -167,9 +156,6 @@ func (s *Inventory) deleteOldInventory(ctx context.Context, dryRun bool) error {
 	if dryRun {
 		return nil
 	}
-
-	s.lock.Lock()
-	defer s.lock.Unlock()
 
 	s.compatibilityMode = false
 	propagation := metav1.DeletePropagationBackground
@@ -181,7 +167,6 @@ func (s *Inventory) deleteOldInventory(ctx context.Context, dryRun bool) error {
 		return fmt.Errorf("failed to delete inventory: %w", err)
 	}
 
-	s.cachedRemoteSet = nil
 	return nil
 }
 

@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
 	"sigs.k8s.io/kustomize/api/types"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
@@ -96,9 +97,12 @@ func (*Flags) ToOptions(args []string, fSys filesys.FileSystem) (*Options, error
 }
 
 // Run execute the hydrate command
-func (o *Options) Run(context.Context) error {
+func (o *Options) Run(ctx context.Context) error {
+	logger := logr.FromContextOrDiscard(ctx)
+
+	logger.V(5).Info("hydrating files", "paths", strings.Join(o.paths, ", "))
 	for _, path := range o.paths {
-		if err := o.hydrateKustomize(path); err != nil {
+		if err := o.hydrateKustomize(ctx, path); err != nil {
 			return err
 		}
 	}
@@ -107,12 +111,16 @@ func (o *Options) Run(context.Context) error {
 }
 
 // hydrateKustomize will read the folder at path and insert the files as resources or patches based on a regex
-func (o *Options) hydrateKustomize(path string) error {
+func (o *Options) hydrateKustomize(ctx context.Context, path string) error {
+	logger := logr.FromContextOrDiscard(ctx)
+
+	logger.V(5).Info("hydrating", "path", path)
 	files, err := o.fSys.ReadDir(path)
 	if err != nil {
 		return err
 	}
 
+	logger.V(8).Info("files found", "paths", strings.Join(files, ", "))
 	var resources []string
 	var patches []string
 	regex := regexp.MustCompile(`(^|\.)patch\.ya?ml$`)
@@ -126,25 +134,30 @@ func (o *Options) hydrateKustomize(path string) error {
 
 		switch regex.MatchString(normalizedName) {
 		case true:
+			logger.V(10).Info("patch found", "path", file)
 			patches = append(patches, file)
 		case false:
+			logger.V(10).Info("resource found", "path", file)
 			resources = append(resources, file)
 		}
 	}
 
 	slices.SortStableFunc(resources, cmp.Compare)
 	slices.SortStableFunc(patches, cmp.Compare)
-	return updateKustomize(o.fSys, path, resources, patches)
+	return updateKustomize(ctx, o.fSys, path, resources, patches)
 }
 
 // updateKustomize will read the kustomization file at path and will add resources and patches if not already
 // present in the file
-func updateKustomize(fSys filesys.FileSystem, path string, resources, patches []string) error {
+func updateKustomize(ctx context.Context, fSys filesys.FileSystem, path string, resources, patches []string) error {
+	logger := logr.FromContextOrDiscard(ctx)
+
 	kf, err := newKustomizationFile(fSys, path)
 	if err != nil {
 		return err
 	}
 
+	logger.V(3).Info("reading kustomization file", "path", path)
 	k, err := kf.read()
 	if err != nil {
 		return err
@@ -154,6 +167,7 @@ func updateKustomize(fSys filesys.FileSystem, path string, resources, patches []
 		if kf.GetPath() == filepath.Join(path, resource) || slices.Contains(k.Resources, resource) {
 			continue
 		}
+		logger.V(8).Info("adding resource", "path", resource)
 		k.Resources = append(k.Resources, resource)
 	}
 
@@ -170,9 +184,11 @@ func updateKustomize(fSys filesys.FileSystem, path string, resources, patches []
 			}
 		}
 		if !found {
+			logger.V(8).Info("adding patch", "path", patch)
 			k.Patches = append(k.Patches, p)
 		}
 	}
 
+	logger.V(5).Info("saving kustomization file", "path", path)
 	return kf.write(k)
 }

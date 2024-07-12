@@ -21,6 +21,7 @@ import (
 	"io"
 
 	"github.com/MakeNowJust/heredoc/v2"
+	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"sigs.k8s.io/kustomize/api/krusty"
@@ -116,7 +117,10 @@ func (f *Flags) ToOptions(args []string, fSys filesys.FileSystem, writer io.Writ
 }
 
 // Run execute the kustomize command
-func (o *Options) Run(context.Context) error {
+func (o *Options) Run(ctx context.Context) error {
+	logger := logr.FromContextOrDiscard(ctx)
+
+	logger.V(5).Info("reading kustomize files", "path", o.inputPath)
 	kustomizer := krusty.MakeKustomizer(krusty.MakeDefaultOptions())
 	resourceMap, err := kustomizer.Run(o.fSys, o.inputPath)
 	if err != nil {
@@ -129,6 +133,7 @@ func (o *Options) Run(context.Context) error {
 	}
 
 	if len(o.outputPath) > 0 {
+		logger.V(5).Info("writing accumulated data", "path", o.outputPath)
 		return o.fSys.WriteFile(o.outputPath, yaml)
 	}
 
