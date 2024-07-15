@@ -27,6 +27,7 @@ import (
 	"github.com/mia-platform/mlp/pkg/cmd/deploy"
 	"github.com/mia-platform/mlp/pkg/cmd/generate"
 	"github.com/mia-platform/mlp/pkg/cmd/hydrate"
+	"github.com/mia-platform/mlp/pkg/cmd/interpolate"
 	"github.com/mia-platform/mlp/pkg/cmd/kustomize"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -88,11 +89,12 @@ func NewRootCommand() *cobra.Command {
 	cmd.SetContext(logr.NewContext(context.Background(), logger))
 
 	cmd.AddCommand(
-		versionCommand(),
-		kustomize.NewCommand(),
-		hydrate.NewCommand(),
-		generate.NewCommand(),
 		deploy.NewCommand(genericclioptions.NewConfigFlags(true)),
+		generate.NewCommand(),
+		hydrate.NewCommand(),
+		interpolate.NewCommand(),
+		kustomize.NewCommand(),
+		versionCommand(),
 	)
 
 	return cmd
