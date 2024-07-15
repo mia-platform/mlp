@@ -23,6 +23,8 @@ If you have [Homebrew] installed on your system `mlp` is only a command away:
 brew install mia-platform/tap/mlp
 ```
 
+This method will also automatically setup the shell completions for `bash`, `zsh` and `fish`.
+
 #### Go
 
 If you have [Golang] installed with a version >= 1.13 in your system and you have the `$GOPATH`env set, you can
