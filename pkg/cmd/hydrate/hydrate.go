@@ -178,11 +178,12 @@ func updateKustomize(ctx context.Context, fSys filesys.FileSystem, path string, 
 
 		found := false
 		for _, pp := range k.Patches {
-			if pp.Equals(p) {
+			if pp.Path == patch {
 				found = true
 				break
 			}
 		}
+
 		if !found {
 			logger.V(8).Info("adding patch", "path", patch)
 			k.Patches = append(k.Patches, p)

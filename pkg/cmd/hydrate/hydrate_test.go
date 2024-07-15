@@ -70,6 +70,10 @@ resources:
 apiVersion: kustomize.config.k8s.io/v1beta1
 patches:
 - path: path.yaml
+  target:
+    group: apps
+    version: v1
+    kind: Deployment
 - path: test4.patch.yml
 - path: test2.patch.YAML
 resources:
@@ -159,6 +163,10 @@ func testingInMemoryFSys(t *testing.T) filesys.FileSystem {
 apiVersion: kustomize.config.k8s.io/v1beta1
 patches:
 - path: path.yaml
+  target:
+    group: apps
+    version: v1
+    kind: Deployment
 - path: test4.patch.yml
 `))
 	require.NoError(t, err)
