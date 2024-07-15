@@ -94,6 +94,7 @@ ZZZZZZZZZZZZZZZZZZZZZZZZZZ
 	t.Setenv("MLP_HTML", "env with spaces and \"")
 
 	fSys := filesys.MakeFsOnDisk()
+	testTmpDir := t.TempDir()
 	tests := map[string]struct {
 		option              *Options
 		expectedError       string
@@ -103,7 +104,7 @@ ZZZZZZZZZZZZZZZZZZZZZZZZZZ
 			option: &Options{
 				prefixes:   []string{"MLP_TEST_", "MLP_"},
 				inputPaths: []string{filepath.Join(testdata, "folder"), filepath.Join(testdata, "file.yaml")},
-				outputPath: filepath.Join(t.TempDir(), "outputs-multiple-paths"),
+				outputPath: filepath.Join(testTmpDir, "outputs-multiple-paths"),
 				fSys:       fSys,
 				reader:     new(bytes.Buffer),
 			},
@@ -113,7 +114,7 @@ ZZZZZZZZZZZZZZZZZZZZZZZZZZ
 			option: &Options{
 				prefixes:   []string{"MLP_"},
 				inputPaths: []string{stdinToken},
-				outputPath: filepath.Join(t.TempDir(), "output-stdin"),
+				outputPath: filepath.Join(testTmpDir, "output-stdin"),
 				fSys:       fSys,
 				reader: func() io.Reader {
 					data, err := fSys.ReadFile(filepath.Join(testdata, "file.yaml"))
@@ -127,7 +128,7 @@ ZZZZZZZZZZZZZZZZZZZZZZZZZZ
 			option: &Options{
 				prefixes:   []string{"MLP_MISSING"},
 				inputPaths: []string{filepath.Join(testdata, "missing-env.yaml")},
-				outputPath: filepath.Join(t.TempDir(), "outputs-missing-envs"),
+				outputPath: filepath.Join(testTmpDir, "outputs-missing-envs"),
 				fSys:       fSys,
 			},
 			expectedError: `environment variable "MISSING_ENV" not found`,
@@ -135,10 +136,9 @@ ZZZZZZZZZZZZZZZZZZZZZZZZZZ
 		"error with ensuring output folder": {
 			option: &Options{
 				outputPath: func() string {
-					tmpdir := filepath.Join(t.TempDir(), "non-executable")
-					fSys.MkdirAll(tmpdir)
+					tmpdir := filepath.Join(testTmpDir, "non-executable")
+					require.NoError(t, os.MkdirAll(tmpdir, os.ModePerm))
 					require.NoError(t, os.Chmod(tmpdir, 0444))
-
 					return filepath.Join(tmpdir, "output")
 				}(),
 				fSys: fSys,
@@ -150,8 +150,8 @@ ZZZZZZZZZZZZZZZZZZZZZZZZZZ
 				prefixes:   []string{"MLP_TEST_", "MLP_"},
 				inputPaths: []string{filepath.Join(testdata, "file.yaml")},
 				outputPath: func() string {
-					tmpdir := filepath.Join(t.TempDir(), "non-writable")
-					fSys.MkdirAll(tmpdir)
+					tmpdir := filepath.Join(testTmpDir, "non-writable")
+					require.NoError(t, os.MkdirAll(tmpdir, os.ModePerm))
 					require.NoError(t, os.Chmod(tmpdir, 0555))
 					return tmpdir
 				}(),
@@ -164,7 +164,7 @@ ZZZZZZZZZZZZZZZZZZZZZZZZZZ
 			option: &Options{
 				prefixes:   []string{"MLP_TEST_", "MLP_"},
 				inputPaths: []string{filepath.Join(testdata, "missing")},
-				outputPath: filepath.Join(t.TempDir(), "no-input"),
+				outputPath: filepath.Join(testTmpDir, "no-input"),
 				fSys:       fSys,
 				reader:     new(bytes.Buffer),
 			},

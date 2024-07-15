@@ -31,9 +31,9 @@ func TestNewCommand(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	file, err := os.Create(filepath.Join(tmpDir, "kustomization"))
+	file, err := os.Create(filepath.Join(tmpDir, "Kustomization"))
 	require.NoError(t, err)
-	defer file.Close()
+	require.NoError(t, file.Close())
 
 	cmd := NewCommand()
 	assert.NotNil(t, cmd)
