@@ -6,7 +6,7 @@ metadata:
   labels:
     name: example
   annotations:
-    mia-platform.eu/dependencies-checksum: 33b16f57da9917f60f04c1016f69c5dd1cc722842cc3df711acc7ee1f7b3579f
+    mia-platform.eu/dependencies-checksum: ec4cee1e7cd6503727710ff3f36d85576177196688ea2871efae51f9de3c65ea
 spec:
   initContainers:
   - name: init

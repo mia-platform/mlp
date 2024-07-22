@@ -104,7 +104,6 @@ var _ mutator.Interface = &dependenciesMutator{}
 // The keys are the configmap kind, name, namespace and key name if necessary.
 func checksumsFromConfigMap(obj *unstructured.Unstructured) map[string]string {
 	checksums := make(map[string]string)
-	cmKey := configMapGK.Kind + obj.GetName() + obj.GetNamespace()
 
 	cm := new(corev1.ConfigMap)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, cm); err != nil {
@@ -114,15 +113,15 @@ func checksumsFromConfigMap(obj *unstructured.Unstructured) map[string]string {
 	totalData := make(map[string][]byte)
 	maps.Copy(totalData, cm.BinaryData)
 	for key, value := range cm.Data {
-		checksums[cmKey+key] = checksumFromData(value)
+		checksums[checksumObjectKey(configMapGK.Kind, obj.GetName(), obj.GetNamespace(), key)] = checksumFromData(value)
 		totalData[key] = []byte(value)
 	}
 
 	for key, value := range cm.BinaryData {
-		checksums[cmKey+key] = checksumFromData(value)
+		checksums[checksumObjectKey(configMapGK.Kind, obj.GetName(), obj.GetNamespace(), key)] = checksumFromData(value)
 	}
 
-	checksums[cmKey] = checksumFromData(totalData)
+	checksums[checksumObjectKey(configMapGK.Kind, obj.GetName(), obj.GetNamespace(), "")] = checksumFromData(totalData)
 	return checksums
 }
 
@@ -131,7 +130,6 @@ func checksumsFromConfigMap(obj *unstructured.Unstructured) map[string]string {
 // The keys are the secret kind, name, namespace and key name if necessary.
 func checksumsFromSecret(obj *unstructured.Unstructured) map[string]string {
 	checksums := make(map[string]string)
-	secKey := secretGK.Kind + obj.GetName() + obj.GetNamespace()
 
 	sec := new(corev1.Secret)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, sec); err != nil {
@@ -141,15 +139,15 @@ func checksumsFromSecret(obj *unstructured.Unstructured) map[string]string {
 	totalData := make(map[string][]byte)
 	maps.Copy(totalData, sec.Data)
 	for key, value := range sec.Data {
-		checksums[secKey+key] = checksumFromData(value)
+		checksums[checksumObjectKey(secretGK.Kind, obj.GetName(), obj.GetNamespace(), key)] = checksumFromData(value)
 	}
 
 	for key, value := range sec.StringData {
-		checksums[secKey+key] = checksumFromData(value)
+		checksums[checksumObjectKey(secretGK.Kind, obj.GetName(), obj.GetNamespace(), key)] = checksumFromData(value)
 		totalData[key] = []byte(value)
 	}
 
-	checksums[secKey] = checksumFromData(totalData)
+	checksums[checksumObjectKey(secretGK.Kind, obj.GetName(), obj.GetNamespace(), "")] = checksumFromData(totalData)
 
 	return checksums
 }
@@ -163,13 +161,13 @@ func (m *dependenciesMutator) checksumsForPodSpec(pod corev1.PodSpec, namespace 
 	for _, volume := range pod.Volumes {
 		fromSecret := volume.Secret
 		if fromSecret != nil {
-			dependencies = append(dependencies, secKind+fromSecret.SecretName+namespace)
+			dependencies = append(dependencies, checksumObjectKey(secKind, fromSecret.SecretName, namespace, ""))
 			continue
 		}
 
 		fromConfigMap := volume.ConfigMap
 		if fromConfigMap != nil {
-			dependencies = append(dependencies, cmKind+fromConfigMap.Name+namespace)
+			dependencies = append(dependencies, checksumObjectKey(cmKind, fromConfigMap.Name, namespace, ""))
 			continue
 		}
 	}
@@ -182,16 +180,16 @@ func (m *dependenciesMutator) checksumsForPodSpec(pod corev1.PodSpec, namespace 
 				}
 
 				if env.ValueFrom.ConfigMapKeyRef != nil {
-					cmName := env.ValueFrom.ConfigMapKeyRef.LocalObjectReference.Name
-					key := env.ValueFrom.ConfigMapKeyRef.Key
-					dependencies = append(dependencies, cmKind+cmName+namespace+key)
+					name := env.ValueFrom.ConfigMapKeyRef.LocalObjectReference.Name
+					key := checksumObjectKey(cmKind, name, namespace, env.ValueFrom.ConfigMapKeyRef.Key)
+					dependencies = append(dependencies, key)
 					continue
 				}
 
 				if env.ValueFrom.SecretKeyRef != nil {
-					secName := env.ValueFrom.SecretKeyRef.LocalObjectReference.Name
-					key := env.ValueFrom.SecretKeyRef.Key
-					dependencies = append(dependencies, secKind+secName+namespace+key)
+					name := env.ValueFrom.SecretKeyRef.LocalObjectReference.Name
+					key := checksumObjectKey(secKind, name, namespace, env.ValueFrom.SecretKeyRef.Key)
+					dependencies = append(dependencies, key)
 				}
 			}
 		}
@@ -208,4 +206,12 @@ func (m *dependenciesMutator) checksumsForPodSpec(pod corev1.PodSpec, namespace 
 	}
 
 	return checksums
+}
+
+func checksumObjectKey(kind, name, namespace, key string) string {
+	if len(key) == 0 {
+		return kind + ":" + name + ":" + namespace
+	}
+
+	return kind + ":" + name + ":" + namespace + ":" + key
 }

@@ -11,7 +11,7 @@ spec:
     metadata:
       annotations:
         existing: annotation
-        mia-platform.eu/dependencies-checksum: 8c957b7db2280ebf67554d2b65ec30199e6e3a6a15648533f9aee370623e9e14
+        mia-platform.eu/dependencies-checksum: 0a7f9b4a49ce906ecfaba03aa45ef6512ecb33639d434107b43473b16d0c1afb
       labels:
         name: example
     spec:

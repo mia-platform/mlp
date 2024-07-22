@@ -10,7 +10,7 @@ spec:
   template:
     metadata:
       annotations:
-        mia-platform.eu/dependencies-checksum: 1e41cd0078be2ed7ec826419c5368e8f9cb924e9d4cc089e201746d514b64bd5
+        mia-platform.eu/dependencies-checksum: e6639472ab29288cafccc49c310dcf7b21109602c2db25e34b10de1041389043
       labels:
         app: example
     spec:

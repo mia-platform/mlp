@@ -51,14 +51,14 @@ func TestNewDependenciesMutator(t *testing.T) {
 				jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "cm-other-namespace.yaml")),
 			},
 			expectedMap: map[string]string{
-				"ConfigMapexampleother-ns":       "89557268706287308eefe82fbdbd327914ac22a23499a45be72ea79483d73a73",
-				"ConfigMapexampleother-nsconfig": "efe6c20174d12ac077f3de985cae67175a6108ac084e813a7d0eb9c5ff9fe85d",
-				"ConfigMapexampletest":           "474402695ca63dd67a8ee93690d46011d2e19181aeb10c616af3cb48ac36adad",
-				"ConfigMapexampletestbconfig":    "f2ad8ef38c3f6fac4d0dcfa67696710c04bc88f92a54f6758cb43c0d392b3eea",
-				"ConfigMapexampletestconfig":     "3f564266de9477b004c53c67de5eb4ec7cedb6dcee5b3d6d77ca2ed6cdd323ca",
-				"Secretexampletest":              "f8ac3c753041ab4d641d61751aaf9a9422faf88b14b727789a0319fe872ee418",
-				"Secretexampletestdata":          "355c838b5878c899babc73dbde367b0f450f37c41e5fec9c4af0a86900086b72",
-				"SecretexampletestotherData":     "3f564266de9477b004c53c67de5eb4ec7cedb6dcee5b3d6d77ca2ed6cdd323ca",
+				"ConfigMap:example:other-ns":        "89557268706287308eefe82fbdbd327914ac22a23499a45be72ea79483d73a73",
+				"ConfigMap:example:other-ns:config": "efe6c20174d12ac077f3de985cae67175a6108ac084e813a7d0eb9c5ff9fe85d",
+				"ConfigMap:example:test":            "474402695ca63dd67a8ee93690d46011d2e19181aeb10c616af3cb48ac36adad",
+				"ConfigMap:example:test:bconfig":    "f2ad8ef38c3f6fac4d0dcfa67696710c04bc88f92a54f6758cb43c0d392b3eea",
+				"ConfigMap:example:test:config":     "3f564266de9477b004c53c67de5eb4ec7cedb6dcee5b3d6d77ca2ed6cdd323ca",
+				"Secret:example:test":               "f8ac3c753041ab4d641d61751aaf9a9422faf88b14b727789a0319fe872ee418",
+				"Secret:example:test:data":          "355c838b5878c899babc73dbde367b0f450f37c41e5fec9c4af0a86900086b72",
+				"Secret:example:test:otherData":     "3f564266de9477b004c53c67de5eb4ec7cedb6dcee5b3d6d77ca2ed6cdd323ca",
 			},
 		},
 	}
@@ -155,14 +155,14 @@ func TestDependenciesMutatorMutate(t *testing.T) {
 	testdata := filepath.Join("testdata", "dependency-mutator")
 
 	checksumsMap := map[string]string{
-		"ConfigMapexampleother-ns":       "89557268706287308eefe82fbdbd327914ac22a23499a45be72ea79483d73a73",
-		"ConfigMapexampleother-nsconfig": "efe6c20174d12ac077f3de985cae67175a6108ac084e813a7d0eb9c5ff9fe85d",
-		"ConfigMapexampletest":           "474402695ca63dd67a8ee93690d46011d2e19181aeb10c616af3cb48ac36adad",
-		"ConfigMapexampletestbconfig":    "f2ad8ef38c3f6fac4d0dcfa67696710c04bc88f92a54f6758cb43c0d392b3eea",
-		"ConfigMapexampletestconfig":     "3f564266de9477b004c53c67de5eb4ec7cedb6dcee5b3d6d77ca2ed6cdd323ca",
-		"Secretexampletest":              "f8ac3c753041ab4d641d61751aaf9a9422faf88b14b727789a0319fe872ee418",
-		"Secretexampletestdata":          "355c838b5878c899babc73dbde367b0f450f37c41e5fec9c4af0a86900086b72",
-		"SecretexampletestotherData":     "3f564266de9477b004c53c67de5eb4ec7cedb6dcee5b3d6d77ca2ed6cdd323ca",
+		"ConfigMap:example:other-ns":        "89557268706287308eefe82fbdbd327914ac22a23499a45be72ea79483d73a73",
+		"ConfigMap:example:other-ns:config": "efe6c20174d12ac077f3de985cae67175a6108ac084e813a7d0eb9c5ff9fe85d",
+		"ConfigMap:example:test":            "474402695ca63dd67a8ee93690d46011d2e19181aeb10c616af3cb48ac36adad",
+		"ConfigMap:example:test:bconfig":    "f2ad8ef38c3f6fac4d0dcfa67696710c04bc88f92a54f6758cb43c0d392b3eea",
+		"ConfigMap:example:test:config":     "3f564266de9477b004c53c67de5eb4ec7cedb6dcee5b3d6d77ca2ed6cdd323ca",
+		"Secret:example:test":               "f8ac3c753041ab4d641d61751aaf9a9422faf88b14b727789a0319fe872ee418",
+		"Secret:example:test:data":          "355c838b5878c899babc73dbde367b0f450f37c41e5fec9c4af0a86900086b72",
+		"Secret:example:test:otherData":     "3f564266de9477b004c53c67de5eb4ec7cedb6dcee5b3d6d77ca2ed6cdd323ca",
 	}
 	tests := map[string]struct {
 		resource       *unstructured.Unstructured
