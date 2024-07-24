@@ -31,9 +31,9 @@ import (
 
 // deployMutator will add the deploy annotation to workload resources if needed, based on configurations.
 //   - if deploy type is 'deploy_all' always set the annotation
-//   - if deploy type is smart deploy and forceDeployWhenNoSemver is false set the annotation only if present on
+//   - if deploy type is smart_deploy and forceDeployWhenNoSemver is false set the annotation only if present on
 //     remote
-//   - if deploy type is smart deploy and forceDeployWhenNoSemver is true, if at least one image in one of its
+//   - if deploy type is smart_deploy and forceDeployWhenNoSemver is true, if at least one image in one of its
 //     containers don't have a semver tag set the deploy annotation, else set the annotation only if present on
 //     remote
 type deployMutator struct {
@@ -109,7 +109,6 @@ func (m *deployMutator) smartDeployAnnotation(obj *unstructured.Unstructured, po
 		}
 	}
 
-	// controlla in remoto
 	remoteObj, err := getter.Get(context.Background(), resource.ObjectMetadataFromUnstructured(obj))
 	if err != nil {
 		return false, "", err

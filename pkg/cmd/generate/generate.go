@@ -146,7 +146,7 @@ func (o *Options) Run(ctx context.Context) error {
 
 	pathsToInterpolate := o.filterYAMLFiles()
 	for _, path := range pathsToInterpolate {
-		logger.V(3).Info("generating resource from configuaration", "path", path)
+		logger.V(3).Info("generating resource from configuration", "path", path)
 		configuration, err := o.readConfiguration(ctx, path)
 		if err != nil {
 			return err

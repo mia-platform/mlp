@@ -71,7 +71,7 @@ func TestDeployMutatorCanHandleResource(t *testing.T) {
 			},
 			expectedResult: true,
 		},
-		"stateful return true": {
+		"statefulset return true": {
 			obj: &metav1.PartialObjectMetadata{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       stsGK.Kind,

@@ -3,7 +3,7 @@
 The `hydrate` subcommand is an helper to fill kustomization configuration files with resources and patches.
 
 For doing so wihtout launching multiple commands with different parameters, and leaving the user being able to add
-specific patches that needs custom targetign will only add files that conform to specific regex and we will skip files
+specific patches that needs custom targeting will only add files that conform to specific regex and we will skip files
 that are already present in the relative section in the file.
 
 The first regex will match any file that ends with `.patch.yaml` or `.patch.yml` and the files `patch.yaml`

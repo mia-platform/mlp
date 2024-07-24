@@ -119,7 +119,7 @@ func TestDependenciesMutatorCanHandleResource(t *testing.T) {
 			},
 			expectedResult: true,
 		},
-		"stateful return true": {
+		"statefulset return true": {
 			hashesMap: hashesMap,
 			obj: &metav1.PartialObjectMetadata{
 				TypeMeta: metav1.TypeMeta{
