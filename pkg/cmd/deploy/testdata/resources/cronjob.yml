@@ -1,0 +1,26 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: example
+  annotations:
+    mia-platform.eu/autocreate: 'true'
+spec:
+  schedule: "*/5 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: example
+            image: busybox
+            args:
+            - /bin/sh
+            - -c
+            - date; sleep 120
+            env:
+            - name: ENV
+              valueFrom:
+                configMapKeyRef:
+                  key: key
+                  name: example
+          restartPolicy: OnFailure

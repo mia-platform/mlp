@@ -1,7 +1,0 @@
-apiVersion: v1
-data:
-  dueKey: deuValue
-  unaKey: unValue
-kind: ConfigMap
-metadata:
-  name: literal

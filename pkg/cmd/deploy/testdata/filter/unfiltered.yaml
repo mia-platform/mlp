@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: unfiltered
+  namespace: test
+  annotations:
+    mia-platform.eu/deploy: once
+type: Opaque

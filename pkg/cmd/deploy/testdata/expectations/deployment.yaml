@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example
+  namespace: mlp-deploy-test
+  annotations: {}
+spec:
+  selector:
+    matchLabels:
+      app: example
+  template:
+    metadata:
+      annotations:
+        mia-platform.eu/dependencies-checksum: "e668e6cbb6e786b4b46b853136cfc9fac4effe474dbef3a8420339cc353b13d1"
+        mia-platform.eu/deploy-checksum: "a2d1ace0489d09c0ca26a1ab8a8bc9b11e4365cb4f904c434565a59119f3eb15"
+      labels:
+        app: example
+    spec:
+      containers:
+      - image: nginx:latest
+        name: example
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+      volumes:
+      - name: example
+        configMap:
+          name: example

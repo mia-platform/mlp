@@ -1,0 +1,27 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: example
+  namespace: mlp-deploy-test
+  annotations:
+    mia-platform.eu/autocreate: 'true'
+spec:
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - args:
+            - /bin/sh
+            - '-c'
+            - date; sleep 120
+            env:
+            - name: ENV
+              valueFrom:
+                configMapKeyRef:
+                  key: key
+                  name: example
+            image: busybox
+            name: example
+          restartPolicy: OnFailure
+  schedule: '*/5 * * * *'

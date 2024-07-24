@@ -45,20 +45,15 @@ jobs:
       run: make ci-lint GOLANGCI_LINT_MODE="github-actions"
 
   test:
-    name: Testing on ${{ matrix.os }} and kubernetes ${{ matrix.k8s_version}}
+    name: Testing on ${{ matrix.os }}
     strategy:
       matrix:
         os:
         - ubuntu-latest
         - macos-latest
-        k8s_version:
-        - "1.27"
-        - "1.28"
-        - "1.29"
-        - "1.30"
     runs-on: ${{ matrix.os }}
     env:
-      ENVTEST_K8S_VERSION: ${{matrix.k8s_version}}
+      GOEXPERIMENT: nocoverageredesign
     steps:
     - name: Checkout Repository
       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7

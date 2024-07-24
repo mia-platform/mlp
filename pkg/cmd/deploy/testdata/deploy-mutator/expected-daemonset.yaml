@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: example
+  namespace: test
+spec:
+  selector:
+    matchLabels:
+      name: example
+  template:
+    metadata:
+      annotations:
+        existing: annotation
+      labels:
+        name: example
+    spec:
+      initContainers:
+      - name: example
+        image: busybox@sha256:9ae97d36d26566ff84e8893c64a6dc4fe8ca6d1144bf5b87b2b85a32def253c7
+      containers:
+      - name: example
+        image: busybox:v1.0.0
+      volumes:
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: example
+        secret:
+          secretName: example
+          optional: true

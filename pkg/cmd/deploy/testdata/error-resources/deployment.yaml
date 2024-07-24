@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example
+spec:
+  selector:
+    matchLabels:
+      app: example
+  template:
+    metadata:
+      annotations:
+        mia-platform.eu/dependencies-checksum: predefined-value
+      labels:
+        app: example
+    spec:
+      containers:
+      - name: example
+        image: nginx:latest
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+      volumes:
+      - name: example
+        configMap:
+          name: example

@@ -1,0 +1,29 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: example
+  namespace: mlp-deploy-test
+  annotations:
+    cronjob.kubernetes.io/instantiate: manual
+  creationTimestamp: null
+spec:
+  template:
+    metadata:
+      creationTimestamp: null
+    spec:
+      containers:
+      - args:
+        - /bin/sh
+        - '-c'
+        - date; sleep 120
+        env:
+        - name: ENV
+          valueFrom:
+            configMapKeyRef:
+              key: key
+              name: example
+        image: busybox
+        name: example
+        resources: {}
+      restartPolicy: OnFailure
+status: {}
