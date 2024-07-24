@@ -2,31 +2,33 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: example
+  namespace: externalsecret-test
 spec:
   selector:
     matchLabels:
       app: example
   template:
     metadata:
-      annotations:
-        mia-platform.eu/dependencies-checksum: predefined-value
       labels:
         app: example
     spec:
-      containers:
+      initContainers:
       - name: example
-        image: nginx:latest
-        resources:
-          limits:
-            memory: "128Mi"
-            cpu: "500m"
+        image: busybox
         env:
         - name: ENV
           valueFrom:
             secretKeyRef:
-              key: secret-key
+              key: data
               name: external-secret
-      volumes:
+      containers:
       - name: example
+        image: busybox
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+      volumes:
+      - name: volume
         configMap:
           name: example

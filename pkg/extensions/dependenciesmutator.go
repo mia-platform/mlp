@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package deploy
+package extensions
 
 import (
 	"maps"
@@ -92,7 +92,7 @@ func (m *dependenciesMutator) Mutate(obj *unstructured.Unstructured, _ cache.Rem
 		return err
 	}
 
-	annotations[checksumAnnotation] = checksumFromData(checksums)
+	annotations[checksumAnnotation] = ChecksumFromData(checksums)
 	return unstructured.SetNestedStringMap(obj.Object, annotations, podAnnotationsFields...)
 }
 
@@ -113,15 +113,15 @@ func checksumsFromConfigMap(obj *unstructured.Unstructured) map[string]string {
 	totalData := make(map[string][]byte)
 	maps.Copy(totalData, cm.BinaryData)
 	for key, value := range cm.Data {
-		checksums[checksumObjectKey(configMapGK.Kind, obj.GetName(), obj.GetNamespace(), key)] = checksumFromData(value)
+		checksums[checksumObjectKey(configMapGK.Kind, obj.GetName(), obj.GetNamespace(), key)] = ChecksumFromData(value)
 		totalData[key] = []byte(value)
 	}
 
 	for key, value := range cm.BinaryData {
-		checksums[checksumObjectKey(configMapGK.Kind, obj.GetName(), obj.GetNamespace(), key)] = checksumFromData(value)
+		checksums[checksumObjectKey(configMapGK.Kind, obj.GetName(), obj.GetNamespace(), key)] = ChecksumFromData(value)
 	}
 
-	checksums[checksumObjectKey(configMapGK.Kind, obj.GetName(), obj.GetNamespace(), "")] = checksumFromData(totalData)
+	checksums[checksumObjectKey(configMapGK.Kind, obj.GetName(), obj.GetNamespace(), "")] = ChecksumFromData(totalData)
 	return checksums
 }
 
@@ -139,15 +139,15 @@ func checksumsFromSecret(obj *unstructured.Unstructured) map[string]string {
 	totalData := make(map[string][]byte)
 	maps.Copy(totalData, sec.Data)
 	for key, value := range sec.Data {
-		checksums[checksumObjectKey(secretGK.Kind, obj.GetName(), obj.GetNamespace(), key)] = checksumFromData(value)
+		checksums[checksumObjectKey(secretGK.Kind, obj.GetName(), obj.GetNamespace(), key)] = ChecksumFromData(value)
 	}
 
 	for key, value := range sec.StringData {
-		checksums[checksumObjectKey(secretGK.Kind, obj.GetName(), obj.GetNamespace(), key)] = checksumFromData(value)
+		checksums[checksumObjectKey(secretGK.Kind, obj.GetName(), obj.GetNamespace(), key)] = ChecksumFromData(value)
 		totalData[key] = []byte(value)
 	}
 
-	checksums[checksumObjectKey(secretGK.Kind, obj.GetName(), obj.GetNamespace(), "")] = checksumFromData(totalData)
+	checksums[checksumObjectKey(secretGK.Kind, obj.GetName(), obj.GetNamespace(), "")] = ChecksumFromData(totalData)
 
 	return checksums
 }

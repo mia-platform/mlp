@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: example
+  namespace: externalsecret-test
+  annotations:
+    config.kubernetes.io/depends-on: external-secrets.io/namespaces/externalsecret-test/ExternalSecret/external-secret2
+spec:
+  selector:
+    matchLabels:
+      name: example
+  template:
+    metadata:
+      annotations:
+        existing: annotation
+      labels:
+        name: example
+    spec:
+      initContainers:
+      - name: example
+        image: busybox
+      containers:
+      - name: example
+        image: busybox:v1.0.0
+      volumes:
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: example
+        secret:
+          secretName: custom-secret-name
+          optional: true

@@ -3,7 +3,8 @@ kind: Deployment
 metadata:
   name: example
   namespace: mlp-deploy-test
-  annotations: {}
+  annotations:
+    config.kubernetes.io/depends-on: external-secrets.io/namespaces/mlp-deploy-test/ExternalSecret/external-secret
 spec:
   selector:
     matchLabels:
@@ -23,6 +24,12 @@ spec:
           limits:
             cpu: 500m
             memory: 128Mi
+        env:
+        - name: ENV
+          valueFrom:
+            secretKeyRef:
+              key: secret-key
+              name: external-secret
       volumes:
       - name: example
         configMap:

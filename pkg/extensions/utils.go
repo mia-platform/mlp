@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package deploy
+package extensions
 
 import (
 	"crypto/sha512"
@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"reflect"
 
+	extsecv1beta1 "github.com/external-secrets/external-secrets/apis/externalsecrets/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -39,23 +40,21 @@ const (
 
 	checksumAnnotation = miaPlatformPrefix + "dependencies-checksum"
 
-	jobGeneratorLabel = miaPlatformPrefix + "autocreate"
-	jobGeneratorValue = "true"
-
-	deployAll   = "deploy_all"
-	deploySmart = "smart_deploy"
+	DeployAll   = "deploy_all"
+	DeploySmart = "smart_deploy"
 )
 
 var (
 	configMapGK = corev1.SchemeGroupVersion.WithKind(reflect.TypeOf(corev1.ConfigMap{}).Name()).GroupKind()
 	secretGK    = corev1.SchemeGroupVersion.WithKind(reflect.TypeOf(corev1.Secret{}).Name()).GroupKind()
 
+	extsecGK      = extsecv1beta1.SchemeGroupVersion.WithKind(extsecv1beta1.ExtSecretKind).GroupKind()
+	extSecStoreGK = extsecv1beta1.SchemeGroupVersion.WithKind(extsecv1beta1.SecretStoreKind).GroupKind()
+
 	deployGK = appsv1.SchemeGroupVersion.WithKind(reflect.TypeOf(appsv1.Deployment{}).Name()).GroupKind()
 	dsGK     = appsv1.SchemeGroupVersion.WithKind(reflect.TypeOf(appsv1.DaemonSet{}).Name()).GroupKind()
 	stsGK    = appsv1.SchemeGroupVersion.WithKind(reflect.TypeOf(appsv1.StatefulSet{}).Name()).GroupKind()
 	podGK    = corev1.SchemeGroupVersion.WithKind(reflect.TypeOf(corev1.Pod{}).Name()).GroupKind()
-
-	validDeployTypeValues = []string{"deploy_all", "smart_deploy"}
 )
 
 // podFieldsForGroupKind return the pieces of the path for the pod spec and pod annotations for an unstructured
@@ -114,8 +113,8 @@ func annotationsFromUnstructuredFields(obj *unstructured.Unstructured, fields []
 	return annotations, nil
 }
 
-// checksumFromData create a Sum512_256 checksum for arbitrary data
-func checksumFromData(data interface{}) string {
+// ChecksumFromData create a Sum512_256 checksum for arbitrary data
+func ChecksumFromData(data interface{}) string {
 	encoded, err := yaml.Marshal(data)
 	if err != nil {
 		return ""

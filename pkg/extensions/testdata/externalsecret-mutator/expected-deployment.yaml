@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example
+  namespace: externalsecret-test
+  annotations:
+    config.kubernetes.io/depends-on: external-secrets.io/namespaces/externalsecret-test/ExternalSecret/external-secret
+spec:
+  selector:
+    matchLabels:
+      app: example
+  template:
+    metadata:
+      labels:
+        app: example
+    spec:
+      initContainers:
+      - name: example
+        image: busybox
+        env:
+        - name: ENV
+          valueFrom:
+            secretKeyRef:
+              key: data
+              name: external-secret
+      containers:
+      - name: example
+        image: busybox
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+      volumes:
+      - name: volume
+        configMap:
+          name: example
