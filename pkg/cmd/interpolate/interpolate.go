@@ -39,7 +39,7 @@ import (
 const (
 	cmdUsage = "interpolate"
 	cmdShort = "Interpolate env variables in files"
-	cmdLong  = `Interpolate the environment variables values inside '{{}}' blocks inside one or
+	cmdLong  = `Interpolate the environment variables values delimited by '{{' and '}}' inside one or
 	multiple files.
 	If a path is a folder only the files directly inside will be interpolated.
 

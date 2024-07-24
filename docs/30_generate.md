@@ -93,5 +93,5 @@ The `tls` block is the last supported type of `secrets` and will generate a Kube
 exposing an HTTPS connection for an `Ingress` the keys of the object are always `tls.crt` for the certificate and
 `tls.key` for the private key.
 
-The valus can be passed by file or directly in the configuration, but we highly reccomend to use files for avoiding
+The values can be passed by file or directly in the configuration, but we highly recommend to use files for avoiding
 to accidentaly leak sensible data.

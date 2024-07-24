@@ -82,7 +82,7 @@ func TestRun(t *testing.T) {
 	key, cert := generateCertificates(t)
 	encodedKey := base64.StdEncoding.EncodeToString([]byte(key))
 	encodedCert := base64.StdEncoding.EncodeToString([]byte(cert))
-	t.Setenv("MLP_DOCKER_PASSOWRD", "password")
+	t.Setenv("MLP_DOCKER_PASSWORD", "password")
 	t.Setenv("MLP_CERTIFICATE", cert)
 
 	fSys := testFilesys(t)
@@ -122,7 +122,7 @@ func TestRun(t *testing.T) {
 				outputPath:  "interpolation-error",
 				fSys:        fSys,
 			},
-			expectedError: `environment variable "DOCKER_PASSOWRD" not found`,
+			expectedError: `environment variable "DOCKER_PASSWORD" not found`,
 		},
 		"error validating certificates": {
 			options: &Options{
@@ -369,7 +369,7 @@ DmewJKf/P6KOTg4jEyNC1WIkB8KiivoxrPlo4OwENn+Hro1sLCVJtpU=
   when: "always"
   docker:
     username: "username"
-    password: "{{DOCKER_PASSOWRD}}"
+    password: "{{DOCKER_PASSWORD}}"
     email: "email@example.com"
     server: "example.com"
 - name: "tls"
