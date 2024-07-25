@@ -16,7 +16,6 @@
 package interpolate
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -27,7 +26,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"text/template"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/go-logr/logr"
@@ -79,7 +77,13 @@ const (
 	stdinToken             = "-"
 	outputFileNameForStdin = "output.yaml"
 
-	envirnonmentRegex = `[{]{2}([A-Z0-9_]+)[}]{2}`
+	envirnonmentRegex      = `[{]{2}([A-Z0-9_]+)[}]{2}`
+	unqutedLeftDelim       = `{{`
+	unqutedRightDelim      = `}}`
+	doubleQoutedLeftDelim  = `"` + unqutedLeftDelim
+	doubleQoutedRightDelim = unqutedRightDelim + `"`
+	singleQoutedLeftDelim  = `'` + unqutedLeftDelim
+	singleQoutedRightDelim = unqutedRightDelim + `'`
 )
 
 // Flags contains all the flags for the `interpolate` command. They will be converted to Options
@@ -175,7 +179,7 @@ func (o *Options) Run(ctx context.Context) error {
 		}
 
 		logger.V(5).Info("intepolating file", "path", path)
-		interpolatedData, err := Interpolate(data, o.prefixes, name)
+		interpolatedData, err := Interpolate(data, o.prefixes)
 		if err != nil {
 			return err
 		}
@@ -249,44 +253,16 @@ func (o *Options) readFile(path string) ([]byte, string, error) {
 }
 
 // Interpolate will interpolate the data content with values from env values
-func Interpolate(data []byte, envPrefixes []string, name string) ([]byte, error) {
-	noQuoteTemplateFuncs := make(template.FuncMap)
-	singleQuotedTemplateFuncs := make(template.FuncMap)
-	doubleQuotedTemplateFuncs := make(template.FuncMap)
-
+func Interpolate(data []byte, envPrefixes []string) ([]byte, error) {
 	for _, env := range envNamesToInterpolate(data) {
-		noQuoteTemplateFuncs[env] = func() (string, error) {
-			return substituteEnv(env, envPrefixes, func(str string) string {
-				return strings.ReplaceAll(str, "\n", "\\n") // keep multiline string on one line
-			})
+		parsedData, err := substituteEnv(string(data), env, envPrefixes)
+		if err != nil {
+			return nil, err
 		}
-		singleQuotedTemplateFuncs[env] = func() (string, error) {
-			return substituteEnv(env, envPrefixes, func(str string) string {
-				str = strconv.Quote(str)
-				str = strings.ReplaceAll(str, `\\`, `\`)
-				str = strings.ReplaceAll(str, `\"`, `"`)
-				return "'" + str[1:len(str)-1] + "'"
-			})
-		}
-		doubleQuotedTemplateFuncs[env] = func() (string, error) {
-			return substituteEnv(env, envPrefixes, func(str string) string {
-				str = strconv.Quote(str)
-				return strings.ReplaceAll(str, `\\`, `\`)
-			})
-		}
+		data = []byte(parsedData)
 	}
 
-	var parsedData []byte
-	var err error
-	if parsedData, err = templating(name, `'{{`, `}}'`, singleQuotedTemplateFuncs, data); err != nil {
-		return nil, err
-	}
-
-	if parsedData, err = templating(name, `"{{`, `}}"`, doubleQuotedTemplateFuncs, parsedData); err != nil {
-		return nil, err
-	}
-
-	return templating(name, "", "", noQuoteTemplateFuncs, parsedData)
+	return data, nil
 }
 
 func envNamesToInterpolate(data []byte) []string {
@@ -302,7 +278,45 @@ func envNamesToInterpolate(data []byte) []string {
 	return envNames
 }
 
-func substituteEnv(envName string, prefixes []string, quotingStringFun func(string) string) (string, error) {
+// substituteEnv substitute envName in data when encased in a set of delimiters appling transformations on the
+// value contained in it.
+func substituteEnv(data, envName string, prefixes []string) (string, error) {
+	doubleQouted := doubleQoutedLeftDelim + envName + doubleQoutedRightDelim
+	substitution, err := valueForEnv(envName, prefixes, func(str string) string {
+		str = strconv.Quote(str)
+		return strings.ReplaceAll(str, `\\`, `\`)
+	})
+	if err != nil {
+		return "", err
+	}
+
+	data = strings.ReplaceAll(data, doubleQouted, substitution)
+
+	singleQouted := singleQoutedLeftDelim + envName + singleQoutedRightDelim
+	substitution, err = valueForEnv(envName, prefixes, func(str string) string {
+		str = strconv.Quote(str)
+		str = strings.ReplaceAll(str, `\\`, `\`)
+		str = strings.ReplaceAll(str, `\"`, `"`)
+		return "'" + str[1:len(str)-1] + "'"
+	})
+	if err != nil {
+		return "", err
+	}
+
+	data = strings.ReplaceAll(data, singleQouted, substitution)
+
+	unquoted := unqutedLeftDelim + envName + unqutedRightDelim
+	substitution, err = valueForEnv(envName, prefixes, func(str string) string {
+		return strings.ReplaceAll(str, "\n", "\\n") // keep multiline string on one line
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return strings.ReplaceAll(data, unquoted, substitution), nil
+}
+
+func valueForEnv(envName string, prefixes []string, fn func(string) string) (string, error) {
 	envsToCheck := make([]string, 0, len(prefixes)+1)
 	for _, prefix := range prefixes {
 		envsToCheck = append(envsToCheck, prefix+envName)
@@ -311,20 +325,9 @@ func substituteEnv(envName string, prefixes []string, quotingStringFun func(stri
 
 	for _, envName := range envsToCheck {
 		if val, exists := os.LookupEnv(envName); exists {
-			return quotingStringFun(val), nil
+			return fn(val), nil
 		}
 	}
 
 	return "", fmt.Errorf("environment variable %q not found", envName)
-}
-
-func templating(name, leftDelim, rightDelim string, funcs template.FuncMap, data []byte) ([]byte, error) {
-	tmpl := template.New(name).Delims(leftDelim, rightDelim).Funcs(funcs)
-	if _, err := tmpl.Parse(string(data)); err != nil {
-		return nil, err
-	}
-
-	buffer := new(bytes.Buffer)
-	err := tmpl.Execute(buffer, data)
-	return buffer.Bytes(), err
 }

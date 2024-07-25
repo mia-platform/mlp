@@ -182,7 +182,7 @@ func (o *Options) readConfiguration(ctx context.Context, path string) (*v1.Gener
 	}
 
 	logger.V(8).Info("interpolating configuration file", "path", path)
-	interpolatedData, err := interpolate.Interpolate(data, o.prefixes, filepath.Base(path))
+	interpolatedData, err := interpolate.Interpolate(data, o.prefixes)
 	if err != nil {
 		return nil, err
 	}

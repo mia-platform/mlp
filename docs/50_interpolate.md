@@ -25,5 +25,5 @@ and substitute the first of this three variables that contains a value.
 
 By default this interpolation will set the value on a single line putting the `\n` character explicitly for every
 new line found in the value.  
-If the interpolation sequence is found sorrounded by the `"` or `'` character will also escape the content contained
+If the interpolation sequence is found sorrounded by the `"` or `'` character we will also escape the content contained
 in the environment for you so that the resulting string will be a valid double or single quoted string.

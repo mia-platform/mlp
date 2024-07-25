@@ -6,4 +6,6 @@ data:
   key: "{{JSON_SINGLELINE_ENV}}"
   key2: {{MULTILINE_STRING}}
   key3: {{STRING_ESCAPED_ENV}}
-  key4: {{DOLLAR_ENV}}
+  key4: "{{DOLLAR_ENV}}otherstring"
+  key5: "otherstring{{MLP_SIMPLE_ENV}}"
+  key6: {{DOLLAR_ENV}}

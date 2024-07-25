@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - complete rewrite of the cli
-- changed interpolation implementation for future improvements
+- changed interpolation implementation for better mantainability
 - use configmap instead of secret as inventory storage
 - update to go 1.22.5
 
