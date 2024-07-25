@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: example
+  namespace: externalsecret-test
+  annotations:
+    config.kubernetes.io/depends-on: external-secrets.io/namespaces/externalsecret-test/ExternalSecret/external-secret,external-secrets.io/namespaces/externalsecret-test/ExternalSecret/external-secret2
+  labels:
+    name: example
+spec:
+  initContainers:
+  - name: init
+    image: busybox
+    env:
+    - name: ENV
+      valueFrom:
+        secretKeyRef:
+          key: otherkey
+          name: external-secret
+  containers:
+  - name: example
+    image: busybox
+    resources:
+      limits:
+        memory: "128Mi"
+        cpu: "500m"
+  volumes:
+  - name: volume
+    secret:
+      secretName: external-secret
+  - name: volume
+    secret:
+      secretName: custom-secret-name

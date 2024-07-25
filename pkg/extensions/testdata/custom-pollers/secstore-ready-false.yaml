@@ -1,0 +1,9 @@
+apiVersion: external-secrets.io/v1beta1
+kind: SecretStore
+metadata:
+  name: store
+status:
+  conditions:
+  - type: Ready
+    status: "False"
+    message: "custom message"

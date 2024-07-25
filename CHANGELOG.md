@@ -7,8 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- fixed `delete-before-apply` annotation behaviour to call namespace-scoped API
-- update to go 1.22.4
+### Changed
+
+- complete rewrite of the cli
+- changed interpolation implementation for future improvements
+- use configmap instead of secret as inventory storage
+- update to go 1.22.5
+
+### Added
+
+- wait for resource status after apply
 
 ## [1.2.3] - 2023-08-24
 

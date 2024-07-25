@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package deploy
+package extensions
 
 import (
 	"context"
@@ -33,7 +33,7 @@ import (
 func TestNewDeployMutator(t *testing.T) {
 	t.Parallel()
 
-	mutator := NewDeployMutator(deployAll, true, "identifier")
+	mutator := NewDeployMutator(DeployAll, true, "identifier")
 	assert.NotNil(t, mutator)
 }
 
@@ -115,41 +115,41 @@ func TestDeployMutatorMutate(t *testing.T) {
 	}{
 		"deployment": {
 			resource:       jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "deployment.yaml")),
-			deployType:     deployAll,
+			deployType:     DeployAll,
 			expectedResult: jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "expected-deployment.yaml")),
 		},
 		"sts": {
 			resource:       jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "sts.yaml")),
-			deployType:     deploySmart,
+			deployType:     DeploySmart,
 			expectedResult: jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "expected-sts.yaml")),
 		},
 		"daemonset": {
 			resource:       jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "daemonset.yaml")),
-			deployType:     deploySmart,
+			deployType:     DeploySmart,
 			forceNoSemver:  true,
 			expectedResult: jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "expected-daemonset.yaml")),
 		},
 		"pod": {
 			resource:       jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "pod.yaml")),
-			deployType:     deploySmart,
+			deployType:     DeploySmart,
 			forceNoSemver:  true,
 			expectedResult: jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "expected-pod.yaml")),
 		},
 		"deployment smart deploy": {
 			resource:       jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "deployment-smart.yaml")),
-			deployType:     deploySmart,
+			deployType:     DeploySmart,
 			forceNoSemver:  true,
 			expectedResult: jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "expected-deployment-smart.yaml")),
 		},
 		"deployment smart deploy with remote annotation": {
 			resource:       jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "deployment-smart-remote.yaml")),
-			deployType:     deploySmart,
+			deployType:     DeploySmart,
 			forceNoSemver:  true,
 			expectedResult: jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "expected-deployment-smart-remote.yaml")),
 		},
 		"error getting resource from remote": {
 			resource:       remoteErrorObject,
-			deployType:     deploySmart,
+			deployType:     DeploySmart,
 			expectedResult: jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "error-remote.yaml")),
 			expectedError:  "error from remote",
 		},
@@ -160,7 +160,7 @@ func TestDeployMutatorMutate(t *testing.T) {
 		},
 		"wrong image string": {
 			resource:       jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "wrong-image.yaml")),
-			deployType:     deploySmart,
+			deployType:     DeploySmart,
 			forceNoSemver:  true,
 			expectedResult: jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "wrong-image.yaml")),
 			expectedError:  `couldn't parse image name "busybox:sha256:5be7104a4306abe768359a5379e6050ef69a29e9a5f99fcf7f46d5f7e9ba29a2"`,

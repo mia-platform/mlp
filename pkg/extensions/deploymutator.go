@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package deploy
+package extensions
 
 import (
 	"context"
@@ -62,6 +62,8 @@ func (m *deployMutator) CanHandleResource(obj *metav1.PartialObjectMetadata) boo
 		return true
 	case podGK:
 		return true
+	case extsecGK:
+		return true
 	}
 
 	return false
@@ -69,6 +71,16 @@ func (m *deployMutator) CanHandleResource(obj *metav1.PartialObjectMetadata) boo
 
 // Mutate implement mutator.Interface interface
 func (m *deployMutator) Mutate(obj *unstructured.Unstructured, getter cache.RemoteResourceGetter) error {
+	if obj.GroupVersionKind().GroupKind() == extsecGK {
+		extSecAnnotationsFields := []string{"metadata", "annotations"}
+		annotations, err := annotationsFromUnstructuredFields(obj, extSecAnnotationsFields)
+		if err != nil {
+			return err
+		}
+		annotations[deployChecksumAnnotation] = m.identifier
+		return unstructured.SetNestedStringMap(obj.Object, annotations, extSecAnnotationsFields...)
+	}
+
 	podSpecFields, podAnnotationsFields, err := podFieldsForGroupKind(obj.GroupVersionKind())
 	if err != nil {
 		return err
@@ -77,12 +89,12 @@ func (m *deployMutator) Mutate(obj *unstructured.Unstructured, getter cache.Remo
 	addAnnotation := false
 	value := ""
 	switch m.deployType {
-	case deploySmart:
+	case DeploySmart:
 		addAnnotation, value, err = m.smartDeployAnnotation(obj, podSpecFields, podAnnotationsFields, getter)
 		if err != nil {
 			return err
 		}
-	case deployAll:
+	case DeployAll:
 		addAnnotation = true
 		value = m.identifier
 	}

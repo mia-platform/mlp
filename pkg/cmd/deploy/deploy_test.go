@@ -29,6 +29,7 @@ import (
 	"testing"
 	"time"
 
+	extsecv1beta1 "github.com/external-secrets/external-secrets/apis/externalsecrets/v1beta1"
 	jplresource "github.com/mia-platform/jpl/pkg/resource"
 	jpltesting "github.com/mia-platform/jpl/pkg/testing"
 	"github.com/mia-platform/jpl/pkg/util"
@@ -36,8 +37,10 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	fcv1beta3 "k8s.io/api/flowcontrol/v1beta3"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
@@ -170,8 +173,18 @@ func TestRun(t *testing.T) {
 					method:           http.MethodPatch,
 					expectedFilePath: filepath.Join(testdata, "expectations", "job.yaml"),
 				},
+				{
+					path:             fmt.Sprintf("/namespaces/%s/externalsecrets/external-secret", namespace),
+					method:           http.MethodPatch,
+					expectedFilePath: filepath.Join(testdata, "expectations", "external-secret.yaml"),
+				},
+				{
+					path:             fmt.Sprintf("/namespaces/%s/secretstores/secret-store", namespace),
+					method:           http.MethodPatch,
+					expectedFilePath: filepath.Join(testdata, "expectations", "store.yaml"),
+				},
 			},
-			expectedCallsNumber: 7,
+			expectedCallsNumber: 9,
 		},
 		"error reading files": {
 			options: &Options{
@@ -219,11 +232,22 @@ func TestRun(t *testing.T) {
 				}),
 			}
 			tf.FakeDynamicClient = fakeDynamicClient
-
+			mapper, err := tf.ToRESTMapper()
+			require.NoError(t, err)
+			crdGV := extsecv1beta1.SchemeGroupVersion
+			crdMapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{crdGV})
+			crdMapper.AddSpecific(extsecv1beta1.ExtSecretGroupVersionKind,
+				crdGV.WithResource("externalsecrets"),
+				crdGV.WithResource("externalsecret"), meta.RESTScopeNamespace)
+			crdMapper.AddSpecific(extsecv1beta1.SecretStoreGroupVersionKind,
+				crdGV.WithResource("secretstores"),
+				crdGV.WithResource("secretstore"), meta.RESTScopeNamespace)
+			mapper = meta.MultiRESTMapper([]meta.RESTMapper{mapper, crdMapper})
+			tf.RESTMapper = mapper
 			test.options.clientFactory = tf
 			test.options.writer = stringBuilder
 
-			err := test.options.Run(ctx)
+			err = test.options.Run(ctx)
 			t.Log(stringBuilder.String())
 
 			assert.Equal(t, test.expectedCallsNumber, callsCounter)
@@ -340,7 +364,7 @@ func validationRoundTripper(t *testing.T, resources []*resourceValidation, r *ht
 		require.NoError(t, err)
 		cm := new(corev1.ConfigMap)
 		require.NoError(t, runtime.DecodeInto(codec, bodyData, cm))
-		assert.Equal(t, 5, len(cm.Data))
+		assert.Equal(t, 7, len(cm.Data))
 		return &http.Response{
 			StatusCode: http.StatusOK,
 			Header:     jpltesting.DefaultHeaders(),
@@ -389,7 +413,6 @@ func (rv *resourceValidation) validateBody(t *testing.T, body io.ReadCloser) []b
 		}
 	}
 
-	require.Equal(t, expected, obj)
-
+	assert.Equal(t, expected, obj)
 	return bodyData
 }

@@ -30,6 +30,7 @@ import (
 	"github.com/mia-platform/jpl/pkg/generator"
 	"github.com/mia-platform/jpl/pkg/resourcereader"
 	"github.com/mia-platform/jpl/pkg/util"
+	"github.com/mia-platform/mlp/pkg/extensions"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,7 +57,7 @@ const (
 	inputPathsFlagUsage = "the files and/or folders that contain the configurations to apply. Use '-' for reading from stdin"
 
 	deployTypeFlagName     = "deploy-type"
-	deployTypeDefaultValue = deployAll
+	deployTypeDefaultValue = extensions.DeployAll
 	deployTypeFlagUsage    = "set the deployment mode (accepted values: deploy_all, smart_deploy)"
 
 	forceDeployFlagName     = "force-deploy-when-no-semver"
@@ -74,6 +75,13 @@ const (
 	stdinToken    = "-"
 	fieldManager  = "mlp"
 	inventoryName = "eu.mia-platform.mlp"
+
+	jobGeneratorLabel = "mia-platform.eu/autocreate"
+	jobGeneratorValue = "true"
+)
+
+var (
+	validDeployTypeValues = []string{extensions.DeployAll, extensions.DeploySmart}
 )
 
 // Flags contains all the flags for the `deploy` command. They will be converted to Options
@@ -230,10 +238,12 @@ func (o *Options) Run(ctx context.Context) error {
 		WithInventory(inventory).
 		WithGenerators(generator.NewJobGenerator(jobGeneratorLabel, jobGeneratorValue)).
 		WithMutator(
-			NewDependenciesMutator(resources),
-			NewDeployMutator(o.deployType, o.forceDeploy, checksumFromData(deployIdentifier)),
+			extensions.NewDependenciesMutator(resources),
+			extensions.NewDeployMutator(o.deployType, o.forceDeploy, extensions.ChecksumFromData(deployIdentifier)),
+			extensions.NewExternalSecretsMutator(resources),
 		).
-		WithFilters(NewDeployOnceFilter()).
+		WithFilters(extensions.NewDeployOnceFilter()).
+		WithCustomStatusChecker(extensions.ExternalSecretStatusCheckers()).
 		Build()
 	if err != nil {
 		return err
