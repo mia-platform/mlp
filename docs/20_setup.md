@@ -94,7 +94,7 @@ we suggest the [binary installation](#binary-download) since it's the most strai
 
 ## Shell Autocompletion
 
-If you have choosen to use an installation method different from the brew one, you will have to setup the
+If you have chosen to use an installation method different from the brew one, you will have to setup the
 commands autocompletion for your shell following one of these guides:
 
 - [`bash`](#bash)
