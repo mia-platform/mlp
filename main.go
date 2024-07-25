@@ -18,7 +18,7 @@ package main
 import (
 	"os"
 
-	"github.com/mia-platform/mlp/pkg/cmd"
+	"github.com/mia-platform/mlp/v2/pkg/cmd"
 
 	// Import to initialize client auth plugins.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"

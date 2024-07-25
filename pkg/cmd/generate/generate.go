@@ -27,8 +27,8 @@ import (
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/go-logr/logr"
-	v1 "github.com/mia-platform/mlp/pkg/apis/mlp.mia-platform.eu/v1"
-	"github.com/mia-platform/mlp/pkg/cmd/interpolate"
+	v1 "github.com/mia-platform/mlp/v2/pkg/apis/mlp.mia-platform.eu/v1"
+	"github.com/mia-platform/mlp/v2/pkg/cmd/interpolate"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	corev1 "k8s.io/api/core/v1"

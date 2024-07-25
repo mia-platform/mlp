@@ -1,4 +1,4 @@
-module github.com/mia-platform/mlp
+module github.com/mia-platform/mlp/v2
 
 go 1.22.5
 
