@@ -97,7 +97,7 @@ func TestExternalSecretMutatorCanHandleResource(t *testing.T) {
 		obj               *metav1.PartialObjectMetadata
 		expectedResult    bool
 	}{
-		"empty external secret map return alway false": {
+		"empty external secret map always returns false": {
 			externalSecretMap: make(map[string]*unstructured.Unstructured),
 			expectedResult:    false,
 		},

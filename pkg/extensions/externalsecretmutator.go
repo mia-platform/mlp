@@ -135,7 +135,7 @@ func externalSecretStoreKey(kind, name, namespace string) string {
 }
 
 // annotateExternalSecret mutate the ExternalSecret obj with the depends-on annotation with all the stores
-// referrend inside it.
+// referred inside it.
 func (m *externalSecretsMutator) annotateExternalSecret(obj *unstructured.Unstructured) error {
 	extsec := new(extsecv1beta1.ExternalSecret)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, extsec); err != nil {
@@ -143,7 +143,7 @@ func (m *externalSecretsMutator) annotateExternalSecret(obj *unstructured.Unstru
 	}
 	stores := make(sets.Set[resource.ObjectMetadata])
 
-	// check if there is a default secret store set for all external secert
+	// check if there is a default secret store set for all external secret
 	if len(extsec.Spec.SecretStoreRef.Name) != 0 {
 		storeKey := externalSecretStoreKey(extsec.Spec.SecretStoreRef.Kind, extsec.Spec.SecretStoreRef.Name, extsec.Namespace)
 		if obj, found := m.secretsStores[storeKey]; found {

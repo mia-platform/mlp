@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - complete rewrite of the cli
 - changed interpolation implementation for future improvements
 - use configmap instead of secret as inventory storage
+- update to go 1.22.5
 
 ### Added
 
