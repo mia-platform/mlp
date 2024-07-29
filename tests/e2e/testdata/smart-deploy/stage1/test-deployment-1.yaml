@@ -5,7 +5,6 @@ metadata:
   labels:
     app: test-deployment
   name: test-deployment
-  namespace: default
 spec:
   replicas: 1
   selector:

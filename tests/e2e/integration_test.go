@@ -13,269 +13,137 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build integration
+//go:build conformance
 
-package deploy
+//nolint:thelper
+package e2e
 
-// import (
-// 	"context"
-// 	"path/filepath"
-// 	"time"
+import (
+	"bytes"
+	"context"
+	"path/filepath"
+	"testing"
 
-// 	"github.com/mia-platform/mlp/v2/internal/utils"
-// 	corev1 "k8s.io/api/core/v1"
-// 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-// 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-// 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-// 	"k8s.io/apimachinery/pkg/runtime/schema"
-// 	"k8s.io/client-go/rest"
+	"github.com/mia-platform/mlp/v2/pkg/cmd/deploy"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"sigs.k8s.io/e2e-framework/pkg/envconf"
+	"sigs.k8s.io/e2e-framework/pkg/features"
+)
 
-// 	. "github.com/onsi/ginkgo" //revive:disable-line:dot-imports
-// 	. "github.com/onsi/gomega" //revive:disable-line:dot-imports
-// 	"k8s.io/client-go/discovery"
-// 	"k8s.io/client-go/dynamic"
-// 	"sigs.k8s.io/controller-runtime/pkg/envtest"
-// 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-// 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-// )
+func TestDeployOnEmptyCluster(t *testing.T) {
+	deploymentFeature := features.New("deployment on empty cluster").
+		Setup(func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+			t.Logf("starting test with kubeconfig %q and namespace %q", cfg.KubeconfigFile(), cfg.Namespace())
 
-// var (
-// 	testEnv        *envtest.Environment
-// 	cfg            *rest.Config
-// 	clients        *k8sClients
-// 	gvrConfigMaps  = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"}
-// 	gvrDeployments = schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
-// 	gvrCronjobs    = schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "cronjobs"}
-// )
-// var _ = BeforeSuite(func() {
+			buffer := new(bytes.Buffer)
+			deployCmd := deploy.NewCommand(genericclioptions.NewConfigFlags(false))
+			deployCmd.SetErr(buffer)
+			deployCmd.SetOut(buffer)
 
-// 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+			deployCmd.SetArgs([]string{
+				"--kubeconfig",
+				cfg.KubeconfigFile(),
+				"--namespace",
+				cfg.Namespace(),
+				"--filename",
+				filepath.Join("testdata", "apply-resources"),
+			})
 
-// 	testEnv = &envtest.Environment{
-// 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
-// 		ErrorIfCRDPathMissing: false,
-// 	}
-// 	var err error
-// 	cfg, err = testEnv.Start()
-// 	Expect(err).NotTo(HaveOccurred())
-// 	Expect(cfg).NotTo(BeNil())
+			assert.NoError(t, deployCmd.ExecuteContext(ctx))
+			t.Log(buffer.String())
+			buffer.Reset()
+			return ctx
+		}).
+		Assess("resoures are being created", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+			deployment := new(appsv1.Deployment)
+			require.NoError(t, cfg.Client().Resources().Get(ctx, "test", cfg.Namespace(), deployment))
+			t.Logf("deployment found: %s", deployment.Name)
+			assert.NotEmpty(t, deployment.Spec.Template.Annotations["mia-platform.eu/deploy-checksum"])
+			assert.NotEmpty(t, deployment.Spec.Template.Annotations["mia-platform.eu/dependencies-checksum"])
 
-// 	clients = &k8sClients{
-// 		dynamic:   dynamic.NewForConfigOrDie(cfg),
-// 		discovery: discovery.NewDiscoveryClientForConfigOrDie(cfg),
-// 	}
-// }, 60)
+			configMap := new(corev1.ConfigMap)
+			require.NoError(t, cfg.Client().Resources().Get(ctx, "literal", cfg.Namespace(), configMap))
+			t.Logf("configmap found: %s", configMap.Name)
+			assert.Empty(t, configMap.Annotations["mia-platform.eu/deploy-checksum"])
+			assert.Empty(t, configMap.Annotations["mia-platform.eu/dependencies-checksum"])
 
-// var _ = AfterSuite(func() {
-// 	By("tearing down the test environment")
-// 	if testEnv != nil {
-// 		err := testEnv.Stop()
-// 		Expect(err).NotTo(HaveOccurred())
-// 	}
-// }, 60)
+			secret1 := new(corev1.Secret)
+			require.NoError(t, cfg.Client().Resources().Get(ctx, "docker", cfg.Namespace(), secret1))
+			t.Logf("secret found: %s", secret1.Name)
+			assert.Empty(t, secret1.Annotations["mia-platform.eu/deploy-checksum"])
+			assert.Empty(t, secret1.Annotations["mia-platform.eu/dependencies-checksum"])
 
-// var _ = Describe("deploy on mock kubernetes", func() {
-// 	deployConfig := utils.DeployConfig{
-// 		DeployType:              deployAll,
-// 		ForceDeployWhenNoSemver: true,
-// 		EnsureNamespace:         true,
-// 	}
-// 	currentTime := time.Now()
+			secret2 := new(corev1.Secret)
+			require.NoError(t, cfg.Client().Resources().Get(ctx, "opaque", cfg.Namespace(), secret2))
+			t.Logf("secret found: %s", secret2.Name)
+			assert.Empty(t, secret2.Annotations["mia-platform.eu/deploy-checksum"])
+			assert.Empty(t, secret2.Annotations["mia-platform.eu/dependencies-checksum"])
 
-// 	Context("apply resources", func() {
-// 		It("creates non existing secret without namespace in metadata", func() {
-// 			err := doRun(clients, "test1", []string{"testdata/integration/apply-resources/docker.secret.yaml"}, deployConfig, currentTime)
-// 			Expect(err).NotTo(HaveOccurred())
-// 			_, err = clients.dynamic.Resource(gvrSecrets).Namespace("test1").
-// 				Get(context.Background(), "docker", metav1.GetOptions{})
-// 			Expect(err).NotTo(HaveOccurred())
-// 		})
-// 		It("creates non existing secret overriding namespace in metadata", func() {
-// 			err := doRun(clients, "test2", []string{"testdata/integration/apply-resources/docker-ns.secret.yaml"}, deployConfig, currentTime)
-// 			Expect(err).NotTo(HaveOccurred())
-// 			_, err = clients.dynamic.Resource(gvrSecrets).Namespace("test2").
-// 				Get(context.Background(), "docker", metav1.GetOptions{})
-// 			Expect(err).NotTo(HaveOccurred())
-// 		})
-// 		It("gives error with no given namespace and no namespace in metadata", func() {
-// 			err := doRun(clients, "", []string{"testdata/integration/apply-resources/docker-no-ns.secret.yaml"}, deployConfig, currentTime)
-// 			Expect(err).To(HaveOccurred())
-// 		})
-// 		It("updates secret", func() {
-// 			err := doRun(clients, "test3", []string{"testdata/integration/apply-resources/opaque-1.secret.yaml"}, deployConfig, currentTime)
-// 			Expect(err).NotTo(HaveOccurred())
-// 			err = doRun(clients, "test3", []string{"testdata/integration/apply-resources/opaque-2.secret.yaml"}, deployConfig, currentTime)
-// 			Expect(err).NotTo(HaveOccurred())
-// 			sec, err := clients.dynamic.Resource(gvrSecrets).Namespace("test3").
-// 				Get(context.Background(), "opaque", metav1.GetOptions{})
-// 			Expect(err).NotTo(HaveOccurred())
-// 			Datakey, _, err := unstructured.NestedString(sec.Object, "data", "key")
-// 			Expect(err).NotTo(HaveOccurred())
-// 			Expect(Datakey).To(Equal("YW5vdGhlcnZhbHVl"))
-// 			Expect(sec.GetLabels()["app.kubernetes.io/managed-by"]).To(Equal("mia-platform"))
-// 			By("No annotation last applied for configmap and secrets")
-// 			Expect(sec.GetLabels()[corev1.LastAppliedConfigAnnotation]).To(Equal(""))
-// 		})
-// 		It("updates configmap", func() {
-// 			err := doRun(clients, "test3", []string{"testdata/integration/apply-resources/literal-1.configmap.yaml"}, deployConfig, currentTime)
-// 			Expect(err).NotTo(HaveOccurred())
-// 			err = doRun(clients, "test3", []string{"testdata/integration/apply-resources/literal-2.configmap.yaml"}, deployConfig, currentTime)
-// 			Expect(err).NotTo(HaveOccurred())
-// 			sec, err := clients.dynamic.Resource(gvrConfigMaps).Namespace("test3").
-// 				Get(context.Background(), "literal", metav1.GetOptions{})
-// 			Expect(err).NotTo(HaveOccurred())
-// 			Datakey, _, err := unstructured.NestedString(sec.Object, "data", "unaKey")
-// 			Expect(err).NotTo(HaveOccurred())
-// 			Expect(Datakey).To(Equal("differentValue1"))
-// 			Expect(sec.GetLabels()["app.kubernetes.io/managed-by"]).To(Equal("mia-platform"))
-// 			By("No annotation last applied for configmap and secrets")
-// 			Expect(sec.GetLabels()[corev1.LastAppliedConfigAnnotation]).To(Equal(""))
-// 		})
-// 		It("creates and updates deployment", func() {
-// 			err := doRun(clients, "test3", []string{"testdata/integration/apply-resources/test-deployment-1.yaml"}, deployConfig, currentTime)
-// 			Expect(err).NotTo(HaveOccurred())
-// 			err = doRun(clients, "test3", []string{"testdata/integration/apply-resources/test-deployment-2.yaml"}, deployConfig, currentTime)
-// 			Expect(err).NotTo(HaveOccurred())
-// 			dep, err := clients.dynamic.Resource(gvrDeployments).
-// 				Namespace("test3").
-// 				Get(context.Background(), "test-deployment", metav1.GetOptions{})
-// 			Expect(err).NotTo(HaveOccurred())
-// 			Expect(dep.GetLabels()["app.kubernetes.io/managed-by"]).To(Equal("mia-platform"))
-// 			Expect(dep.GetAnnotations()[corev1.LastAppliedConfigAnnotation]).NotTo(Equal(""))
-// 		})
-// 		It("is respected mia-platform.eu/once annotation", func() {
-// 			err := doRun(clients, "test3", []string{"testdata/integration/apply-resources/test-cronjob-1.yaml"}, deployConfig, currentTime)
-// 			Expect(err).NotTo(HaveOccurred())
-// 			err = doRun(clients, "test3", []string{"testdata/integration/apply-resources/test-cronjob-2.yaml"}, deployConfig, currentTime)
-// 			Expect(err).NotTo(HaveOccurred())
-// 			cron, err := clients.dynamic.Resource(gvrCronjobs).
-// 				Namespace("test3").
-// 				Get(context.Background(), "test-cronjob", metav1.GetOptions{})
-// 			Expect(err).NotTo(HaveOccurred())
-// 			containers, _, err := unstructured.NestedSlice(cron.Object, "spec", "jobTemplate", "spec", "template", "spec", "containers")
-// 			Expect(err).NotTo(HaveOccurred())
-// 			Expect(containers[0].(map[string]interface{})["image"].(string)).To(Equal("busybox"))
-// 		})
-// 		It("creates job from cronjob", func() {
-// 			err := doRun(clients, "test4", []string{"testdata/integration/apply-resources/test-cronjob-1.yaml"}, deployConfig, currentTime)
-// 			Expect(err).NotTo(HaveOccurred())
-// 			jobList, err := clients.dynamic.Resource(gvrJobs).
-// 				Namespace("test4").
-// 				List(context.Background(), metav1.ListOptions{})
-// 			Expect(err).NotTo(HaveOccurred())
-// 			Expect(jobList.Items[0].GetLabels()["job-name"]).To(ContainSubstring("test-cronjob"))
-// 		})
-// 		It("update secrets also if empty namespace released before", func() {
-// 			namespace := "test-empty-resource"
-// 			err := doRun(clients, namespace, []string{}, deployConfig, currentTime)
-// 			Expect(err).NotTo(HaveOccurred())
+			cronjob := new(batchv1.CronJob)
+			require.NoError(t, cfg.Client().Resources().Get(ctx, "test", cfg.Namespace(), cronjob))
+			t.Logf("cronjob found: %s", cronjob.Name)
+			assert.Empty(t, cronjob.Spec.JobTemplate.Spec.Template.Annotations["mia-platform.eu/deploy-checksum"])
+			assert.Empty(t, cronjob.Spec.JobTemplate.Spec.Template.Annotations["mia-platform.eu/dependencies-checksum"])
 
-// 			err = doRun(clients, namespace, []string{"testdata/integration/apply-resources/test-deployment-1.yaml"}, deployConfig, currentTime)
-// 			Expect(err).NotTo(HaveOccurred())
+			jobList := new(batchv1.JobList)
+			require.NoError(t, cfg.Client().Resources(cfg.Namespace()).List(ctx, jobList))
+			t.Logf("jobs found: %d", len(jobList.Items))
+			manualJobFound := false
+			for _, job := range jobList.Items {
+				if value, found := job.Annotations["cronjob.kubernetes.io/instantiate"]; found && value == "manual" {
+					manualJobFound = true
+					break
+				}
+			}
+			assert.True(t, manualJobFound)
 
-// 			dep, err := clients.dynamic.Resource(gvrDeployments).
-// 				Namespace(namespace).
-// 				Get(context.Background(), "test-deployment", metav1.GetOptions{})
+			inventory := new(corev1.ConfigMap)
+			require.NoError(t, cfg.Client().Resources().Get(ctx, "eu.mia-platform.mlp", cfg.Namespace(), inventory))
+			t.Logf("inventory found: %s", configMap.Name)
+			assert.Equal(t, 6, len(inventory.Data))
 
-// 			Expect(err).NotTo(HaveOccurred())
-// 			Expect(dep.GetAnnotations()[corev1.LastAppliedConfigAnnotation]).NotTo(Equal(""))
-// 		})
-// 	})
-// 	Context("smart deploy", func() {
-// 		deployConfig := utils.DeployConfig{
-// 			DeployType:              smartDeploy,
-// 			ForceDeployWhenNoSemver: false,
-// 			EnsureNamespace:         true,
-// 		}
-// 		It("changes a pod annotation in deployment if configmap associated changes", func() {
-// 			err := doRun(clients, "test6", []string{"testdata/integration/smart-deploy/stage1"}, deployConfig, currentTime)
-// 			Expect(err).NotTo(HaveOccurred())
-// 			err = doRun(clients, "test6", []string{"testdata/integration/smart-deploy/stage2"}, deployConfig, currentTime)
-// 			Expect(err).NotTo(HaveOccurred())
-// 		})
-// 		It("does not modify deployment/pods on same object apply", func() {
-// 			lastApplied := ""
-// 			for i := 0; i < 4; i++ {
-// 				err := doRun(clients, "test7", []string{"testdata/integration/smart-deploy/stage1"}, deployConfig, currentTime)
-// 				Expect(err).NotTo(HaveOccurred())
-// 				deployment, err := clients.dynamic.Resource(gvrDeployments).
-// 					Namespace("test7").
-// 					Get(context.Background(), "test-deployment", metav1.GetOptions{})
-// 				Expect(err).NotTo(HaveOccurred())
-// 				if lastApplied == "" {
-// 					lastApplied = deployment.GetAnnotations()["kubectl.kubernetes.io/last-applied-configuration"]
-// 					continue
-// 				}
-// 				thisLastApplied := deployment.GetAnnotations()["kubectl.kubernetes.io/last-applied-configuration"]
-// 				Expect(lastApplied).Should(BeIdenticalTo(thisLastApplied))
-// 				lastApplied = thisLastApplied
-// 			}
-// 			deployAll := utils.DeployConfig{
-// 				DeployType:              deployAll,
-// 				ForceDeployWhenNoSemver: false,
-// 				EnsureNamespace:         true,
-// 			}
+			return ctx
+		}).
+		Feature()
 
-// 			// Force deploy_all, lastapplied annotation should not be equals
-// 			err := doRun(clients, "test7", []string{"testdata/integration/smart-deploy/stage1"}, deployAll, currentTime)
-// 			Expect(err).NotTo(HaveOccurred())
-// 			deployment, err := clients.dynamic.Resource(gvrDeployments).
-// 				Namespace("test7").
-// 				Get(context.Background(), "test-deployment", metav1.GetOptions{})
-// 			Expect(err).NotTo(HaveOccurred())
-// 			thisLastApplied := deployment.GetAnnotations()["kubectl.kubernetes.io/last-applied-configuration"]
-// 			Expect(lastApplied).ShouldNot(BeIdenticalTo(thisLastApplied))
-// 			lastApplied = thisLastApplied
+	testenv.Test(t, deploymentFeature)
+}
 
-// 			// Another smart_deploy, should be identical to the previous
-// 			err = doRun(clients, "test7", []string{"testdata/integration/smart-deploy/stage1"}, deployConfig, currentTime)
-// 			Expect(err).NotTo(HaveOccurred())
-// 			deployment, err = clients.dynamic.Resource(gvrDeployments).
-// 				Namespace("test7").
-// 				Get(context.Background(), "test-deployment", metav1.GetOptions{})
-// 			Expect(err).NotTo(HaveOccurred())
-// 			ann, _, _ := unstructured.NestedStringMap(deployment.Object, "spec", "template", "metadata", "annotations")
-// 			Expect(ann["mia-platform.eu/deploy-checksum"]).Should(Not(BeEmpty()))
-// 			thisLastApplied = deployment.GetAnnotations()["kubectl.kubernetes.io/last-applied-configuration"]
-// 			Expect(lastApplied).Should(BeIdenticalTo(thisLastApplied))
-// 		})
-// 	})
-// 	Context("deletes resources", func() {
-// 		deployConfig := utils.DeployConfig{
-// 			DeployType:              smartDeploy,
-// 			ForceDeployWhenNoSemver: true,
-// 			EnsureNamespace:         true,
-// 		}
-// 		It("deletes deployment not in current directory", func() {
-// 			err := doRun(clients, "test5", []string{"testdata/integration/delete-resources/stage1"}, deployConfig, currentTime)
-// 			Expect(err).NotTo(HaveOccurred())
-// 			err = doRun(clients, "test5", []string{"testdata/integration/delete-resources/stage2/"}, deployConfig, currentTime)
-// 			Expect(err).NotTo(HaveOccurred())
-// 			_, err = clients.dynamic.Resource(gvrDeployments).
-// 				Namespace("test5").
-// 				Get(context.Background(), "test-deployment-2", metav1.GetOptions{})
-// 			Expect(apierrors.IsNotFound(err))
-// 		})
-// 		It("deletes resource even if secret is in v0 version", func() {
-// 			err := doRun(clients, "test6", []string{"testdata/integration/delete-resources/stage1"}, deployConfig, currentTime)
-// 			Expect(err).NotTo(HaveOccurred())
-// 			sec, err := clients.dynamic.Resource(gvrSecrets).
-// 				Namespace("test6").
-// 				Get(context.Background(), "resources-deployed", metav1.GetOptions{})
-// 			Expect(err).NotTo(HaveOccurred())
-// 			resources := make(map[string]string)
-// 			resources["resources"] = "eyJEZXBsb3ltZW50Ijp7ImtpbmQiOiJEZXBsb3ltZW50IiwiTWFwcGluZyI6eyJHcm91cCI6ImFwcHMiLCJWZXJzaW9uIjoidjEiLCJSZXNvdXJjZSI6ImRlcGxveW1lbnRzIn0sInJlc291cmNlcyI6WyJ0ZXN0LWRlcGxveW1lbnQiLCJ0ZXN0LWRlcGxveW1lbnQtMiJdfX0="
-// 			unstructured.SetNestedStringMap(sec.Object, resources, "data")
-// 			_, err = clients.dynamic.Resource(gvrSecrets).
-// 				Namespace("test6").
-// 				Update(context.Background(), sec, metav1.UpdateOptions{})
-// 			Expect(err).NotTo(HaveOccurred())
-// 			err = doRun(clients, "test6", []string{"testdata/integration/delete-resources/stage2"}, deployConfig, currentTime)
-// 			Expect(err).NotTo(HaveOccurred())
-// 			_, err = clients.dynamic.Resource(gvrDeployments).
-// 				Namespace("test5").
-// 				Get(context.Background(), "test-deployment-2", metav1.GetOptions{})
-// 			Expect(apierrors.IsNotFound(err))
-// 		})
-// 	})
-// })
+func TestSmartDeploy(t *testing.T) {
+	deploymentFeature := features.New("smart deploy").
+		Setup(func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
+			t.Logf("starting test with kubeconfig %q and namespace %q", cfg.KubeconfigFile(), cfg.Namespace())
+
+			buffer := new(bytes.Buffer)
+			deployCmd := deploy.NewCommand(genericclioptions.NewConfigFlags(false))
+			deployCmd.SetErr(buffer)
+			deployCmd.SetOut(buffer)
+
+			deployCmd.SetArgs([]string{
+				"--deploy-type",
+				"smart_deploy",
+				"--kubeconfig",
+				cfg.KubeconfigFile(),
+				"--namespace",
+				cfg.Namespace(),
+				"--filename",
+				filepath.Join("testdata", "smart-deploy", "stage1"),
+			})
+
+			assert.NoError(t, deployCmd.ExecuteContext(ctx))
+			t.Log(buffer.String())
+			buffer.Reset()
+			return ctx
+		}).
+		Assess("smart deploy", func(ctx context.Context, t *testing.T, c *envconf.Config) context.Context {
+			return ctx
+		}).
+		Feature()
+
+	testenv.Test(t, deploymentFeature)
+}

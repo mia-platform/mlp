@@ -1,11 +1,9 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: test-cronjob
-  namespace: default
+  name: test
   annotations:
     mia-platform.eu/autocreate: 'true'
-    mia-platform.eu/deploy: once
 spec:
   schedule: "*/5 * * * *"
   jobTemplate:
@@ -14,9 +12,9 @@ spec:
         spec:
           containers:
           - name: hello
-            image: busybox:2
+            image: busybox
             args:
             - /bin/sh
             - -c
-            - date; sleep 120
+            - date; sleep 5
           restartPolicy: OnFailure
