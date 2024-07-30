@@ -3,19 +3,19 @@ kind: Deployment
 metadata:
   creationTimestamp: null
   labels:
-    app: test-deployment
-  name: test-deployment
+    app: test
+  name: test
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: test-deployment
+      app: test
   strategy: {}
   template:
     metadata:
       creationTimestamp: null
       labels:
-        app: test-deployment
+        app: test
       annotations:
         mia-platform.eu/deploy-checksum: ""
     spec:
