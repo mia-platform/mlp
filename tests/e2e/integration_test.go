@@ -168,18 +168,11 @@ func TestSmartDeploy(t *testing.T) {
 
 			return ctx
 		}).
-		Feature()
-
-	smartDeployPhase2 := features.New("smart deploy phase 2").
-		Setup(func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
-			t.Helper()
-			t.Logf("starting test with kubeconfig %q and namespace %q", cfg.KubeconfigFile(), cfg.Namespace())
-			deploying(ctx, cfg, extensions.DeploySmart, "stage2")
-			time.Sleep(2 * time.Second) // sleep to wait background deletions
-			return ctx
-		}).
 		Assess("smart deploy phase 2", func(ctx context.Context, t *testing.T, cfg *envconf.Config) context.Context {
 			t.Helper()
+			deploying(ctx, cfg, extensions.DeploySmart, "stage2")
+			time.Sleep(2 * time.Second) // sleep to wait background deletions
+
 			deployment := new(appsv1.Deployment)
 			require.NoError(t, cfg.Client().Resources().Get(ctx, "test", cfg.Namespace(), deployment))
 			t.Logf("deployment found: %s", deployment.Name)
@@ -194,5 +187,5 @@ func TestSmartDeploy(t *testing.T) {
 		}).
 		Feature()
 
-	testenv.Test(t, smartDeployPhase1, smartDeployPhase2)
+	testenv.Test(t, smartDeployPhase1)
 }
