@@ -4,15 +4,15 @@ metadata:
   annotations:
     mia-platform.eu/version: 8.4.0
   labels:
-    app: test-nginx
+    app: test
     app.kubernetes.io/component: custom
     app.kubernetes.io/managed-by: mia-platform
-    app.kubernetes.io/name: test-nginx
+    app.kubernetes.io/name: test
     app.kubernetes.io/part-of: test-mlp-kustomize-2
     app.kubernetes.io/version: latest
     mia-platform.eu/stage: 'DEV'
     mia-platform.eu/tenant: kustomize-tenant
-  name: test-nginx
+  name: test
 spec:
   ports:
   - name: http
@@ -21,5 +21,5 @@ spec:
     protocol: TCP
     targetPort: 3000
   selector:
-    app: test-nginx
+    app: test
   type: ClusterIP

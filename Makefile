@@ -63,7 +63,7 @@ GOARM:= $(shell go env GOARM)
 GIT_REV:= $(shell git rev-parse --short HEAD 2>/dev/null)
 VERSION:= $(shell git describe --tags --exact-match 2>/dev/null || (echo $(GIT_REV) | cut -c1-12))
 # insert here the go module where to add the version metadata
-VERSION_MODULE_NAME:= github.com/mia-platform/mlp/pkg/cmd
+VERSION_MODULE_NAME:= github.com/mia-platform/mlp/v2/pkg/cmd
 
 # supported platforms for container creation, these are a subset of the supported
 # platforms of the base image.

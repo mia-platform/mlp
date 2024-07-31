@@ -1,27 +1,27 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  creationTimestamp: null
+  name: test
   labels:
-    app: test-deployment
-  annotation:
-    announo: valueuno
-  name: test-deployment
-  namespace: default
+    app: test
+  annotations:
+    key: value
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: test-deployment
+      app: test
   strategy: {}
   template:
     metadata:
-      creationTimestamp: null
       labels:
-        app: test-deployment
+        app: test
     spec:
       containers:
       - image: nginx
         name: nginx
         resources: {}
-status: {}
+      volumes:
+      - name: configmap
+        configMap:
+          name: literal

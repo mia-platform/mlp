@@ -3,23 +3,31 @@ kind: Deployment
 metadata:
   creationTimestamp: null
   labels:
-    app: test-deployment
-  name: test-deployment
-  namespace: default
+    app: test
+  name: test
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: test-deployment
+      app: test
   strategy: {}
   template:
     metadata:
       creationTimestamp: null
       labels:
-        app: test-deployment
+        app: test
     spec:
       containers:
       - image: nginx
         name: nginx
         resources: {}
+        volumeMounts:
+        - mountPath: /etc/nginx/conf.d
+          name: api-gateway-server
+          readOnly: true
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: api-gateway-server
+        name: api-gateway-server
 status: {}
