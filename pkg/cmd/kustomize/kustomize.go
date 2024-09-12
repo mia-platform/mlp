@@ -17,7 +17,7 @@ package kustomize
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"io"
 
 	"github.com/MakeNowJust/heredoc/v2"
@@ -105,7 +105,7 @@ func (f *Flags) ToOptions(args []string, fSys filesys.FileSystem, writer io.Writ
 	}
 
 	if len(f.outputPath) > 0 && fSys.IsDir(f.outputPath) {
-		return nil, fmt.Errorf(outputIsADirectoryError)
+		return nil, errors.New(outputIsADirectoryError)
 	}
 
 	return &Options{

@@ -17,6 +17,7 @@ package deploy
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"slices"
@@ -266,7 +267,7 @@ loop:
 			}
 
 			if event.IsErrorEvent() {
-				errorsDuringApplying = append(errorsDuringApplying, fmt.Errorf(event.String()))
+				errorsDuringApplying = append(errorsDuringApplying, errors.New(event.String()))
 			}
 
 			fmt.Fprintln(o.writer, event.String())
@@ -285,7 +286,7 @@ loop:
 		builder.WriteString(fmt.Sprintf("\t- %s\n", err))
 	}
 
-	return fmt.Errorf(builder.String())
+	return errors.New(builder.String())
 }
 
 func deployTypeFlagCompletionfunc(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
