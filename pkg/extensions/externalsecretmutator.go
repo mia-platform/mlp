@@ -165,7 +165,7 @@ func (m *externalSecretsMutator) annotateExternalSecret(obj *unstructured.Unstru
 		if data.SourceRef == nil {
 			continue
 		}
-		if obj, found := extractStoreFromSourceRef(data.SourceRef.SecretStoreRef); found {
+		if obj, found := extractStoreFromSourceRef(&data.SourceRef.SecretStoreRef); found {
 			stores.Insert(resource.ObjectMetadataFromUnstructured(obj))
 		}
 	}

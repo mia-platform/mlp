@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- update to go 1.23.1
+- update kubernetes libraries to 0.30
+
 ## [v2.0.0-beta] - 2024-07-25
 
 ### Changed
