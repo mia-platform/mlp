@@ -190,6 +190,8 @@ func updateKustomize(ctx context.Context, fSys filesys.FileSystem, path string, 
 		}
 	}
 
+	// add managed by annotation to allow empty kustomization files
+	k.MetaData = &types.ObjectMeta{Labels: map[string]string{"app.kubernetes.io/managed-by": "mlp"}}
 	logger.V(5).Info("saving kustomization file", "path", path)
 	return kf.write(k)
 }

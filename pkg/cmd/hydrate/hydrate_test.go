@@ -61,6 +61,9 @@ func TestRun(t *testing.T) {
 
 	expectedConfigurationData := `kind: Kustomization
 apiVersion: kustomize.config.k8s.io/v1beta1
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: mlp
 resources:
 - Test4.YAML
 - test1.yaml
@@ -68,6 +71,9 @@ resources:
 `
 	expectedOverlaysData := `kind: Kustomization
 apiVersion: kustomize.config.k8s.io/v1beta1
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: mlp
 patches:
 - path: path.yaml
   target:

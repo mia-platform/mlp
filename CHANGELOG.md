@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - update to go 1.23.2
 
+### Fixed
+
+- hydrate command now add metadata to kustomize file to avoid "empty kubernetes file"
+	errors during deploy
+
 ## [v2.0.0-beta.1] - 2024-09-19
 
 ### Changed
