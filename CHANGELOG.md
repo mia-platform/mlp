@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- hanging if no resources has been applied successfully in a step
+- error if a group/kind of a resource saved in the old inventory format is not availbale anymore in the cluster
+	now we skip the resource because we cannot retrieve it
+
 ## [v2.0.0-beta.2] - 2024-10-04
 
 ### Changed

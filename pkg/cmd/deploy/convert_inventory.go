@@ -132,6 +132,9 @@ func (s *Inventory) oldInventoryObjects(ctx context.Context) (sets.Set[resource.
 
 		mapping, err := s.mapper.RESTMapping(gvk.GroupKind())
 		if err != nil {
+			if meta.IsNoMatchError(err) {
+				continue
+			}
 			return nil, err
 		}
 

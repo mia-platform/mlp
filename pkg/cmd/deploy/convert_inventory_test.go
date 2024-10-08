@@ -193,6 +193,57 @@ func TestLoadInventory(t *testing.T) { //nolint: gocyclo
 			}),
 			expectedError: fmt.Sprintf("unexpected call: %q, method GET", secretPath),
 		},
+		"unavailable kind in compatibility mode": {
+			client: restfake.CreateHTTPClient(func(r *http.Request) (*http.Response, error) {
+				path := r.URL.Path
+				method := r.Method
+				switch {
+				case path == configMapPath && method == http.MethodGet:
+					return &http.Response{StatusCode: http.StatusNotFound, Header: jpltesting.DefaultHeaders()}, nil
+				case path == secretPath && method == http.MethodGet:
+					data, err := json.Marshal(map[string]*oldResourceList{
+						"Deployment": {
+							Kind: "Deployment",
+							Mapping: schema.GroupVersionResource{
+								Group:    "apps",
+								Version:  "v1",
+								Resource: "deployments",
+							},
+							Resources: []string{"example"},
+						},
+						"Namespace": {
+							Kind: "Namespace",
+							Mapping: schema.GroupVersionResource{
+								Group:    "",
+								Version:  "v1",
+								Resource: "namespaces",
+							},
+							Resources: []string{"example"},
+						},
+						"Foo": {
+							Kind: "Foo",
+							Mapping: schema.GroupVersionResource{
+								Group:    "example.com",
+								Version:  "v1alpha1",
+								Resource: "foos",
+							},
+						},
+					})
+					require.NoError(t, err)
+					sec := &corev1.Secret{Data: map[string][]byte{
+						oldInventoryKey: data,
+					}}
+					body := io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, sec))))
+					return &http.Response{StatusCode: http.StatusOK, Body: body, Header: jpltesting.DefaultHeaders()}, nil
+				}
+
+				return nil, fmt.Errorf("unexpected call: %q, method %s", path, method)
+			}),
+			expectedSet: sets.New(
+				deployResource,
+				namespaceResource,
+			),
+		},
 	}
 
 	for name, test := range tests {

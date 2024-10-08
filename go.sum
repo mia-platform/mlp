@@ -117,8 +117,8 @@ github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de h1:9TO3cAIGXtEhn
 github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de/go.mod h1:zAbeS9B/r2mtpb6U+EI2rYA5OAXxsYw6wTamcNW+zcE=
 github.com/mailru/easyjson v0.7.7 h1:UGYAvKxe3sBsEDzO8ZeWOSlIQfWFlxbzLZe7hwFURr0=
 github.com/mailru/easyjson v0.7.7/go.mod h1:xzfreul335JAWq5oZzymOObrkdz5UnU4kGfJJLY9Nlc=
-github.com/mia-platform/jpl v0.5.0 h1:DF6hMMZvMZxabHfpZ1xvfIDOirufsRWt64vynoGwEaA=
-github.com/mia-platform/jpl v0.5.0/go.mod h1:fo3TIOpsOhO4sQLgQxhCy4CBOo0BvLRCzgk2fAggvs4=
+github.com/mia-platform/jpl v0.5.1 h1:3KpKtOk3Nf8p9DofpO6uCONMsJpyo9v10Tp/cD7Qgeo=
+github.com/mia-platform/jpl v0.5.1/go.mod h1:fo3TIOpsOhO4sQLgQxhCy4CBOo0BvLRCzgk2fAggvs4=
 github.com/moby/spdystream v0.2.0 h1:cjW1zVyyoiM0T7b6UoySUFqzXMoqRckQtXwGPiBhOM8=
 github.com/moby/spdystream v0.2.0/go.mod h1:f7i0iNDQJ059oMTcWxx8MA/zKFIuD/lY+0GqbN2Wy8c=
 github.com/moby/term v0.0.0-20221205130635-1aeaba878587 h1:HfkjXDfhgVaN5rmueG8cL8KKeFNecRCXFhaJ2qZ5SKA=

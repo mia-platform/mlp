@@ -9,7 +9,7 @@ require (
 	github.com/external-secrets/external-secrets v0.10.0
 	github.com/go-logr/logr v1.4.2
 	github.com/go-logr/stdr v1.2.2
-	github.com/mia-platform/jpl v0.5.0
+	github.com/mia-platform/jpl v0.5.1
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.9.0
