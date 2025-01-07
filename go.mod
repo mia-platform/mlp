@@ -1,6 +1,6 @@
 module github.com/mia-platform/mlp/v2
 
-go 1.23.3
+go 1.23.4
 
 require (
 	github.com/MakeNowJust/heredoc/v2 v2.0.1
@@ -13,11 +13,11 @@ require (
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.10.0
-	k8s.io/api v0.30.5
-	k8s.io/apimachinery v0.30.5
-	k8s.io/cli-runtime v0.30.5
-	k8s.io/client-go v0.30.5
-	k8s.io/utils v0.0.0-20240902221715-702e33fdd3c3
+	k8s.io/api v0.30.8
+	k8s.io/apimachinery v0.30.8
+	k8s.io/cli-runtime v0.30.8
+	k8s.io/client-go v0.30.8
+	k8s.io/utils v0.0.0-20241210054802-24370beab758
 	sigs.k8s.io/e2e-framework v0.4.0
 	sigs.k8s.io/kustomize/api v0.17.3
 	sigs.k8s.io/kustomize/kyaml v0.17.2

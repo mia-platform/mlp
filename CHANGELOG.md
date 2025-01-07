@@ -9,8 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- update to go 1.23.3
+- update to go 1.23.4
 - update testify to v1.10.0
+- update kubernetes libraries to 0.30.8
 
 ## [v2.0.0-rc] - 2024-10-08
 
