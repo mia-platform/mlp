@@ -1,6 +1,6 @@
 module github.com/mia-platform/mlp/v2
 
-go 1.23.4
+go 1.23.5
 
 require (
 	github.com/MakeNowJust/heredoc/v2 v2.0.1
