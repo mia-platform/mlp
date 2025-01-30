@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v2.0.0] - 2025-01-30
+
+### Changed
+
+- complete rewrite of the cli
+- update to go 1.23.5
+- update external-secrets to v0.11.0
+- update kubernetes libraries to 0.31
+- use configmap instead of secret as inventory storage
+
+### Added
+
+- wait for resource status after apply
+
+### Fixed
+
+- hydrate command now add metadata to kustomize file to avoid "empty kubernetes file"
+	errors during deploy
+
 ## [v2.0.0-rc.1] - 2025-01-23
 
 ### Changed
@@ -197,7 +216,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial Release 🎉🎉🎉
 
-[Unreleased]: https://github.com/mia-platform/mlp/compare/v2.0.0-rc.1...HEAD
+[Unreleased]: https://github.com/mia-platform/mlp/compare/v2.0.0...HEAD
+[v2.0.0]: https://github.com/mia-platform/mlp/compare/v2.0.0-rc.1...v2.0.0
 [v2.0.0-rc.1]: https://github.com/mia-platform/mlp/compare/v2.0.0-rc...v2.0.0-rc.1
 [v2.0.0-rc]: https://github.com/mia-platform/mlp/compare/v2.0.0-beta.2...v2.0.0-rc
 [v2.0.0-beta.2]: https://github.com/mia-platform/mlp/compare/v2.0.0-beta.1...v2.0.0-beta.2
