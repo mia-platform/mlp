@@ -17,7 +17,6 @@ package interpolate
 
 import (
 	"bytes"
-	"context"
 	"io"
 	"io/fs"
 	"os"
@@ -174,7 +173,7 @@ ZZZZZZZZZZZZZZZZZZZZZZZZZZ
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			err := test.option.Run(context.TODO())
+			err := test.option.Run(t.Context())
 
 			switch len(test.expectedError) {
 			case 0:

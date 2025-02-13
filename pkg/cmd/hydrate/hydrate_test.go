@@ -16,7 +16,6 @@
 package hydrate
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -115,7 +114,7 @@ resources:
 				paths: test.paths,
 				fSys:  fSys,
 			}
-			err := options.Run(context.TODO())
+			err := options.Run(t.Context())
 			switch len(test.expectedError) {
 			case 0:
 				assert.NoError(t, err)

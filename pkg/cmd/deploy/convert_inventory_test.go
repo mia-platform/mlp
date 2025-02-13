@@ -17,7 +17,6 @@ package deploy
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -37,7 +36,7 @@ import (
 	restfake "k8s.io/client-go/rest/fake"
 )
 
-func TestLoadInventory(t *testing.T) { //nolint: gocyclo
+func TestLoadInventory(t *testing.T) {
 	t.Parallel()
 
 	namespace := "test-inventory"
@@ -256,7 +255,7 @@ func TestLoadInventory(t *testing.T) { //nolint: gocyclo
 			inv, err := NewInventory(factory, inventoryName, namespace, "mlp")
 			require.NoError(t, err)
 
-			set, err := inv.Load(context.TODO())
+			set, err := inv.Load(t.Context())
 			switch len(test.expectedError) {
 			case 0:
 				assert.NoError(t, err)
@@ -345,7 +344,7 @@ func TestSavingInventory(t *testing.T) {
 			castedInventory.compatibilityMode = test.compatibilityMode
 			require.NoError(t, err)
 
-			err = inv.Save(context.TODO(), test.dryRun)
+			err = inv.Save(t.Context(), test.dryRun)
 			if len(test.expectedError) > 0 {
 				assert.ErrorContains(t, err, test.expectedError)
 				return

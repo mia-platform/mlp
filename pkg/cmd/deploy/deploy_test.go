@@ -215,7 +215,7 @@ func TestRun(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			stringBuilder := new(strings.Builder)
-			ctx, cancel := context.WithTimeout(context.TODO(), test.timeout)
+			ctx, cancel := context.WithTimeout(t.Context(), test.timeout)
 			defer cancel()
 
 			callsCounter := 0
@@ -294,7 +294,7 @@ func TestApplyingEncounteringErrors(t *testing.T) {
 	}
 
 	stringBuilder := new(strings.Builder)
-	ctx, cancel := context.WithTimeout(context.TODO(), timeout)
+	ctx, cancel := context.WithTimeout(t.Context(), timeout)
 	defer cancel()
 
 	tf := jpltesting.NewTestClientFactory().

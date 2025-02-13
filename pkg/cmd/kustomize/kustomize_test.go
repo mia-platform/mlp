@@ -17,7 +17,6 @@ package kustomize
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"path/filepath"
 	"testing"
@@ -142,7 +141,7 @@ func TestRun(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			err := test.options.Run(context.TODO())
+			err := test.options.Run(t.Context())
 
 			switch len(test.expectedError) {
 			case 0:

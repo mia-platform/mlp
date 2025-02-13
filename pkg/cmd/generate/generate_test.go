@@ -16,7 +16,6 @@
 package generate
 
 import (
-	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -146,7 +145,7 @@ func TestRun(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			err := test.options.Run(context.TODO())
+			err := test.options.Run(t.Context())
 
 			switch len(test.expectedError) {
 			case 0:
