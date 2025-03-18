@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - update to go 1.24.1
+- update jlp to v0.6.1
+- update cobra to 1.9.1
+- update pflag to 1.0.6
+- update kubernetes libraries to 0.31.7
+- update kustomize libraries to 0.19.0
 
 ## [v2.0.0] - 2025-01-30
 
