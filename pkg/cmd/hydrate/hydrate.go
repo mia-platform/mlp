@@ -163,8 +163,13 @@ func updateKustomize(ctx context.Context, fSys filesys.FileSystem, path string, 
 		return err
 	}
 
+	alreadyPresentFiles := k.Resources
+	for _, patch := range k.Patches {
+		alreadyPresentFiles = append(alreadyPresentFiles, patch.Path)
+	}
+
 	for _, resource := range resources {
-		if kf.GetPath() == filepath.Join(path, resource) || slices.Contains(k.Resources, resource) {
+		if kf.GetPath() == filepath.Join(path, resource) || slices.Contains(alreadyPresentFiles, resource) {
 			continue
 		}
 		logger.V(8).Info("adding resource", "path", resource)
@@ -177,8 +182,8 @@ func updateKustomize(ctx context.Context, fSys filesys.FileSystem, path string, 
 		}
 
 		found := false
-		for _, pp := range k.Patches {
-			if pp.Path == patch {
+		for _, path := range alreadyPresentFiles {
+			if path == patch {
 				found = true
 				break
 			}

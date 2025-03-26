@@ -80,8 +80,10 @@ patches:
     version: v1
     kind: Deployment
 - path: test4.patch.yml
+- path: config-file.yaml
 - path: test2.patch.YAML
 resources:
+- test2.patch.yaml
 - Test1.YAML
 - test3.patches.YAML
 `
@@ -164,8 +166,12 @@ func testingInMemoryFSys(t *testing.T) filesys.FileSystem {
 	require.NoError(t, err)
 	err = fSys.WriteFile(filepath.Join(overlaysFolder, "test4.patch.yml"), []byte{})
 	require.NoError(t, err)
+	err = fSys.WriteFile(filepath.Join(overlaysFolder, "config-file.yaml"), []byte{})
+	require.NoError(t, err)
 	err = fSys.WriteFile(filepath.Join(overlaysFolder, "kustomization.yml"), []byte(`kind: Kustomization
 apiVersion: kustomize.config.k8s.io/v1beta1
+resources:
+- test2.patch.yaml
 patches:
 - path: path.yaml
   target:
@@ -173,6 +179,7 @@ patches:
     version: v1
     kind: Deployment
 - path: test4.patch.yml
+- path: config-file.yaml
 `))
 	require.NoError(t, err)
 
