@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v2.0.2] - 2025-03-27
+
 ### Fixed
 
 - improve file detection during hydrate command for already present file in kustomization files
@@ -231,7 +233,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial Release 🎉🎉🎉
 
-[Unreleased]: https://github.com/mia-platform/mlp/compare/v2.0.1...HEAD
+[Unreleased]: https://github.com/mia-platform/mlp/compare/v2.0.2...HEAD
+[v2.0.2]: https://github.com/mia-platform/mlp/compare/v2.0.1...v2.0.2
 [v2.0.1]: https://github.com/mia-platform/mlp/compare/v2.0.0...v2.0.1
 [v2.0.0]: https://github.com/mia-platform/mlp/compare/v2.0.0-rc.1...v2.0.0
 [v2.0.0-rc.1]: https://github.com/mia-platform/mlp/compare/v2.0.0-rc...v2.0.0-rc.1
