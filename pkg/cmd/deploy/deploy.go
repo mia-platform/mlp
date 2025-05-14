@@ -281,9 +281,9 @@ loop:
 	}
 
 	builder := new(strings.Builder)
-	builder.WriteString(fmt.Sprintf("applying process has encountered %d error(s):\n", len(errorsDuringApplying)))
+	fmt.Fprintf(builder, "applying process has encountered %d error(s):\n", len(errorsDuringApplying))
 	for _, err := range errorsDuringApplying {
-		builder.WriteString(fmt.Sprintf("\t- %s\n", err))
+		fmt.Fprintf(builder, "\t- %s\n", err)
 	}
 
 	return errors.New(builder.String())

@@ -180,14 +180,14 @@ func (m *dependenciesMutator) checksumsForPodSpec(pod corev1.PodSpec, namespace 
 				}
 
 				if env.ValueFrom.ConfigMapKeyRef != nil {
-					name := env.ValueFrom.ConfigMapKeyRef.LocalObjectReference.Name
+					name := env.ValueFrom.ConfigMapKeyRef.Name
 					key := checksumObjectKey(cmKind, name, namespace, env.ValueFrom.ConfigMapKeyRef.Key)
 					dependencies = append(dependencies, key)
 					continue
 				}
 
 				if env.ValueFrom.SecretKeyRef != nil {
-					name := env.ValueFrom.SecretKeyRef.LocalObjectReference.Name
+					name := env.ValueFrom.SecretKeyRef.Name
 					key := checksumObjectKey(secKind, name, namespace, env.ValueFrom.SecretKeyRef.Key)
 					dependencies = append(dependencies, key)
 				}

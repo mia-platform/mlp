@@ -114,7 +114,7 @@ func secretForExternalSecret(obj *unstructured.Unstructured) map[string]*unstruc
 
 	secretName := extsec.Spec.Target.Name
 	if len(secretName) == 0 {
-		secretName = extsec.ObjectMeta.Name
+		secretName = extsec.Name
 	}
 	externalSecrets[secretKey(secretName, obj.GetNamespace())] = obj
 
@@ -201,7 +201,7 @@ func (m *externalSecretsMutator) externalSecretsForPodSpec(pod corev1.PodSpec, n
 				}
 
 				if env.ValueFrom.SecretKeyRef != nil {
-					name := env.ValueFrom.SecretKeyRef.LocalObjectReference.Name
+					name := env.ValueFrom.SecretKeyRef.Name
 					secretsReferences = append(secretsReferences, secretKey(name, namespace))
 				}
 			}
