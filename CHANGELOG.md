@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- update to go 1.24.4
+- update jlp to v0.7.0
+- update kubernetes libraries to 0.32.5
+- update external-secrets to 0.16.2
+
 ## [v2.0.2] - 2025-03-27
 
 ### Fixed

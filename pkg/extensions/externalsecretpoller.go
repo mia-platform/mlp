@@ -16,7 +16,7 @@
 package extensions
 
 import (
-	extsecv1beta1 "github.com/external-secrets/external-secrets/apis/externalsecrets/v1beta1"
+	extsecv1 "github.com/external-secrets/external-secrets/apis/externalsecrets/v1"
 	"github.com/mia-platform/jpl/pkg/poller"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -32,14 +32,14 @@ func ExternalSecretStatusCheckers() poller.CustomStatusCheckers {
 
 // externalSecretStatusChecker contains the logic for checking if an ExternalSecret has finished to sync its data
 func externalSecretStatusChecker(object *unstructured.Unstructured) (*poller.Result, error) {
-	externalSecret := new(extsecv1beta1.ExternalSecret)
+	externalSecret := new(extsecv1.ExternalSecret)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, externalSecret); err != nil {
 		return nil, err
 	}
 
 	for _, condition := range externalSecret.Status.Conditions {
 		switch condition.Type {
-		case extsecv1beta1.ExternalSecretReady:
+		case extsecv1.ExternalSecretReady:
 			switch condition.Status {
 			case corev1.ConditionTrue:
 				return &poller.Result{
@@ -57,7 +57,7 @@ func externalSecretStatusChecker(object *unstructured.Unstructured) (*poller.Res
 					Message: condition.Message,
 				}, nil
 			}
-		case extsecv1beta1.ExternalSecretDeleted:
+		case extsecv1.ExternalSecretDeleted:
 			if condition.Status == corev1.ConditionTrue {
 				return &poller.Result{
 					Status:  poller.StatusTerminating,
@@ -75,13 +75,13 @@ func externalSecretStatusChecker(object *unstructured.Unstructured) (*poller.Res
 
 // secretStoreStatusChecker contains the logic for checking if an SecretStore has
 func secretStoreStatusChecker(object *unstructured.Unstructured) (*poller.Result, error) {
-	secretStore := new(extsecv1beta1.SecretStore)
+	secretStore := new(extsecv1.SecretStore)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(object.Object, secretStore); err != nil {
 		return nil, err
 	}
 
 	for _, condition := range secretStore.Status.Conditions {
-		if condition.Type != extsecv1beta1.SecretStoreReady {
+		if condition.Type != extsecv1.SecretStoreReady {
 			continue
 		}
 		switch condition.Status {

@@ -19,7 +19,7 @@ import (
 	"maps"
 	"slices"
 
-	extsecv1beta1 "github.com/external-secrets/external-secrets/apis/externalsecrets/v1beta1"
+	extsecv1 "github.com/external-secrets/external-secrets/apis/externalsecrets/v1"
 	"github.com/mia-platform/jpl/pkg/client/cache"
 	"github.com/mia-platform/jpl/pkg/mutator"
 	"github.com/mia-platform/jpl/pkg/resource"
@@ -107,7 +107,7 @@ var _ mutator.Interface = &dependenciesMutator{}
 func secretForExternalSecret(obj *unstructured.Unstructured) map[string]*unstructured.Unstructured {
 	externalSecrets := make(map[string]*unstructured.Unstructured)
 
-	extsec := new(extsecv1beta1.ExternalSecret)
+	extsec := new(extsecv1.ExternalSecret)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, extsec); err != nil {
 		return externalSecrets
 	}
@@ -128,7 +128,7 @@ func secretKey(name, namespace string) string {
 // externalSecretStoreKey return a key rappresentation for a secret store given its kind, name and eventual namespace
 func externalSecretStoreKey(kind, name, namespace string) string {
 	if len(kind) == 0 {
-		kind = extsecv1beta1.SecretStoreKind
+		kind = extsecv1.SecretStoreKind
 	}
 
 	return kind + ":" + name + ":" + namespace
@@ -137,7 +137,7 @@ func externalSecretStoreKey(kind, name, namespace string) string {
 // annotateExternalSecret mutate the ExternalSecret obj with the depends-on annotation with all the stores
 // referred inside it.
 func (m *externalSecretsMutator) annotateExternalSecret(obj *unstructured.Unstructured) error {
-	extsec := new(extsecv1beta1.ExternalSecret)
+	extsec := new(extsecv1.ExternalSecret)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, extsec); err != nil {
 		return err
 	}
@@ -151,7 +151,7 @@ func (m *externalSecretsMutator) annotateExternalSecret(obj *unstructured.Unstru
 		}
 	}
 
-	extractStoreFromSourceRef := func(sourceRef *extsecv1beta1.SecretStoreRef) (*unstructured.Unstructured, bool) {
+	extractStoreFromSourceRef := func(sourceRef *extsecv1.SecretStoreRef) (*unstructured.Unstructured, bool) {
 		if sourceRef == nil || len(sourceRef.Name) == 0 {
 			return nil, false
 		}

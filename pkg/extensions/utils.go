@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"reflect"
 
-	extsecv1beta1 "github.com/external-secrets/external-secrets/apis/externalsecrets/v1beta1"
+	extsecv1 "github.com/external-secrets/external-secrets/apis/externalsecrets/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -48,8 +48,8 @@ var (
 	configMapGK = corev1.SchemeGroupVersion.WithKind(reflect.TypeOf(corev1.ConfigMap{}).Name()).GroupKind()
 	secretGK    = corev1.SchemeGroupVersion.WithKind(reflect.TypeOf(corev1.Secret{}).Name()).GroupKind()
 
-	extsecGK      = extsecv1beta1.SchemeGroupVersion.WithKind(extsecv1beta1.ExtSecretKind).GroupKind()
-	extSecStoreGK = extsecv1beta1.SchemeGroupVersion.WithKind(extsecv1beta1.SecretStoreKind).GroupKind()
+	extsecGK      = extsecv1.SchemeGroupVersion.WithKind(extsecv1.ExtSecretKind).GroupKind()
+	extSecStoreGK = extsecv1.SchemeGroupVersion.WithKind(extsecv1.SecretStoreKind).GroupKind()
 
 	deployGK = appsv1.SchemeGroupVersion.WithKind(reflect.TypeOf(appsv1.Deployment{}).Name()).GroupKind()
 	dsGK     = appsv1.SchemeGroupVersion.WithKind(reflect.TypeOf(appsv1.DaemonSet{}).Name()).GroupKind()
