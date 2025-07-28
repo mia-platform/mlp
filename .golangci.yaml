@@ -65,9 +65,16 @@ linters:
         limitations under the License.
     mnd:
       checks:
-        - case
-        - condition
-        - return
+      - case
+      - condition
+      - return
+    revive:
+      rules:
+      - name: var-naming
+        arguments:
+          - [] # allow list
+          - [] # block list
+          - - skip-package-name-checks: true # options
     tagliatelle:
       case:
         rules:
