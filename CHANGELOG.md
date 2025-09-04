@@ -9,7 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- update to go 1.24.5
+- update to go 1.25.0
+- update jlp to v0.8.0
+- update kubernetes libraries to 0.33.4
+- update external-secrets to 0.19.2
+- update cobra to v1.10.1
+- update pflag to v1.0.10
+- update kustomize/api to v0.20.1
+- update kyaml to v0.20.1
+- update yaml to v1.5.0
 
 ## [v2.1.0] - 2025-06-12
 
