@@ -73,6 +73,10 @@ const (
 	dryRunDefaultValue = false
 	dryRunFlagUsage    = "if true the resources will be sent to the cluster but not persisted"
 
+	timeoutFlagName     = "timeout"
+	timeoutDefaultValue = 0 * time.Second
+	timeoutFlagUsage    = "the length of time to wait before giving up on waiting for the resources to be ready. 0 means no timeout."
+
 	stdinToken    = "-"
 	fieldManager  = "mlp"
 	inventoryName = "eu.mia-platform.mlp"
@@ -93,6 +97,7 @@ type Flags struct {
 	deployType      string
 	forceDeploy     bool
 	ensureNamespace bool
+	timeout         time.Duration
 	dryRun          bool
 }
 
@@ -102,6 +107,7 @@ type Options struct {
 	deployType      string
 	forceDeploy     bool
 	ensureNamespace bool
+	timeout         time.Duration
 	dryRun          bool
 
 	clientFactory util.ClientFactory
@@ -169,6 +175,7 @@ func (f *Flags) AddFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&f.deployType, deployTypeFlagName, deployTypeDefaultValue, deployTypeFlagUsage)
 	flags.BoolVar(&f.forceDeploy, forceDeployFlagName, forceDeployDefaultValue, forceDeployFlagUsage)
 	flags.BoolVar(&f.ensureNamespace, ensureNamespaceFlagName, ensureNamespaceDefaultValue, ensureNamespaceFlagUsage)
+	flags.DurationVar(&f.timeout, timeoutFlagName, timeoutDefaultValue, timeoutFlagUsage)
 	flags.BoolVar(&f.dryRun, dryRunFlagName, dryRunDefaultValue, dryRunFlagUsage)
 }
 
@@ -183,6 +190,7 @@ func (f *Flags) ToOptions(reader io.Reader, writer io.Writer) (*Options, error) 
 		deployType:      f.deployType,
 		forceDeploy:     f.forceDeploy,
 		ensureNamespace: f.ensureNamespace,
+		timeout:         f.timeout,
 
 		clientFactory: util.NewFactory(f.ConfigFlags),
 		reader:        reader,
@@ -252,6 +260,7 @@ func (o *Options) Run(ctx context.Context) error {
 	opts := client.ApplierOptions{
 		FieldManager: fieldManager,
 		DryRun:       o.dryRun,
+		Timeout:      o.timeout,
 	}
 
 	logger.V(3).Info("start applying resources")
