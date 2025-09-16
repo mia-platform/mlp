@@ -330,6 +330,41 @@ func TestApplyingEncounteringErrors(t *testing.T) {
 	t.Log(stringBuilder.String())
 }
 
+func TestWithTimeout(t *testing.T) {
+	t.Parallel()
+
+	namespace := "mlp-deploy-timeout-test"
+	testdata := "testdata"
+	fakeClock := clocktesting.NewFakePassiveClock(time.Date(1970, time.January, 0, 0, 0, 0, 0, time.UTC))
+	stringBuilder := new(strings.Builder)
+
+	secret := jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "resources", "secret.yaml"))
+	fakeDynamicClient := dynamicfake.NewSimpleDynamicClient(jpltesting.Scheme, secret)
+	options := &Options{
+		inputPaths: []string{filepath.Join(testdata, "error-resources")},
+		deployType: "deploy_all",
+		dryRun:     true,
+		timeout:    100 * time.Millisecond,
+		clock:      fakeClock,
+	}
+
+	tf := jpltesting.NewTestClientFactory().
+		WithNamespace(namespace)
+	tf.Client = &restfake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: restfake.CreateHTTPClient(func(r *http.Request) (*http.Response, error) {
+			time.Sleep(200 * time.Millisecond)
+			return &http.Response{StatusCode: http.StatusNotFound, Body: nil, Header: jpltesting.DefaultHeaders()}, nil
+		}),
+	}
+	tf.FakeDynamicClient = fakeDynamicClient
+
+	options.clientFactory = tf
+	options.writer = stringBuilder
+	err := options.Run(t.Context())
+	assert.ErrorContains(t, err, context.DeadlineExceeded.Error())
+}
+
 func validationRoundTripper(t *testing.T, resources []*resourceValidation, r *http.Request) (*http.Response, error) {
 	t.Helper()
 	path := r.URL.Path
