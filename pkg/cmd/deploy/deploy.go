@@ -75,7 +75,7 @@ const (
 
 	timeoutFlagName     = "timeout"
 	timeoutDefaultValue = 0 * time.Second
-	timeoutFlagUsage    = "the length of time to wait before giving up on waiting for the resources to be ready. 0 means no timeout."
+	timeoutFlagUsage    = "the length of time to wait before giving up on waiting for the resources to be ready. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means no timeout"
 
 	stdinToken    = "-"
 	fieldManager  = "mlp"
