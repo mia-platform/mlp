@@ -77,6 +77,10 @@ const (
 	timeoutDefaultValue = 0 * time.Second
 	timeoutFlagUsage    = "the length of time to wait before giving up on waiting for the resources to be ready. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means no timeout"
 
+	waitFlagName         = "wait"
+	waitFlagDefaultValue = true
+	waitFlagUsage        = "if true, wait for resources to be current before marking them as successfully applied"
+
 	stdinToken    = "-"
 	fieldManager  = "mlp"
 	inventoryName = "eu.mia-platform.mlp"
@@ -99,6 +103,7 @@ type Flags struct {
 	ensureNamespace bool
 	timeout         time.Duration
 	dryRun          bool
+	wait            bool
 }
 
 // Options have the data required to perform the deploy operation
@@ -109,6 +114,7 @@ type Options struct {
 	ensureNamespace bool
 	timeout         time.Duration
 	dryRun          bool
+	wait            bool
 
 	clientFactory util.ClientFactory
 	clock         clock.PassiveClock
@@ -177,6 +183,7 @@ func (f *Flags) AddFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&f.ensureNamespace, ensureNamespaceFlagName, ensureNamespaceDefaultValue, ensureNamespaceFlagUsage)
 	flags.DurationVar(&f.timeout, timeoutFlagName, timeoutDefaultValue, timeoutFlagUsage)
 	flags.BoolVar(&f.dryRun, dryRunFlagName, dryRunDefaultValue, dryRunFlagUsage)
+	flags.BoolVar(&f.wait, waitFlagName, waitFlagDefaultValue, waitFlagUsage)
 }
 
 // ToOptions transform the command flags in command runtime arguments
@@ -191,6 +198,7 @@ func (f *Flags) ToOptions(reader io.Reader, writer io.Writer) (*Options, error) 
 		forceDeploy:     f.forceDeploy,
 		ensureNamespace: f.ensureNamespace,
 		timeout:         f.timeout,
+		wait:            f.wait,
 
 		clientFactory: util.NewFactory(f.ConfigFlags),
 		reader:        reader,
@@ -261,6 +269,7 @@ func (o *Options) Run(ctx context.Context) error {
 		FieldManager: fieldManager,
 		DryRun:       o.dryRun,
 		Timeout:      o.timeout,
+		DisableWait:  !o.wait,
 	}
 
 	logger.V(3).Info("start applying resources")

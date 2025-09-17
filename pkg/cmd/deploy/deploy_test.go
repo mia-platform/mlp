@@ -101,6 +101,7 @@ func TestOptions(t *testing.T) {
 		writer:        buffer,
 		clientFactory: util.NewFactory(configFlags),
 		clock:         clock.RealClock{},
+		wait:          false,
 	}
 
 	flag := &Flags{
@@ -150,6 +151,7 @@ func TestRun(t *testing.T) {
 				deployType: "deploy_all",
 				dryRun:     true,
 				clock:      fakeClock,
+				wait:       false,
 			},
 			timeout: 1 * time.Second,
 			expectedResources: []*resourceValidation{
@@ -192,6 +194,7 @@ func TestRun(t *testing.T) {
 				deployType: "deploy_all",
 				dryRun:     true,
 				clock:      fakeClock,
+				wait:       true,
 			},
 			timeout:             1 * time.Second,
 			expectedResources:   []*resourceValidation{},
@@ -202,7 +205,7 @@ func TestRun(t *testing.T) {
 			options: &Options{
 				inputPaths: []string{filepath.Join(testdata, "resources")},
 				deployType: "deploy_all",
-				dryRun:     true,
+				wait:       false,
 				clock:      fakeClock,
 			},
 			timeout:             0 * time.Millisecond,
@@ -281,6 +284,7 @@ func TestApplyingEncounteringErrors(t *testing.T) {
 		deployType: "deploy_all",
 		dryRun:     true,
 		clock:      fakeClock,
+		wait:       true,
 	}
 	timeout := 1 * time.Second
 	secret := jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "resources", "secret.yaml"))
@@ -346,6 +350,7 @@ func TestWithTimeout(t *testing.T) {
 		dryRun:     true,
 		timeout:    100 * time.Millisecond,
 		clock:      fakeClock,
+		wait:       true,
 	}
 
 	tf := jpltesting.NewTestClientFactory().
