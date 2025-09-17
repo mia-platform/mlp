@@ -53,8 +53,7 @@ curl -fsSL --proto '=https' --tlsv1.2 https://github.com/mia-platform/mlp/releas
 wget -q --https-only --secure-protocol=TLSv1_2 https://github.com/mia-platform/mlp/releases/download/v2.4.0/mlp-linux-amd64 -O /tmp/mlp
 ```
 
-After you have downloaded the file you can validate it against the checksum you can find at this [url] running the
-command:
+After you have downloaded the file you can validate it against the [checksum] running the command:
 
 ```sh
 sha256sum /tmp/mlp
@@ -149,7 +148,7 @@ enable the autocompletion.
 
 [Homebrew]: https://brew.sh "The Missing Package Manager for macOS (or Linux)"
 [Golang]: https://go.dev "Build simple, secure, scalable systems with Go"
-[url]: https://github.com/mia-platform/mlp/releases/download/v0.12.2/checksums.txt "mlp checksums"
+[checksum]: https://github.com/mia-platform/mlp/releases/download/v2.4.0/checksums.txt "mlp checksums"
 [`bash-completion`]: https://github.com/scop/bash-completion "Programmable completion functions for bash"
 [`oh-my-zsh`]: https://ohmyz.sh "Oh My Zsh is a delightful, open source, community-driven
 	framework for managing your Zsh configuration"
