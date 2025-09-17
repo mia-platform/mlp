@@ -1,6 +1,6 @@
 module github.com/mia-platform/mlp/v2
 
-go 1.25.0
+go 1.25.1
 
 require (
 	github.com/MakeNowJust/heredoc/v2 v2.0.1
@@ -9,7 +9,7 @@ require (
 	github.com/external-secrets/external-secrets v0.19.2
 	github.com/go-logr/logr v1.4.3
 	github.com/go-logr/stdr v1.2.2
-	github.com/mia-platform/jpl v0.8.0
+	github.com/mia-platform/jpl v0.9.0
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1

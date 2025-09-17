@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- update to go 1.25.1
+- update jlp to v0.9.0
+
+### Added
+
+- new wait flag that can be used to turn off the waiting steps of the deploy command
+
 ## [v2.3.0] - 2025-09-16
 
 ### Changed
