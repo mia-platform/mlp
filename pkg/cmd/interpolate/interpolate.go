@@ -17,6 +17,7 @@ package interpolate
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -150,11 +151,11 @@ func (f *Flags) ToOptions(reader io.Reader, fSys filesys.FileSystem) (*Options, 
 
 func (o *Options) Validate() error {
 	if len(o.inputPaths) == 0 {
-		return fmt.Errorf("at least one path must be specified")
+		return errors.New("at least one path must be specified")
 	}
 
 	if len(o.inputPaths) > 1 && slices.Contains(o.inputPaths, stdinToken) {
-		return fmt.Errorf("cannot read from stdin and other paths together")
+		return errors.New("cannot read from stdin and other paths together")
 	}
 
 	return nil

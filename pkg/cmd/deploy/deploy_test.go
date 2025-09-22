@@ -131,6 +131,7 @@ func TestOptions(t *testing.T) {
 
 func TestRun(t *testing.T) {
 	t.Parallel()
+
 	testdata := "testdata"
 	namespace := "mlp-deploy-test"
 	fakeClock := clocktesting.NewFakePassiveClock(time.Date(1970, time.January, 0, 0, 0, 0, 0, time.UTC))
@@ -217,6 +218,8 @@ func TestRun(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			stringBuilder := new(strings.Builder)
 			ctx, cancel := context.WithTimeout(t.Context(), test.timeout)
 			defer cancel()
@@ -374,8 +377,8 @@ func validationRoundTripper(t *testing.T, resources []*resourceValidation, r *ht
 	t.Helper()
 	path := r.URL.Path
 	method := r.Method
-	inventoryPath := fmt.Sprintf("/api/v1/namespaces/mlp-deploy-test/configmaps/%s", inventoryName)
-	oldInventoryPath := fmt.Sprintf("/api/v1/namespaces/mlp-deploy-test/secrets/%s", oldInventoryName)
+	inventoryPath := "/api/v1/namespaces/mlp-deploy-test/configmaps/" + inventoryName
+	oldInventoryPath := "/api/v1/namespaces/mlp-deploy-test/secrets/" + oldInventoryName
 	codec := jpltesting.Codecs.LegacyCodec(jpltesting.Scheme.PrioritizedVersionsAllGroups()...)
 
 	if r.Body != nil {
@@ -404,7 +407,7 @@ func validationRoundTripper(t *testing.T, resources []*resourceValidation, r *ht
 		require.NoError(t, err)
 		cm := new(corev1.ConfigMap)
 		require.NoError(t, runtime.DecodeInto(codec, bodyData, cm))
-		assert.Equal(t, 7, len(cm.Data))
+		assert.Len(t, cm.Data, 7)
 		return &http.Response{
 			StatusCode: http.StatusOK,
 			Header:     jpltesting.DefaultHeaders(),

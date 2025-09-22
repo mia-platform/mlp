@@ -110,7 +110,7 @@ func TestDeployOnEmptyCluster(t *testing.T) {
 			inventory := new(corev1.ConfigMap)
 			require.NoError(t, cfg.Client().Resources().Get(ctx, "eu.mia-platform.mlp", cfg.Namespace(), inventory))
 			t.Logf("inventory found: %s", configMap.Name)
-			assert.Equal(t, 6, len(inventory.Data))
+			assert.Len(t, inventory.Data, 6)
 
 			return ctx
 		}).
@@ -122,7 +122,7 @@ func TestDeployOnEmptyCluster(t *testing.T) {
 func TestSmartDeploy(t *testing.T) {
 	deploying := func(ctx context.Context, cfg *envconf.Config, deployType, stage string) {
 		buffer := new(bytes.Buffer)
-		deployCmd := deploy.NewCommand(genericclioptions.NewConfigFlags(false))
+		deployCmd := deploy.NewCommand(genericclioptions.NewConfigFlags(false)) //nolint:contextcheck
 		deployCmd.SetErr(buffer)
 		deployCmd.SetOut(buffer)
 

@@ -16,7 +16,7 @@
 package extensions
 
 import (
-	"fmt"
+	"errors"
 	"path/filepath"
 	"testing"
 
@@ -29,6 +29,7 @@ import (
 
 func TestFilter(t *testing.T) {
 	t.Parallel()
+
 	testdata := filepath.Join("testdata", "filter")
 	filtered := jpltesting.UnstructuredFromFile(t, filepath.Join(testdata, "filtered.yaml"))
 
@@ -67,7 +68,7 @@ func TestFilter(t *testing.T) {
 			getter: &testGetter{
 				availableObjects: map[resource.ObjectMetadata]*unstructured.Unstructured{},
 				errors: map[resource.ObjectMetadata]error{
-					resource.ObjectMetadataFromUnstructured(filtered): fmt.Errorf("error on load"),
+					resource.ObjectMetadataFromUnstructured(filtered): errors.New("error on load"),
 				},
 			},
 			expectedError: "error on load",
@@ -76,6 +77,8 @@ func TestFilter(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			filter := NewDeployOnceFilter()
 			filtered, err := filter.Filter(test.object, test.getter)
 			switch len(test.expectedError) {

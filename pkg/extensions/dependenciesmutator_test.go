@@ -28,8 +28,8 @@ import (
 
 func TestNewDependenciesMutator(t *testing.T) {
 	t.Parallel()
-	testdata := filepath.Join("testdata", "dependency-mutator")
 
+	testdata := filepath.Join("testdata", "dependency-mutator")
 	tests := map[string]struct {
 		objects     []*unstructured.Unstructured
 		expectedMap map[string]string
@@ -65,6 +65,8 @@ func TestNewDependenciesMutator(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			m := NewDependenciesMutator(test.objects)
 			dm, ok := m.(*dependenciesMutator)
 			require.True(t, ok)
@@ -143,6 +145,8 @@ func TestDependenciesMutatorCanHandleResource(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			dm := dependenciesMutator{checksumsMap: test.hashesMap}
 			assert.Equal(t, test.expectedResult, dm.CanHandleResource(test.obj))
 		})
@@ -194,6 +198,8 @@ func TestDependenciesMutatorMutate(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			mutator := &dependenciesMutator{
 				checksumsMap: checksumsMap,
 			}

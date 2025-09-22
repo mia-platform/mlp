@@ -17,7 +17,7 @@ package extensions
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"path/filepath"
 	"testing"
 
@@ -93,6 +93,8 @@ func TestDeployMutatorCanHandleResource(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			m := deployMutator{}
 			assert.Equal(t, test.expectedResult, m.CanHandleResource(test.obj))
 		})
@@ -169,6 +171,8 @@ func TestDeployMutatorMutate(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			mutator := &deployMutator{
 				deployType:    test.deployType,
 				forceNoSemver: test.forceNoSemver,
@@ -180,7 +184,7 @@ func TestDeployMutatorMutate(t *testing.T) {
 					resource.ObjectMetadataFromUnstructured(remoteObject): remoteObject,
 				},
 				errors: map[resource.ObjectMetadata]error{
-					resource.ObjectMetadataFromUnstructured(remoteErrorObject): fmt.Errorf("error from remote"),
+					resource.ObjectMetadataFromUnstructured(remoteErrorObject): errors.New("error from remote"),
 				},
 			}
 

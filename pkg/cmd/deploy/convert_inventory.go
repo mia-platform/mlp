@@ -122,7 +122,7 @@ func (s *Inventory) oldInventoryObjects(ctx context.Context) (sets.Set[resource.
 		var convertError error
 		resourceList, convertError = convertSecretFormat(secretData)
 		if convertError != nil {
-			return nil, fmt.Errorf("error unmarshalling resource map in secret %s: %s in namespace %s. Try to convert format from v0, but fails", oldInventoryName, err, s.namespace)
+			return nil, fmt.Errorf("error unmarshalling resource map in secret %s: %w in namespace %s. Try to convert format from v0, but fails", oldInventoryName, err, s.namespace)
 		}
 	}
 

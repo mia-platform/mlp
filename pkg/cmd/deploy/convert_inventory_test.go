@@ -247,6 +247,8 @@ func TestLoadInventory(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			factory := jpltesting.NewTestClientFactory()
 			factory.Client = &restfake.RESTClient{
 				Client: test.client,
@@ -333,6 +335,8 @@ func TestSavingInventory(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			factory := jpltesting.NewTestClientFactory()
 			factory.Client = &restfake.RESTClient{
 				Client: test.client,

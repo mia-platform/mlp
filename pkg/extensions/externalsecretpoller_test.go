@@ -29,7 +29,7 @@ func TestExtendedPoller(t *testing.T) {
 	t.Parallel()
 
 	customCheckers := ExternalSecretStatusCheckers()
-	assert.Equal(t, 2, len(customCheckers))
+	assert.Len(t, customCheckers, 2)
 }
 
 func TestExternalSecretStatusChecker(t *testing.T) {
@@ -73,6 +73,8 @@ func TestExternalSecretStatusChecker(t *testing.T) {
 
 	for testName, testCase := range tests {
 		t.Run(testName, func(t *testing.T) {
+			t.Parallel()
+
 			result, err := externalSecretStatusChecker(testCase.object)
 			if len(testCase.expectedError) > 0 {
 				assert.ErrorContains(t, err, testCase.expectedError)
@@ -120,6 +122,8 @@ func TestSecretStoreStatusChecker(t *testing.T) {
 
 	for testName, testCase := range tests {
 		t.Run(testName, func(t *testing.T) {
+			t.Parallel()
+
 			result, err := secretStoreStatusChecker(testCase.object)
 			if len(testCase.expectedError) > 0 {
 				assert.ErrorContains(t, err, testCase.expectedError)

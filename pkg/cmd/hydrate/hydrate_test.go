@@ -111,6 +111,8 @@ resources:
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			fSys := testingInMemoryFSys(t)
 			options := &Options{
 				paths: test.paths,

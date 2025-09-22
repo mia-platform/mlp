@@ -75,6 +75,8 @@ func TestNewExternalSecretMutator(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			m := NewExternalSecretsMutator(test.objects)
 			esm, ok := m.(*externalSecretsMutator)
 			require.True(t, ok)
@@ -165,6 +167,8 @@ func TestExternalSecretMutatorCanHandleResource(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			esm := externalSecretsMutator{externalSecretMap: test.externalSecretMap}
 			assert.Equal(t, test.expectedResult, esm.CanHandleResource(test.obj))
 		})
@@ -217,6 +221,8 @@ func TestExternalSecretMutatorMutate(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			mutator := &externalSecretsMutator{
 				externalSecretMap: externalSecretsMap,
 				secretsStores:     secretsStores,

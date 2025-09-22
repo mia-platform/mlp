@@ -17,7 +17,7 @@ package kustomize
 
 import (
 	"bytes"
-	"fmt"
+	"errors"
 	"path/filepath"
 	"testing"
 
@@ -86,6 +86,8 @@ func TestToOptions(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			o, err := test.flags.ToOptions(test.args, fSys, buffer)
 			switch len(test.expectedError) {
 			case 0:
@@ -100,6 +102,8 @@ func TestToOptions(t *testing.T) {
 }
 
 func TestRun(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		options        *Options
 		expectedOutput string
@@ -141,8 +145,9 @@ func TestRun(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			err := test.options.Run(t.Context())
+			t.Parallel()
 
+			err := test.options.Run(t.Context())
 			switch len(test.expectedError) {
 			case 0:
 				assert.NoError(t, err)
@@ -157,4 +162,4 @@ func TestRun(t *testing.T) {
 type failWriter struct{}
 
 // Write implements the Writer interface's Write method and returns an error.
-func (failWriter) Write([]byte) (int, error) { return 0, fmt.Errorf("nope") }
+func (failWriter) Write([]byte) (int, error) { return 0, errors.New("nope") }

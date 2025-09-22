@@ -44,8 +44,8 @@ func TestCommand(t *testing.T) {
 	configurationPath := filepath.Join("testdata", "configuration.yaml")
 	outputPath := filepath.Join(t.TempDir(), "generate-cmd-outptut")
 	cmd.SetArgs([]string{
-		fmt.Sprintf("--config-file=%s", configurationPath),
-		fmt.Sprintf("--out=%s", outputPath),
+		"--config-file=" + configurationPath,
+		"--out=" + outputPath,
 	})
 	assert.NoError(t, cmd.Execute())
 }

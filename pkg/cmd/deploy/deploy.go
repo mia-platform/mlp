@@ -189,7 +189,7 @@ func (f *Flags) AddFlags(flags *pflag.FlagSet) {
 // ToOptions transform the command flags in command runtime arguments
 func (f *Flags) ToOptions(reader io.Reader, writer io.Writer) (*Options, error) {
 	if f.ConfigFlags == nil {
-		return nil, fmt.Errorf("config flags are required")
+		return nil, errors.New("config flags are required")
 	}
 
 	return &Options{
@@ -213,7 +213,7 @@ func (o *Options) Validate() error {
 	}
 
 	if len(o.inputPaths) > 1 && slices.Contains(o.inputPaths, stdinToken) {
-		return fmt.Errorf("cannot read from stdin and other paths together")
+		return errors.New("cannot read from stdin and other paths together")
 	}
 
 	if !slices.Contains(validDeployTypeValues, o.deployType) {

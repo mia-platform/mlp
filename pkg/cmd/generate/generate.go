@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"slices"
@@ -130,7 +131,7 @@ func (f *Flags) ToOptions(fSys filesys.FileSystem) (*Options, error) {
 
 func (o *Options) Validate() error {
 	if len(o.configFiles) == 0 {
-		return fmt.Errorf("at least one config file must be specified")
+		return errors.New("at least one config file must be specified")
 	}
 
 	return nil
@@ -204,7 +205,7 @@ func (o *Options) generateResources(ctx context.Context, config *v1.GenerateConf
 		}
 
 		logger.V(7).Info("generated configmap", "name", cm.Name)
-		name := fmt.Sprintf("%s.configmap.yaml", obj.Name)
+		name := obj.Name + ".configmap.yaml"
 		resources[name] = cm
 	}
 
@@ -215,7 +216,7 @@ func (o *Options) generateResources(ctx context.Context, config *v1.GenerateConf
 		}
 
 		logger.V(7).Info("generated secret", "name", sec.Name)
-		name := fmt.Sprintf("%s.secret.yaml", obj.Name)
+		name := obj.Name + ".secret.yaml"
 		resources[name] = sec
 	}
 
