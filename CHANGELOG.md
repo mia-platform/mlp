@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- interpolate command now correctly parse only file inside a path and not recuresvly inside other
+- interpolate command now correctly parse only file inside a path and not recursively inside other
 	folders inside it.
 
 ## [v2.4.0] - 2025-09-17
