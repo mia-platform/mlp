@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v2.4.1] - 2025-09-26
+
 ### Fixed
 
 - interpolate command now correctly parse only file inside a path and not recuresvly inside other
@@ -278,7 +280,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial Release 🎉🎉🎉
 
-[Unreleased]: https://github.com/mia-platform/mlp/compare/v2.4.0...HEAD
+[Unreleased]: https://github.com/mia-platform/mlp/compare/v2.4.1...HEAD
+[v2.4.1]: https://github.com/mia-platform/mlp/compare/v2.4.0...HEAD
 [v2.4.0]: https://github.com/mia-platform/mlp/compare/v2.3.0...v2.4.0
 [v2.3.0]: https://github.com/mia-platform/mlp/compare/v2.2.0...v2.3.0
 [v2.2.0]: https://github.com/mia-platform/mlp/compare/v2.1.0...v2.2.0
