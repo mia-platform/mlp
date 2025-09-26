@@ -228,7 +228,7 @@ func (o *Options) filesToInterpolate(ctx context.Context) ([]string, error) {
 			}
 			if info.IsDir() {
 				logger.V(10).Info("ignore folder inside a folder", "path", path)
-				return nil
+				return fs.SkipDir
 			}
 
 			addOnlyYAMLFiles(path)

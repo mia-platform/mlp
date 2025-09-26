@@ -109,6 +109,16 @@ ZZZZZZZZZZZZZZZZZZZZZZZZZZ
 			},
 			expectedResultsPath: filepath.Join(testdata, "results"),
 		},
+		"interpolate with multiple paths contained inside each others": {
+			option: &Options{
+				prefixes:   []string{"MLP_TEST_", "MLP_"},
+				inputPaths: []string{filepath.Join(testdata, "folder"), filepath.Join(testdata, "folder", "inner")},
+				outputPath: filepath.Join(testTmpDir, "outputs-multiple-contained-paths"),
+				fSys:       fSys,
+				reader:     new(bytes.Buffer),
+			},
+			expectedResultsPath: filepath.Join(testdata, "results-contained"),
+		},
 		"interpolate from reader": {
 			option: &Options{
 				prefixes:   []string{"MLP_"},
