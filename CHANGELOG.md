@@ -222,13 +222,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Added
 
-- [BPSINS-27](https://makeitapp.atlassian.net/browse/BPSINS-27): add flag to skip namespace ensure when deploy
+- add flag to skip namespace ensure when deploy
 
 ## v0.4.1 - 2021-03-30
 
 ### Fixed
 
-- [BMP-940](https://makeitapp.atlassian.net/browse/BMP-940): fix annotation length by using an unique name,
+- fix annotation length by using an unique name,
 	`mia-platform.eu/dependenciesChecksum`, for all dependencies and its value is a object of key-values of all
 	the dependencies.
 
@@ -240,13 +240,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixes
 
-- [BMP-823](https://makeitapp.atlassian.net/browse/BMP-823): fix quote in configmap strings
+- fix quote in configmap strings
 
 ## v0.3.2 - 2021-01-22
 
 ### Fixed
 
-- [MPPS-57](https://makeitapp.atlassian.net/browse/MPPS-57): interpolation of variables inside single quotes
+- interpolation of variables inside single quotes
 
 ## v0.3.1 - 2020-11-25
 
