@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v2.4.2] - 2025-09-29
+
 ### Fixed
 
 - interpolate command now acutally interpolate files inside a folder path
@@ -284,7 +286,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial Release 🎉🎉🎉
 
-[Unreleased]: https://github.com/mia-platform/mlp/compare/v2.4.1...HEAD
+[Unreleased]: https://github.com/mia-platform/mlp/compare/v2.4.2...HEAD
+[v2.4.2]: https://github.com/mia-platform/mlp/compare/v2.4.1...v2.4.2
 [v2.4.1]: https://github.com/mia-platform/mlp/compare/v2.4.0...HEAD
 [v2.4.0]: https://github.com/mia-platform/mlp/compare/v2.3.0...v2.4.0
 [v2.3.0]: https://github.com/mia-platform/mlp/compare/v2.2.0...v2.3.0
