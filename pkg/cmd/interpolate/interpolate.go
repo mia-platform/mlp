@@ -222,16 +222,16 @@ func (o *Options) filesToInterpolate(ctx context.Context) ([]string, error) {
 		}
 
 		logger.V(10).Info("considering folder", "path", path)
-		err := o.fSys.Walk(path, func(path string, info fs.FileInfo, err error) error {
+		err := o.fSys.Walk(path, func(walkPath string, info fs.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
-			if info.IsDir() {
-				logger.V(10).Info("ignore folder inside a folder", "path", path)
+			if info.IsDir() && walkPath != path {
+				logger.V(10).Info("ignore folder inside a folder", "path", walkPath)
 				return fs.SkipDir
 			}
 
-			addOnlyYAMLFiles(path)
+			addOnlyYAMLFiles(walkPath)
 			return nil
 		})
 		if err != nil {

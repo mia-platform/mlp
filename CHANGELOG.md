@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- interpolate command now acutally interpolate files inside a folder path
+
 ## [v2.4.1] - 2025-09-26
 
 ### Fixed
