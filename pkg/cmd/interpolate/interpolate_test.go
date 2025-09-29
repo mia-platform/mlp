@@ -199,21 +199,40 @@ ZZZZZZZZZZZZZZZZZZZZZZZZZZ
 func testStructure(t *testing.T, pathToTest, expectationPath string) {
 	t.Helper()
 
-	_ = filepath.WalkDir(pathToTest, func(path string, d fs.DirEntry, err error) error {
+	// walk both pathToTest and expectationPath to ensure they have the same structure and contents
+	err := filepath.WalkDir(pathToTest, func(testPath string, d fs.DirEntry, err error) error {
 		require.NoError(t, err)
-		cleanPath := strings.TrimPrefix(path, pathToTest)
+		expectedPath := filepath.Join(expectationPath, strings.TrimPrefix(testPath, pathToTest))
 
-		testPath := filepath.Join(expectationPath, cleanPath)
 		if d.IsDir() {
 			require.DirExists(t, testPath)
 		} else {
-			data, err := os.ReadFile(path)
+			data, err := os.ReadFile(testPath)
 			require.NoError(t, err)
-			expectedData, err := os.ReadFile(testPath)
+			expectedData, err := os.ReadFile(expectedPath)
+			require.NoError(t, err)
+			assert.Equal(t, string(expectedData), string(data), expectedPath)
+		}
+
+		return nil
+	})
+	require.NoError(t, err)
+
+	err = filepath.WalkDir(expectationPath, func(expectedPath string, d fs.DirEntry, err error) error {
+		require.NoError(t, err)
+		testPath := filepath.Join(pathToTest, strings.TrimPrefix(expectedPath, expectationPath))
+
+		if d.IsDir() {
+			require.DirExists(t, testPath)
+		} else {
+			data, err := os.ReadFile(testPath)
+			require.NoError(t, err)
+			expectedData, err := os.ReadFile(expectedPath)
 			require.NoError(t, err)
 			assert.Equal(t, string(expectedData), string(data), testPath)
 		}
 
 		return nil
 	})
+	require.NoError(t, err)
 }
