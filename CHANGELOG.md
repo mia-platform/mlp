@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v2.5.0] - 2025-11-04
+
 ### Changed
 
 - update to go 1.25.3
@@ -295,7 +297,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial Release 🎉🎉🎉
 
-[Unreleased]: https://github.com/mia-platform/mlp/compare/v2.4.2...HEAD
+[Unreleased]: https://github.com/mia-platform/mlp/compare/v2.5.0...HEAD
+[v2.5.0]: https://github.com/mia-platform/mlp/compare/v2.4.2...v2.5.0
 [v2.4.2]: https://github.com/mia-platform/mlp/compare/v2.4.1...v2.4.2
 [v2.4.1]: https://github.com/mia-platform/mlp/compare/v2.4.0...HEAD
 [v2.4.0]: https://github.com/mia-platform/mlp/compare/v2.3.0...v2.4.0
