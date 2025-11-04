@@ -179,6 +179,17 @@ ZZZZZZZZZZZZZZZZZZZZZZZZZZ
 			},
 			expectedError: "no such file or directory",
 		},
+		"allow missing filenames flag will skip path": {
+			option: &Options{
+				prefixes:              []string{"MLP_TEST_", "MLP_"},
+				inputPaths:            []string{filepath.Join(testdata, "file.yaml"), filepath.Join(testdata, "missing")},
+				allowMissingFilenames: true,
+				outputPath:            filepath.Join(testTmpDir, "outputs-missing-path"),
+				fSys:                  fSys,
+				reader:                new(bytes.Buffer),
+			},
+			expectedResultsPath: filepath.Join(testdata, "results-missing-path"),
+		},
 	}
 
 	for name, test := range tests {

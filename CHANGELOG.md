@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `allow-missing-filenames` flag to `interpolate` command for ignoring errors when paths
+	are not found
+
 ## [v2.4.2] - 2025-09-29
 
 ### Fixed

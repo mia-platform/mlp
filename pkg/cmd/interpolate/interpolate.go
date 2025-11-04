@@ -71,6 +71,10 @@ const (
 	inputFlagShort = "f"
 	inputFlagUsage = "file or folder paths containing data to interpolate"
 
+	allowMissingFilenamesFlagName    = "allow-missing-filenames"
+	allowMissingFilenamesFlagUsage   = "set to allow missing input filenames"
+	allowMissingFilenamesFlagDefault = false
+
 	outputFlagName  = "out"
 	outputFlagShort = "o"
 	outputFlagUsage = "output directory where interpolated files are saved"
@@ -90,18 +94,20 @@ const (
 // Flags contains all the flags for the `interpolate` command. They will be converted to Options
 // that contains all runtime options for the command.
 type Flags struct {
-	prefixes   []string
-	inputPaths []string
-	outputPath string
+	prefixes              []string
+	inputPaths            []string
+	allowMissingFilenames bool
+	outputPath            string
 }
 
 // Options have the data required to perform the interpolate operation
 type Options struct {
-	prefixes   []string
-	inputPaths []string
-	outputPath string
-	fSys       filesys.FileSystem
-	reader     io.Reader
+	prefixes              []string
+	inputPaths            []string
+	allowMissingFilenames bool
+	outputPath            string
+	fSys                  filesys.FileSystem
+	reader                io.Reader
 }
 
 // NewCommand return the command for interpolating env variables on target files
@@ -132,6 +138,7 @@ func NewCommand() *cobra.Command {
 func (f *Flags) AddFlags(flags *pflag.FlagSet) {
 	flags.StringSliceVarP(&f.prefixes, prefixesFlagName, prefixesFlagShort, nil, prefixesFlagUsage)
 	flags.StringSliceVarP(&f.inputPaths, inputFlagName, inputFlagShort, nil, inputFlagUsage)
+	flags.BoolVar(&f.allowMissingFilenames, allowMissingFilenamesFlagName, allowMissingFilenamesFlagDefault, allowMissingFilenamesFlagUsage)
 	flags.StringVarP(&f.outputPath, outputFlagName, outputFlagShort, "interpolated-files", outputFlagUsage)
 	if err := cobra.MarkFlagDirname(flags, outputFlagName); err != nil {
 		panic(err)
@@ -141,11 +148,12 @@ func (f *Flags) AddFlags(flags *pflag.FlagSet) {
 // ToOptions transform the command flags in command runtime arguments
 func (f *Flags) ToOptions(reader io.Reader, fSys filesys.FileSystem) (*Options, error) {
 	return &Options{
-		inputPaths: f.inputPaths,
-		prefixes:   f.prefixes,
-		outputPath: f.outputPath,
-		fSys:       fSys,
-		reader:     reader,
+		inputPaths:            f.inputPaths,
+		prefixes:              f.prefixes,
+		allowMissingFilenames: f.allowMissingFilenames,
+		outputPath:            f.outputPath,
+		fSys:                  fSys,
+		reader:                reader,
 	}, nil
 }
 
@@ -212,10 +220,16 @@ func (o *Options) filesToInterpolate(ctx context.Context) ([]string, error) {
 			paths = append(paths, path)
 		}
 	}
+
 	for _, path := range o.inputPaths {
-		if !o.fSys.Exists(path) {
+		switch exists := o.fSys.Exists(path); {
+		case !exists && o.allowMissingFilenames:
+			logger.WithName("WARN").Info("can't read input file", "path", path)
+			continue
+		case !exists && !o.allowMissingFilenames:
 			return nil, fmt.Errorf("no such file or directory: %s", path)
 		}
+
 		if !o.fSys.IsDir(path) {
 			addOnlyYAMLFiles(path)
 			continue
