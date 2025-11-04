@@ -1,6 +1,6 @@
 {
 	"name": "Go",
-	"image": "golang:1.25.1",
+	"image": "golang:1.25.3",
 	"features": {
 		"ghcr.io/devcontainers/features/common-utils:2": {
 			"installZsh": "true",
