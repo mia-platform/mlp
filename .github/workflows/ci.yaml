@@ -58,12 +58,44 @@ jobs:
     - name: Run Test Coverage
       run: make ci
 
+  conformance-test:
+    name: Testing against Kubernetes ${{ matrix.kind_node_image }}
+    runs-on: ubuntu-latest
+    needs:
+    - test
+    strategy:
+      matrix:
+        kind_node_image:
+        - kindest/node:v1.34.0@sha256:7416a61b42b1662ca6ca89f02028ac133a309a2a30ba309614e8ec94d976dc5a
+        - kindest/node:v1.33.4@sha256:25a6018e48dfcaee478f4a59af81157a437f15e6e140bf103f85a2e7cd0cbbf2
+        - kindest/node:v1.32.8@sha256:abd489f042d2b644e2d033f5c2d900bc707798d075e8186cb65e3f1367a9d5a1
+        - kindest/node:v1.31.12@sha256:0f5cc49c5e73c0c2bb6e2df56e7df189240d83cf94edfa30946482eb08ec57d2
+        - kindest/node:v1.30.13@sha256:397209b3d947d154f6641f2d0ce8d473732bd91c87d9575ade99049aa33cd648
+    env:
+      KIND_NODE_IMAGE: ${{matrix.kind_node_image}}
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+      with:
+        show-progress: false
+    - name: Setup Golang
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+      with:
+        go-version-file: go.mod
+    - name: Setup Kind
+      uses: helm/kind-action@92086f6be054225fa813e0a4b13787fc9088faab # v1.13.0
+      with:
+        version: v0.30.0
+        install_only: true
+    - name: Run Conformance Tests
+      run: make test-conformance
+
   build:
     name: Build for Supported Architectures
     runs-on: ubuntu-latest
     needs:
     - lint
-    - test
+    - conformance-test
     if: github.event_name != 'push'
     steps:
     - name: Checkout Repository
@@ -86,7 +118,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
     - lint
-    - test
+    - conformance-test
     if: github.event_name == 'push'
     steps:
     - name: Checkout Repository
