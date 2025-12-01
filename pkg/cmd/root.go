@@ -24,14 +24,15 @@ import (
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/go-logr/logr"
 	"github.com/go-logr/stdr"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+
 	"github.com/mia-platform/mlp/v2/pkg/cmd/deploy"
 	"github.com/mia-platform/mlp/v2/pkg/cmd/generate"
 	"github.com/mia-platform/mlp/v2/pkg/cmd/hydrate"
 	"github.com/mia-platform/mlp/v2/pkg/cmd/interpolate"
 	"github.com/mia-platform/mlp/v2/pkg/cmd/kustomize"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
 var (

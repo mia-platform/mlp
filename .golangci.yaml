@@ -119,15 +119,12 @@ linters:
     rules:
     - linters:
       - errcheck
+      - goconst
       - gocyclo
       - gosec
       - tagliatelle
       path: _test\.go
-    - linters:
-      - goconst
-      path: (.+)_test\.go
     paths:
-    - internal/jws
     - third_party$
     - builtin$
     - examples$
@@ -138,10 +135,12 @@ formatters:
   settings:
     gofmt:
       simplify: true
+    goimports:
+       local-prefixes:
+        - github.com/mia-platform/mlp
   exclusions:
     generated: lax
     paths:
-    - internal/jws
     - third_party$
     - builtin$
     - examples$

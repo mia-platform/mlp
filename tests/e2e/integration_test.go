@@ -24,8 +24,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mia-platform/mlp/v2/pkg/cmd/deploy"
-	"github.com/mia-platform/mlp/v2/pkg/extensions"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
@@ -35,6 +33,9 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/features"
+
+	"github.com/mia-platform/mlp/v2/pkg/cmd/deploy"
+	"github.com/mia-platform/mlp/v2/pkg/extensions"
 )
 
 func TestDeployOnEmptyCluster(t *testing.T) {

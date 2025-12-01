@@ -31,7 +31,6 @@ import (
 	"github.com/mia-platform/jpl/pkg/generator"
 	"github.com/mia-platform/jpl/pkg/resourcereader"
 	"github.com/mia-platform/jpl/pkg/util"
-	"github.com/mia-platform/mlp/v2/pkg/extensions"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +39,8 @@ import (
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/utils/clock"
+
+	"github.com/mia-platform/mlp/v2/pkg/extensions"
 )
 
 const (
