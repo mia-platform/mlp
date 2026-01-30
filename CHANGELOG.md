@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+###  Changed
+
+- update to go 1.25.6
+- update jlp to v0.10.0
+- update kubernetes libraries to 0.34.3
+- update cobra to v1.10.2
+- update kustomize/api to v0.21.0
+- update kyaml to v0.21.0
+- update yaml to v1.6.0
+
 ## [v2.5.0] - 2025-11-04
 
 ### Changed
@@ -22,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- interpolate command now acutally interpolate files inside a folder path
+- interpolate command now actually interpolate files inside a folder path
 
 ## [v2.4.1] - 2025-09-26
 
