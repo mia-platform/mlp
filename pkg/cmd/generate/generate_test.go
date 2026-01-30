@@ -244,7 +244,6 @@ kind: Secret
 metadata:
   annotations:
     mia-platform.eu/deploy: always
-  creationTimestamp: null
   name: docker
 type: kubernetes.io/dockerconfigjson
 `
@@ -256,7 +255,6 @@ kind: Secret
 metadata:
   annotations:
     mia-platform.eu/deploy: always
-  creationTimestamp: null
   name: tls
 type: kubernetes.io/tls
 `
@@ -266,7 +264,6 @@ data:
   otherKey: value
 kind: ConfigMap
 metadata:
-  creationTimestamp: null
   name: literal
 `
 	opaqueSecret = `apiVersion: v1
@@ -277,7 +274,6 @@ kind: Secret
 metadata:
   annotations:
     mia-platform.eu/deploy: always
-  creationTimestamp: null
   name: opaque
 type: Opaque
 `
@@ -320,7 +316,6 @@ data:
   key: value
 kind: ConfigMap
 metadata:
-  creationTimestamp: null
   name: files
 `
 	certificate = `-----BEGIN CERTIFICATE-----

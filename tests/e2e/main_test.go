@@ -45,7 +45,7 @@ func TestMain(m *testing.M) {
 	runID := envconf.RandomName("ns", 4)
 
 	kindClusterName := "mlp-e2e-tests"
-	kindImageName := "kindest/node:v1.32.5@sha256:e3b2327e3a5ab8c76f5ece68936e4cafaa82edf58486b769727ab0b3b97a5b0d"
+	kindImageName := "kindest/node:v1.34.3@sha256:08497ee19eace7b4b5348db5c6a1591d7752b164530a36f855cb0f2bdcbadd48"
 	if nameFromEnv, found := os.LookupEnv("KIND_NODE_IMAGE"); found {
 		kindImageName = nameFromEnv
 	}

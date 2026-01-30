@@ -5,11 +5,9 @@ metadata:
   namespace: mlp-deploy-test
   annotations:
     cronjob.kubernetes.io/instantiate: manual
-  creationTimestamp: null
 spec:
   template:
-    metadata:
-      creationTimestamp: null
+    metadata: {}
     spec:
       containers:
       - args:
