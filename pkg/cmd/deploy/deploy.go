@@ -82,6 +82,17 @@ const (
 	waitFlagDefaultValue = true
 	waitFlagUsage        = "if true, wait for resources to be current before marking them as successfully applied"
 
+	preDeployJobTimeoutFlagName     = "pre-deploy-job-timeout"
+	preDeployJobTimeoutDefaultValue = 30 * time.Second
+	preDeployJobTimeoutFlagUsage    = "the length of time to wait before giving up on a single pre-deploy job execution. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h)"
+
+	preDeployJobMaxRetriesFlagName     = "pre-deploy-job-max-retries"
+	preDeployJobMaxRetriesDefaultValue = 3
+	preDeployJobMaxRetriesFlagUsage    = "the maximum number of attempts for a pre-deploy job before aborting the deploy"
+
+	preDeployJobAnnotationFlagName  = "pre-deploy-job-annotation"
+	preDeployJobAnnotationFlagUsage = "the value of the mia-platform.eu/deploy annotation used to identify pre-deploy jobs"
+
 	stdinToken    = "-"
 	fieldManager  = "mlp"
 	inventoryName = "eu.mia-platform.mlp"
@@ -97,25 +108,32 @@ var (
 // Flags contains all the flags for the `deploy` command. They will be converted to Options
 // that contains all runtime options for the command.
 type Flags struct {
-	ConfigFlags     *genericclioptions.ConfigFlags
-	inputPaths      []string
-	deployType      string
-	forceDeploy     bool
-	ensureNamespace bool
-	timeout         time.Duration
-	dryRun          bool
-	wait            bool
+	ConfigFlags            *genericclioptions.ConfigFlags
+	inputPaths             []string
+	deployType             string
+	forceDeploy            bool
+	ensureNamespace        bool
+	timeout                time.Duration
+	preDeployJobTimeout    time.Duration
+	preDeployJobMaxRetries int
+	preDeployJobAnnotation string
+	dryRun                 bool
+	wait                   bool
 }
 
 // Options have the data required to perform the deploy operation
 type Options struct {
-	inputPaths      []string
-	deployType      string
-	forceDeploy     bool
-	ensureNamespace bool
-	timeout         time.Duration
-	dryRun          bool
-	wait            bool
+	inputPaths               []string
+	deployType               string
+	forceDeploy              bool
+	ensureNamespace          bool
+	timeout                  time.Duration
+	preDeployJobTimeout      time.Duration
+	preDeployJobMaxRetries   int
+	preDeployJobAnnotation   string
+	preDeployPollingInterval time.Duration
+	dryRun                   bool
+	wait                     bool
 
 	clientFactory util.ClientFactory
 	clock         clock.PassiveClock
@@ -185,6 +203,9 @@ func (f *Flags) AddFlags(flags *pflag.FlagSet) {
 	flags.DurationVar(&f.timeout, timeoutFlagName, timeoutDefaultValue, timeoutFlagUsage)
 	flags.BoolVar(&f.dryRun, dryRunFlagName, dryRunDefaultValue, dryRunFlagUsage)
 	flags.BoolVar(&f.wait, waitFlagName, waitFlagDefaultValue, waitFlagUsage)
+	flags.DurationVar(&f.preDeployJobTimeout, preDeployJobTimeoutFlagName, preDeployJobTimeoutDefaultValue, preDeployJobTimeoutFlagUsage)
+	flags.IntVar(&f.preDeployJobMaxRetries, preDeployJobMaxRetriesFlagName, preDeployJobMaxRetriesDefaultValue, preDeployJobMaxRetriesFlagUsage)
+	flags.StringVar(&f.preDeployJobAnnotation, preDeployJobAnnotationFlagName, extensions.PreDeployFilterDefaultValue, preDeployJobAnnotationFlagUsage)
 }
 
 // ToOptions transform the command flags in command runtime arguments
@@ -194,12 +215,15 @@ func (f *Flags) ToOptions(reader io.Reader, writer io.Writer) (*Options, error) 
 	}
 
 	return &Options{
-		inputPaths:      f.inputPaths,
-		deployType:      f.deployType,
-		forceDeploy:     f.forceDeploy,
-		ensureNamespace: f.ensureNamespace,
-		timeout:         f.timeout,
-		wait:            f.wait,
+		inputPaths:             f.inputPaths,
+		deployType:             f.deployType,
+		forceDeploy:            f.forceDeploy,
+		ensureNamespace:        f.ensureNamespace,
+		timeout:                f.timeout,
+		preDeployJobTimeout:    f.preDeployJobTimeout,
+		preDeployJobMaxRetries: f.preDeployJobMaxRetries,
+		preDeployJobAnnotation: f.preDeployJobAnnotation,
+		wait:                   f.wait,
 
 		clientFactory: util.NewFactory(f.ConfigFlags),
 		reader:        reader,
@@ -243,6 +267,20 @@ func (o *Options) Run(ctx context.Context) error {
 		return err
 	}
 
+	annotationValue := o.preDeployJobAnnotation
+	if annotationValue == "" {
+		annotationValue = extensions.PreDeployFilterDefaultValue
+	}
+
+	preDeployJobs, resources := extensions.ExtractPreDeployJobs(resources, annotationValue)
+	if len(preDeployJobs) > 0 {
+		logger.V(3).Info("found pre-deploy jobs", "count", len(preDeployJobs))
+
+		if err := o.runPreDeployJobs(ctx, preDeployJobs, namespace); err != nil {
+			return fmt.Errorf("pre-deploy phase failed: %w", err)
+		}
+	}
+
 	if err := o.ensuringNamespace(ctx, namespace); err != nil {
 		return nil
 	}
@@ -260,7 +298,7 @@ func (o *Options) Run(ctx context.Context) error {
 			extensions.NewDeployMutator(o.deployType, o.forceDeploy, extensions.ChecksumFromData(deployIdentifier)),
 			extensions.NewExternalSecretsMutator(resources),
 		).
-		WithFilters(extensions.NewDeployOnceFilter()).
+		WithFilters(extensions.NewDeployOnceFilter(), extensions.NewPreDeployFilter(annotationValue)).
 		WithCustomStatusChecker(extensions.ExternalSecretStatusCheckers()).
 		Build()
 	if err != nil {

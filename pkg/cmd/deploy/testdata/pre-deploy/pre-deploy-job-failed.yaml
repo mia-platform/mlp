@@ -1,0 +1,20 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pre-deploy-migration-fail
+  annotations:
+    mia-platform.eu/deploy: pre-deploy
+spec:
+  # backoffLimit is also enforced to 0 by mlp at apply time
+  backoffLimit: 0
+  template:
+    metadata: {}
+    spec:
+      containers:
+      - name: migration
+        image: busybox
+        args:
+        - /bin/sh
+        - -c
+        - echo "migration failed!" && exit 1
+      restartPolicy: Never
