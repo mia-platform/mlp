@@ -337,13 +337,16 @@ loop:
 		return nil
 	}
 
+	return errors.New(formatApplyErrors(errorsDuringApplying))
+}
+
+func formatApplyErrors(errs []error) string {
 	builder := new(strings.Builder)
-	fmt.Fprintf(builder, "applying process has encountered %d error(s):\n", len(errorsDuringApplying))
-	for _, err := range errorsDuringApplying {
+	fmt.Fprintf(builder, "applying process has encountered %d error(s):\n", len(errs))
+	for _, err := range errs {
 		fmt.Fprintf(builder, "\t- %s\n", err)
 	}
-
-	return errors.New(builder.String())
+	return builder.String()
 }
 
 func deployTypeFlagCompletionfunc(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {

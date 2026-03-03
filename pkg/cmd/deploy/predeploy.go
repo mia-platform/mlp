@@ -18,18 +18,20 @@ package deploy
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/mia-platform/mlp/v2/pkg/extensions"
 	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
+
+	"github.com/mia-platform/mlp/v2/pkg/extensions"
 )
 
 const (
@@ -84,38 +86,7 @@ func (o *Options) runPreDeployJobs(ctx context.Context, jobs []*unstructured.Uns
 			jobNamespace = namespace
 		}
 
-		var lastErr error
-		for attempt := 1; attempt <= maxRetries; attempt++ {
-			logger.V(3).Info("running pre-deploy job", "name", jobName, "namespace", jobNamespace, "attempt", attempt)
-			fmt.Fprintf(o.writer, "pre-deploy job %s: starting (attempt %d/%d)\n", jobName, attempt, maxRetries)
-
-			if err := o.applyPreDeployJob(ctx, jobResource, job, jobNamespace); err != nil {
-				return fmt.Errorf("pre-deploy job %s: failed to apply: %w", jobName, err)
-			}
-
-			if o.dryRun {
-				fmt.Fprintf(o.writer, "pre-deploy job %s: applied (dry-run)\n", jobName)
-				lastErr = nil
-				break
-			}
-
-			// Create a per-execution timeout context
-			execCtx := ctx
-			if o.preDeployJobTimeout > 0 {
-				var cancel context.CancelFunc
-				execCtx, cancel = context.WithTimeout(ctx, o.preDeployJobTimeout)
-				defer cancel()
-			}
-
-			lastErr = o.waitForJobCompletion(execCtx, jobResource, jobName, jobNamespace, pollingInterval)
-			if lastErr == nil {
-				fmt.Fprintf(o.writer, "pre-deploy job %s: completed successfully\n", jobName)
-				break
-			}
-
-			fmt.Fprintf(o.writer, "pre-deploy job %s: attempt %d/%d failed: %s\n", jobName, attempt, maxRetries, lastErr)
-		}
-
+		lastErr := o.executePreDeployJobWithRetries(ctx, jobResource, job, jobName, jobNamespace, maxRetries, pollingInterval, logger)
 		if lastErr != nil {
 			if extensions.IsOptionalPreDeployJob(job) {
 				fmt.Fprintf(o.writer, "pre-deploy job %s: optional job failed after %d attempt(s), continuing: %s\n", jobName, maxRetries, lastErr)
@@ -126,6 +97,42 @@ func (o *Options) runPreDeployJobs(ctx context.Context, jobs []*unstructured.Uns
 	}
 
 	return nil
+}
+
+// executePreDeployJobWithRetries runs a single pre-deploy job with the retry logic.
+// Returns the last error if all retries failed, or nil on success.
+func (o *Options) executePreDeployJobWithRetries(ctx context.Context, jobResource dynamic.NamespaceableResourceInterface, job *unstructured.Unstructured, jobName, jobNamespace string, maxRetries int, pollingInterval time.Duration, logger logr.Logger) error {
+	var lastErr error
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		logger.V(3).Info("running pre-deploy job", "name", jobName, "namespace", jobNamespace, "attempt", attempt)
+		fmt.Fprintf(o.writer, "pre-deploy job %s: starting (attempt %d/%d)\n", jobName, attempt, maxRetries)
+
+		if err := o.applyPreDeployJob(ctx, jobResource, job, jobNamespace); err != nil {
+			return fmt.Errorf("pre-deploy job %s: failed to apply: %w", jobName, err)
+		}
+
+		if o.dryRun {
+			fmt.Fprintf(o.writer, "pre-deploy job %s: applied (dry-run)\n", jobName)
+			return nil
+		}
+
+		// Create a per-execution timeout context
+		execCtx := ctx
+		if o.preDeployJobTimeout > 0 {
+			var cancel context.CancelFunc
+			execCtx, cancel = context.WithTimeout(ctx, o.preDeployJobTimeout)
+			defer cancel()
+		}
+
+		lastErr = o.waitForJobCompletion(execCtx, jobResource, jobName, jobNamespace, pollingInterval)
+		if lastErr == nil {
+			fmt.Fprintf(o.writer, "pre-deploy job %s: completed successfully\n", jobName)
+			return nil
+		}
+
+		fmt.Fprintf(o.writer, "pre-deploy job %s: attempt %d/%d failed: %s\n", jobName, attempt, maxRetries, lastErr)
+	}
+	return lastErr
 }
 
 // applyPreDeployJob removes any existing job with the same name and applies the new one using server-side apply.
@@ -147,7 +154,7 @@ func (o *Options) applyPreDeployJob(ctx context.Context, jobResource dynamic.Nam
 		err := jobResource.Namespace(namespace).Delete(ctx, job.GetName(), metav1.DeleteOptions{
 			PropagationPolicy: &propagationPolicy,
 		})
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !k8serrors.IsNotFound(err) {
 			return fmt.Errorf("failed to delete existing job: %w", err)
 		}
 
@@ -211,7 +218,7 @@ func (o *Options) waitForJobCompletion(ctx context.Context, jobResource dynamic.
 		// Wait for next poll interval or context cancellation
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("timed out waiting for job completion")
+			return errors.New("timed out waiting for job completion")
 		case <-ticker.C:
 			// continue to next check
 		}

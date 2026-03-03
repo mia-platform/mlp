@@ -16,7 +16,7 @@
 package deploy
 
 import (
-	"fmt"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -212,7 +212,7 @@ func TestRunPreDeployJobs(t *testing.T) {
 			setupClient: func() *dynamicfake.FakeDynamicClient {
 				client := dynamicfake.NewSimpleDynamicClient(jpltesting.Scheme)
 				client.PrependReactor("delete", "jobs", func(action k8stesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.NewNotFound(schema.GroupResource{Group: "batch", Resource: "jobs"}, "migration")
+					return true, nil, k8serrors.NewNotFound(schema.GroupResource{Group: "batch", Resource: "jobs"}, "migration")
 				})
 				client.PrependReactor("patch", "jobs", func(action k8stesting.Action) (bool, runtime.Object, error) {
 					return true, makePreDeployJob("migration"), nil
@@ -233,13 +233,13 @@ func TestRunPreDeployJobs(t *testing.T) {
 			setupClient: func() *dynamicfake.FakeDynamicClient {
 				client := dynamicfake.NewSimpleDynamicClient(jpltesting.Scheme)
 				client.PrependReactor("delete", "jobs", func(action k8stesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.NewNotFound(schema.GroupResource{Group: "batch", Resource: "jobs"}, "migration")
+					return true, nil, k8serrors.NewNotFound(schema.GroupResource{Group: "batch", Resource: "jobs"}, "migration")
 				})
 				client.PrependReactor("patch", "jobs", func(action k8stesting.Action) (bool, runtime.Object, error) {
 					return true, makePreDeployJob("migration"), nil
 				})
 				client.PrependReactor("get", "jobs", func(action k8stesting.Action) (bool, runtime.Object, error) {
-					return true, failedJobUnstructured("migration", namespace, "BackoffLimitExceeded"), nil
+					return true, failedJobUnstructured("migration", namespace), nil
 				})
 				return client
 			},
@@ -259,7 +259,7 @@ func TestRunPreDeployJobs(t *testing.T) {
 			setupClient: func() *dynamicfake.FakeDynamicClient {
 				client := dynamicfake.NewSimpleDynamicClient(jpltesting.Scheme)
 				client.PrependReactor("delete", "jobs", func(action k8stesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.NewNotFound(schema.GroupResource{Group: "batch", Resource: "jobs"}, "migration")
+					return true, nil, k8serrors.NewNotFound(schema.GroupResource{Group: "batch", Resource: "jobs"}, "migration")
 				})
 				attemptCount := 0
 				client.PrependReactor("patch", "jobs", func(action k8stesting.Action) (bool, runtime.Object, error) {
@@ -269,7 +269,7 @@ func TestRunPreDeployJobs(t *testing.T) {
 				client.PrependReactor("get", "jobs", func(action k8stesting.Action) (bool, runtime.Object, error) {
 					// First attempt fails, second succeeds
 					if attemptCount <= 1 {
-						return true, failedJobUnstructured("migration", namespace, "BackoffLimitExceeded"), nil
+						return true, failedJobUnstructured("migration", namespace), nil
 					}
 					return true, completedJobUnstructured("migration", namespace), nil
 				})
@@ -288,13 +288,13 @@ func TestRunPreDeployJobs(t *testing.T) {
 			setupClient: func() *dynamicfake.FakeDynamicClient {
 				client := dynamicfake.NewSimpleDynamicClient(jpltesting.Scheme)
 				client.PrependReactor("delete", "jobs", func(action k8stesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.NewNotFound(schema.GroupResource{Group: "batch", Resource: "jobs"}, "migration")
+					return true, nil, k8serrors.NewNotFound(schema.GroupResource{Group: "batch", Resource: "jobs"}, "migration")
 				})
 				client.PrependReactor("patch", "jobs", func(action k8stesting.Action) (bool, runtime.Object, error) {
 					return true, makePreDeployJob("migration"), nil
 				})
 				client.PrependReactor("get", "jobs", func(action k8stesting.Action) (bool, runtime.Object, error) {
-					return true, failedJobUnstructured("migration", namespace, "BackoffLimitExceeded"), nil
+					return true, failedJobUnstructured("migration", namespace), nil
 				})
 				return client
 			},
@@ -310,7 +310,7 @@ func TestRunPreDeployJobs(t *testing.T) {
 			setupClient: func() *dynamicfake.FakeDynamicClient {
 				client := dynamicfake.NewSimpleDynamicClient(jpltesting.Scheme)
 				client.PrependReactor("delete", "jobs", func(action k8stesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.NewNotFound(schema.GroupResource{Group: "batch", Resource: "jobs"}, "migration")
+					return true, nil, k8serrors.NewNotFound(schema.GroupResource{Group: "batch", Resource: "jobs"}, "migration")
 				})
 				attemptCount := 0
 				client.PrependReactor("patch", "jobs", func(action k8stesting.Action) (bool, runtime.Object, error) {
@@ -340,10 +340,10 @@ func TestRunPreDeployJobs(t *testing.T) {
 			setupClient: func() *dynamicfake.FakeDynamicClient {
 				client := dynamicfake.NewSimpleDynamicClient(jpltesting.Scheme)
 				client.PrependReactor("delete", "jobs", func(action k8stesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.NewNotFound(schema.GroupResource{Group: "batch", Resource: "jobs"}, "migration")
+					return true, nil, k8serrors.NewNotFound(schema.GroupResource{Group: "batch", Resource: "jobs"}, "migration")
 				})
 				client.PrependReactor("patch", "jobs", func(action k8stesting.Action) (bool, runtime.Object, error) {
-					return true, nil, fmt.Errorf("forbidden")
+					return true, nil, errors.New("forbidden")
 				})
 				return client
 			},
@@ -376,13 +376,13 @@ func TestRunPreDeployJobs(t *testing.T) {
 			setupClient: func() *dynamicfake.FakeDynamicClient {
 				client := dynamicfake.NewSimpleDynamicClient(jpltesting.Scheme)
 				client.PrependReactor("delete", "jobs", func(action k8stesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.NewNotFound(schema.GroupResource{Group: "batch", Resource: "jobs"}, "optional-migration")
+					return true, nil, k8serrors.NewNotFound(schema.GroupResource{Group: "batch", Resource: "jobs"}, "optional-migration")
 				})
 				client.PrependReactor("patch", "jobs", func(action k8stesting.Action) (bool, runtime.Object, error) {
 					return true, makeOptionalPreDeployJob("optional-migration"), nil
 				})
 				client.PrependReactor("get", "jobs", func(action k8stesting.Action) (bool, runtime.Object, error) {
-					return true, failedJobUnstructured("optional-migration", namespace, "BackoffLimitExceeded"), nil
+					return true, failedJobUnstructured("optional-migration", namespace), nil
 				})
 				return client
 			},
@@ -403,7 +403,7 @@ func TestRunPreDeployJobs(t *testing.T) {
 			setupClient: func() *dynamicfake.FakeDynamicClient {
 				client := dynamicfake.NewSimpleDynamicClient(jpltesting.Scheme)
 				client.PrependReactor("delete", "jobs", func(action k8stesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.NewNotFound(schema.GroupResource{Group: "batch", Resource: "jobs"}, "job")
+					return true, nil, k8serrors.NewNotFound(schema.GroupResource{Group: "batch", Resource: "jobs"}, "job")
 				})
 				client.PrependReactor("patch", "jobs", func(action k8stesting.Action) (bool, runtime.Object, error) {
 					patchAction := action.(k8stesting.PatchAction)
@@ -417,7 +417,7 @@ func TestRunPreDeployJobs(t *testing.T) {
 					getAction := action.(k8stesting.GetAction)
 					name := getAction.GetName()
 					if name == "optional-migration" {
-						return true, failedJobUnstructured(name, namespace, "BackoffLimitExceeded"), nil
+						return true, failedJobUnstructured(name, namespace), nil
 					}
 					return true, completedJobUnstructured(name, namespace), nil
 				})
@@ -436,7 +436,7 @@ func TestRunPreDeployJobs(t *testing.T) {
 			setupClient: func() *dynamicfake.FakeDynamicClient {
 				client := dynamicfake.NewSimpleDynamicClient(jpltesting.Scheme)
 				client.PrependReactor("delete", "jobs", func(action k8stesting.Action) (bool, runtime.Object, error) {
-					return true, nil, errors.NewNotFound(schema.GroupResource{Group: "batch", Resource: "jobs"}, "optional-migration")
+					return true, nil, k8serrors.NewNotFound(schema.GroupResource{Group: "batch", Resource: "jobs"}, "optional-migration")
 				})
 				client.PrependReactor("patch", "jobs", func(action k8stesting.Action) (bool, runtime.Object, error) {
 					return true, makeOptionalPreDeployJob("optional-migration"), nil
@@ -587,7 +587,7 @@ func completedJobUnstructured(name, namespace string) *unstructured.Unstructured
 	}
 }
 
-func failedJobUnstructured(name, namespace, message string) *unstructured.Unstructured {
+func failedJobUnstructured(name, namespace string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "batch/v1",
@@ -601,7 +601,7 @@ func failedJobUnstructured(name, namespace, message string) *unstructured.Unstru
 					map[string]interface{}{
 						"type":    string(batchv1.JobFailed),
 						"status":  "True",
-						"message": message,
+						"message": "BackoffLimitExceeded",
 					},
 				},
 			},
