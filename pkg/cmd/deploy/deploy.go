@@ -82,16 +82,16 @@ const (
 	waitFlagDefaultValue = true
 	waitFlagUsage        = "if true, wait for resources to be current before marking them as successfully applied"
 
-	preDeployJobTimeoutFlagName     = "pre-deploy-job-timeout"
-	preDeployJobTimeoutDefaultValue = 30 * time.Second
-	preDeployJobTimeoutFlagUsage    = "the length of time to wait before giving up on a single pre-deploy job execution. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h)"
+	preDeployJobAnnotationFlagName  = "pre-deploy-job-annotation"
+	preDeployJobAnnotationFlagUsage = "the annotation value for mia-platform.eu/deploy to identify pre-deploy jobs"
 
 	preDeployJobMaxRetriesFlagName     = "pre-deploy-job-max-retries"
 	preDeployJobMaxRetriesDefaultValue = 3
-	preDeployJobMaxRetriesFlagUsage    = "the maximum number of attempts for a pre-deploy job before aborting the deploy"
+	preDeployJobMaxRetriesFlagUsage    = "the maximum number of retries for a failed pre-deploy job"
 
-	preDeployJobAnnotationFlagName  = "pre-deploy-job-annotation"
-	preDeployJobAnnotationFlagUsage = "the value of the mia-platform.eu/deploy annotation used to identify pre-deploy jobs"
+	preDeployJobTimeoutFlagName     = "pre-deploy-job-timeout"
+	preDeployJobTimeoutDefaultValue = 30 * time.Second
+	preDeployJobTimeoutFlagUsage    = "the timeout for a single pre-deploy job execution"
 
 	stdinToken    = "-"
 	fieldManager  = "mlp"
@@ -114,26 +114,25 @@ type Flags struct {
 	forceDeploy            bool
 	ensureNamespace        bool
 	timeout                time.Duration
-	preDeployJobTimeout    time.Duration
-	preDeployJobMaxRetries int
-	preDeployJobAnnotation string
 	dryRun                 bool
 	wait                   bool
+	preDeployJobAnnotation string
+	preDeployJobMaxRetries int
+	preDeployJobTimeout    time.Duration
 }
 
 // Options have the data required to perform the deploy operation
 type Options struct {
-	inputPaths               []string
-	deployType               string
-	forceDeploy              bool
-	ensureNamespace          bool
-	timeout                  time.Duration
-	preDeployJobTimeout      time.Duration
-	preDeployJobMaxRetries   int
-	preDeployJobAnnotation   string
-	preDeployPollingInterval time.Duration
-	dryRun                   bool
-	wait                     bool
+	inputPaths             []string
+	deployType             string
+	forceDeploy            bool
+	ensureNamespace        bool
+	timeout                time.Duration
+	dryRun                 bool
+	wait                   bool
+	preDeployJobAnnotation string
+	preDeployJobMaxRetries int
+	preDeployJobTimeout    time.Duration
 
 	clientFactory util.ClientFactory
 	clock         clock.PassiveClock
@@ -203,9 +202,9 @@ func (f *Flags) AddFlags(flags *pflag.FlagSet) {
 	flags.DurationVar(&f.timeout, timeoutFlagName, timeoutDefaultValue, timeoutFlagUsage)
 	flags.BoolVar(&f.dryRun, dryRunFlagName, dryRunDefaultValue, dryRunFlagUsage)
 	flags.BoolVar(&f.wait, waitFlagName, waitFlagDefaultValue, waitFlagUsage)
-	flags.DurationVar(&f.preDeployJobTimeout, preDeployJobTimeoutFlagName, preDeployJobTimeoutDefaultValue, preDeployJobTimeoutFlagUsage)
+	flags.StringVar(&f.preDeployJobAnnotation, preDeployJobAnnotationFlagName, "", preDeployJobAnnotationFlagUsage)
 	flags.IntVar(&f.preDeployJobMaxRetries, preDeployJobMaxRetriesFlagName, preDeployJobMaxRetriesDefaultValue, preDeployJobMaxRetriesFlagUsage)
-	flags.StringVar(&f.preDeployJobAnnotation, preDeployJobAnnotationFlagName, extensions.PreDeployFilterDefaultValue, preDeployJobAnnotationFlagUsage)
+	flags.DurationVar(&f.preDeployJobTimeout, preDeployJobTimeoutFlagName, preDeployJobTimeoutDefaultValue, preDeployJobTimeoutFlagUsage)
 }
 
 // ToOptions transform the command flags in command runtime arguments
@@ -220,10 +219,10 @@ func (f *Flags) ToOptions(reader io.Reader, writer io.Writer) (*Options, error) 
 		forceDeploy:            f.forceDeploy,
 		ensureNamespace:        f.ensureNamespace,
 		timeout:                f.timeout,
-		preDeployJobTimeout:    f.preDeployJobTimeout,
-		preDeployJobMaxRetries: f.preDeployJobMaxRetries,
-		preDeployJobAnnotation: f.preDeployJobAnnotation,
 		wait:                   f.wait,
+		preDeployJobAnnotation: f.preDeployJobAnnotation,
+		preDeployJobMaxRetries: f.preDeployJobMaxRetries,
+		preDeployJobTimeout:    f.preDeployJobTimeout,
 
 		clientFactory: util.NewFactory(f.ConfigFlags),
 		reader:        reader,
@@ -267,21 +266,17 @@ func (o *Options) Run(ctx context.Context) error {
 		return err
 	}
 
-	annotationValue := o.preDeployJobAnnotation
-	if annotationValue == "" {
-		annotationValue = extensions.PreDeployFilterDefaultValue
-	}
-
-	preDeployJobs, resources := extensions.ExtractPreDeployJobs(resources, annotationValue)
-	if len(preDeployJobs) > 0 {
-		logger.V(3).Info("found pre-deploy jobs", "count", len(preDeployJobs))
-
-		if err := o.runPreDeployJobs(ctx, preDeployJobs, namespace); err != nil {
-			return fmt.Errorf("pre-deploy phase failed: %w", err)
-		}
-	}
-
 	if err := o.ensuringNamespace(ctx, namespace); err != nil {
+		return nil
+	}
+
+	var stop bool
+	resources, stop, err = o.runPreDeployPhase(ctx, namespace, resources)
+	if err != nil {
+		return err
+	}
+	if stop {
+		logger.V(3).Info("pre-deploy jobs executed, skipping remaining resources apply")
 		return nil
 	}
 
@@ -298,7 +293,7 @@ func (o *Options) Run(ctx context.Context) error {
 			extensions.NewDeployMutator(o.deployType, o.forceDeploy, extensions.ChecksumFromData(deployIdentifier)),
 			extensions.NewExternalSecretsMutator(resources),
 		).
-		WithFilters(extensions.NewDeployOnceFilter(), extensions.NewPreDeployFilter(annotationValue)).
+		WithFilters(extensions.NewDeployOnceFilter()).
 		WithCustomStatusChecker(extensions.ExternalSecretStatusCheckers()).
 		Build()
 	if err != nil {
@@ -347,6 +342,33 @@ func formatApplyErrors(errs []error) string {
 		fmt.Fprintf(builder, "\t- %s\n", err)
 	}
 	return builder.String()
+}
+
+// runPreDeployPhase handles pre-deploy job filtering and execution. When the pre-deploy
+// annotation flag is set, matching jobs are extracted and executed; if any are found the
+// caller should stop the normal apply phase (stop=true). When the flag is absent, annotated
+// jobs are stripped from the resource list so they are never applied as regular resources.
+func (o *Options) runPreDeployPhase(ctx context.Context, namespace string, resources []*unstructured.Unstructured) ([]*unstructured.Unstructured, bool, error) {
+	if o.preDeployJobAnnotation == "" {
+		return StripAnnotatedJobs(resources), false, nil
+	}
+
+	preDeployJobs, remaining := FilterPreDeployJobs(resources, o.preDeployJobAnnotation)
+	if len(preDeployJobs) == 0 {
+		return resources, false, nil
+	}
+
+	clientSet, err := o.clientFactory.KubernetesClientSet()
+	if err != nil {
+		return nil, false, err
+	}
+
+	runner := NewPreDeployJobRunner(clientSet, namespace, o.preDeployJobMaxRetries, o.preDeployJobTimeout, o.writer, o.dryRun)
+	if err := runner.Run(ctx, preDeployJobs); err != nil {
+		return nil, false, err
+	}
+
+	return remaining, true, nil
 }
 
 func deployTypeFlagCompletionfunc(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
