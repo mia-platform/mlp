@@ -82,6 +82,17 @@ const (
 	waitFlagDefaultValue = true
 	waitFlagUsage        = "if true, wait for resources to be current before marking them as successfully applied"
 
+	preDeployJobAnnotationFlagName  = "pre-deploy-job-annotation"
+	preDeployJobAnnotationFlagUsage = "the annotation value for mia-platform.eu/deploy to identify pre-deploy jobs"
+
+	preDeployJobMaxRetriesFlagName     = "pre-deploy-job-max-retries"
+	preDeployJobMaxRetriesDefaultValue = 3
+	preDeployJobMaxRetriesFlagUsage    = "the maximum number of retries for a failed pre-deploy job"
+
+	preDeployJobTimeoutFlagName     = "pre-deploy-job-timeout"
+	preDeployJobTimeoutDefaultValue = 30 * time.Second
+	preDeployJobTimeoutFlagUsage    = "the timeout for a single pre-deploy job execution"
+
 	stdinToken    = "-"
 	fieldManager  = "mlp"
 	inventoryName = "eu.mia-platform.mlp"
@@ -97,25 +108,31 @@ var (
 // Flags contains all the flags for the `deploy` command. They will be converted to Options
 // that contains all runtime options for the command.
 type Flags struct {
-	ConfigFlags     *genericclioptions.ConfigFlags
-	inputPaths      []string
-	deployType      string
-	forceDeploy     bool
-	ensureNamespace bool
-	timeout         time.Duration
-	dryRun          bool
-	wait            bool
+	ConfigFlags            *genericclioptions.ConfigFlags
+	inputPaths             []string
+	deployType             string
+	forceDeploy            bool
+	ensureNamespace        bool
+	timeout                time.Duration
+	dryRun                 bool
+	wait                   bool
+	preDeployJobAnnotation string
+	preDeployJobMaxRetries int
+	preDeployJobTimeout    time.Duration
 }
 
 // Options have the data required to perform the deploy operation
 type Options struct {
-	inputPaths      []string
-	deployType      string
-	forceDeploy     bool
-	ensureNamespace bool
-	timeout         time.Duration
-	dryRun          bool
-	wait            bool
+	inputPaths             []string
+	deployType             string
+	forceDeploy            bool
+	ensureNamespace        bool
+	timeout                time.Duration
+	dryRun                 bool
+	wait                   bool
+	preDeployJobAnnotation string
+	preDeployJobMaxRetries int
+	preDeployJobTimeout    time.Duration
 
 	clientFactory util.ClientFactory
 	clock         clock.PassiveClock
@@ -185,6 +202,9 @@ func (f *Flags) AddFlags(flags *pflag.FlagSet) {
 	flags.DurationVar(&f.timeout, timeoutFlagName, timeoutDefaultValue, timeoutFlagUsage)
 	flags.BoolVar(&f.dryRun, dryRunFlagName, dryRunDefaultValue, dryRunFlagUsage)
 	flags.BoolVar(&f.wait, waitFlagName, waitFlagDefaultValue, waitFlagUsage)
+	flags.StringVar(&f.preDeployJobAnnotation, preDeployJobAnnotationFlagName, "", preDeployJobAnnotationFlagUsage)
+	flags.IntVar(&f.preDeployJobMaxRetries, preDeployJobMaxRetriesFlagName, preDeployJobMaxRetriesDefaultValue, preDeployJobMaxRetriesFlagUsage)
+	flags.DurationVar(&f.preDeployJobTimeout, preDeployJobTimeoutFlagName, preDeployJobTimeoutDefaultValue, preDeployJobTimeoutFlagUsage)
 }
 
 // ToOptions transform the command flags in command runtime arguments
@@ -194,12 +214,15 @@ func (f *Flags) ToOptions(reader io.Reader, writer io.Writer) (*Options, error) 
 	}
 
 	return &Options{
-		inputPaths:      f.inputPaths,
-		deployType:      f.deployType,
-		forceDeploy:     f.forceDeploy,
-		ensureNamespace: f.ensureNamespace,
-		timeout:         f.timeout,
-		wait:            f.wait,
+		inputPaths:             f.inputPaths,
+		deployType:             f.deployType,
+		forceDeploy:            f.forceDeploy,
+		ensureNamespace:        f.ensureNamespace,
+		timeout:                f.timeout,
+		wait:                   f.wait,
+		preDeployJobAnnotation: f.preDeployJobAnnotation,
+		preDeployJobMaxRetries: f.preDeployJobMaxRetries,
+		preDeployJobTimeout:    f.preDeployJobTimeout,
 
 		clientFactory: util.NewFactory(f.ConfigFlags),
 		reader:        reader,
@@ -244,6 +267,16 @@ func (o *Options) Run(ctx context.Context) error {
 	}
 
 	if err := o.ensuringNamespace(ctx, namespace); err != nil {
+		return nil
+	}
+
+	var stop bool
+	resources, stop, err = o.runPreDeployPhase(ctx, namespace, resources)
+	if err != nil {
+		return err
+	}
+	if stop {
+		logger.V(3).Info("pre-deploy jobs executed, skipping remaining resources apply")
 		return nil
 	}
 
@@ -299,13 +332,45 @@ loop:
 		return nil
 	}
 
+	return errors.New(formatApplyErrors(errorsDuringApplying))
+}
+
+func formatApplyErrors(errs []error) string {
 	builder := new(strings.Builder)
-	fmt.Fprintf(builder, "applying process has encountered %d error(s):\n", len(errorsDuringApplying))
-	for _, err := range errorsDuringApplying {
+	fmt.Fprintf(builder, "applying process has encountered %d error(s):\n", len(errs))
+	for _, err := range errs {
 		fmt.Fprintf(builder, "\t- %s\n", err)
 	}
+	return builder.String()
+}
 
-	return errors.New(builder.String())
+// runPreDeployPhase handles pre-deploy job filtering and execution. When the pre-deploy
+// annotation flag is set, matching jobs are extracted and executed; if any are found the
+// caller should stop the normal apply phase (stop=true). If the flag is set but no jobs
+// match the filter, nothing is applied (stop=true with empty resources). When the flag is
+// absent, annotated jobs are stripped from the resource list so they are never applied as
+// regular resources.
+func (o *Options) runPreDeployPhase(ctx context.Context, namespace string, resources []*unstructured.Unstructured) ([]*unstructured.Unstructured, bool, error) {
+	if o.preDeployJobAnnotation == "" {
+		return StripAnnotatedJobs(resources), false, nil
+	}
+
+	preDeployJobs, remaining := FilterPreDeployJobs(resources, o.preDeployJobAnnotation)
+	if len(preDeployJobs) == 0 {
+		return nil, true, nil
+	}
+
+	clientSet, err := o.clientFactory.KubernetesClientSet()
+	if err != nil {
+		return nil, false, err
+	}
+
+	runner := NewPreDeployJobRunner(clientSet, namespace, o.preDeployJobMaxRetries, o.preDeployJobTimeout, o.writer, o.dryRun)
+	if err := runner.Run(ctx, preDeployJobs); err != nil {
+		return nil, false, err
+	}
+
+	return remaining, true, nil
 }
 
 func deployTypeFlagCompletionfunc(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
