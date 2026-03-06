@@ -346,8 +346,10 @@ func formatApplyErrors(errs []error) string {
 
 // runPreDeployPhase handles pre-deploy job filtering and execution. When the pre-deploy
 // annotation flag is set, matching jobs are extracted and executed; if any are found the
-// caller should stop the normal apply phase (stop=true). When the flag is absent, annotated
-// jobs are stripped from the resource list so they are never applied as regular resources.
+// caller should stop the normal apply phase (stop=true). If the flag is set but no jobs
+// match the filter, nothing is applied (stop=true with empty resources). When the flag is
+// absent, annotated jobs are stripped from the resource list so they are never applied as
+// regular resources.
 func (o *Options) runPreDeployPhase(ctx context.Context, namespace string, resources []*unstructured.Unstructured) ([]*unstructured.Unstructured, bool, error) {
 	if o.preDeployJobAnnotation == "" {
 		return StripAnnotatedJobs(resources), false, nil
@@ -355,7 +357,7 @@ func (o *Options) runPreDeployPhase(ctx context.Context, namespace string, resou
 
 	preDeployJobs, remaining := FilterPreDeployJobs(resources, o.preDeployJobAnnotation)
 	if len(preDeployJobs) == 0 {
-		return resources, false, nil
+		return nil, true, nil
 	}
 
 	clientSet, err := o.clientFactory.KubernetesClientSet()
