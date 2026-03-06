@@ -19,7 +19,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -32,8 +31,9 @@ import (
 )
 
 const (
-	preDeployAnnotation = "mia-platform.eu/deploy"
-	jobKind             = "Job"
+	preDeployAnnotation      = "mia-platform.eu/deploy"
+	deployOptionalAnnotation = "mia-platform.eu/deploy-optional"
+	jobKind                  = "Job"
 )
 
 // PreDeployJobRunner handles the creation, execution and monitoring of pre-deploy jobs
@@ -101,9 +101,16 @@ func StripAnnotatedJobs(resources []*unstructured.Unstructured) []*unstructured.
 	return remaining
 }
 
+// isOptionalPreDeployJob reports whether the job carries the deploy-optional annotation set to "true".
+func isOptionalPreDeployJob(job *unstructured.Unstructured) bool {
+	return job.GetAnnotations()[deployOptionalAnnotation] == "true"
+}
+
 // Run executes all pre-deploy jobs with retry and timeout support. Each job is retried
-// up to maxRetries times upon failure. An error is returned only if ALL annotated jobs fail;
-// if at least one succeeds, it returns nil and the deploy process can continue.
+// up to maxRetries times upon failure. Jobs annotated with mia-platform.eu/deploy-optional=true
+// are treated as non-blocking: their failure is logged as a warning but never counted as an
+// error. For mandatory jobs an error is returned only if ALL of them fail; if at least one
+// mandatory job succeeds, the deploy process can continue.
 func (r *PreDeployJobRunner) Run(ctx context.Context, jobs []*unstructured.Unstructured) error {
 	logger := logr.FromContextOrDiscard(ctx)
 
@@ -121,31 +128,25 @@ func (r *PreDeployJobRunner) Run(ctx context.Context, jobs []*unstructured.Unstr
 
 	logger.V(3).Info("starting pre-deploy jobs", "count", len(jobs))
 
-	var failedJobs []string
-	successCount := 0
-
 	for _, job := range jobs {
 		jobName := job.GetName()
+		optional := isOptionalPreDeployJob(job)
+
 		err := r.runJobWithRetries(ctx, job)
 		if err != nil {
-			fmt.Fprintf(r.writer, "pre-deploy job %q failed after %d retries: %s\n", jobName, r.maxRetries, err)
-			failedJobs = append(failedJobs, jobName)
+			if optional {
+				logger.V(3).Info("optional pre-deploy job failed, continuing", "name", jobName, "error", err)
+				fmt.Fprintf(r.writer, "optional pre-deploy job %q failed, continuing\n", jobName)
+			} else {
+				logger.V(3).Info("pre-deploy job failed", "name", jobName, "error", err)
+				return fmt.Errorf("pre-deploy job %q failed after %d attempts: %w", jobName, r.maxRetries, err)
+			}
 		} else {
 			fmt.Fprintf(r.writer, "pre-deploy job %q completed successfully\n", jobName)
-			successCount++
 		}
 	}
 
-	if successCount == 0 {
-		builder := new(strings.Builder)
-		fmt.Fprintf(builder, "all %d pre-deploy job(s) failed:\n", len(failedJobs))
-		for _, name := range failedJobs {
-			fmt.Fprintf(builder, "\t- %s\n", name)
-		}
-		return fmt.Errorf("%s", builder.String())
-	}
-
-	logger.V(3).Info("pre-deploy jobs completed", "succeeded", successCount, "failed", len(failedJobs))
+	logger.V(3).Info("pre-deploy jobs completed")
 	return nil
 }
 

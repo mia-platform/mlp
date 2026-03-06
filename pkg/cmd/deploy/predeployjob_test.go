@@ -67,6 +67,15 @@ func newTestJob(name, annotationValue string) *unstructured.Unstructured {
 	return obj
 }
 
+// newOptionalTestJob creates a pre-deploy Job with the deploy-optional annotation set to "true".
+func newOptionalTestJob(name string) *unstructured.Unstructured {
+	job := newTestJob(name, "pre-deploy")
+	annotations := job.GetAnnotations()
+	annotations[deployOptionalAnnotation] = "true"
+	job.SetAnnotations(annotations)
+	return job
+}
+
 func TestFilterPreDeployJobs(t *testing.T) {
 	t.Parallel()
 
@@ -311,9 +320,9 @@ func TestPreDeployJobRunnerRun(t *testing.T) {
 				})
 			},
 			maxRetries:    1,
-			expectedError: "all 1 pre-deploy job(s) failed",
+			expectedError: "pre-deploy job \"fail-job\" failed after 1 attempts:",
 		},
-		"partial success continues deploy": {
+		"partial success stops at first failure": {
 			jobs: []*unstructured.Unstructured{
 				newTestJob("success-job", "pre-deploy"),
 				newTestJob("fail-job", "pre-deploy"),
@@ -342,10 +351,11 @@ func TestPreDeployJobRunnerRun(t *testing.T) {
 					}, nil
 				})
 			},
-			maxRetries:  0,
-			expectedOut: "completed successfully",
+			maxRetries:    0,
+			expectedOut:   "completed successfully",
+			expectedError: "pre-deploy job \"fail-job\" failed after 0 attempts:",
 		},
-		"multiple jobs all fail": {
+		"multiple jobs stops at first failure": {
 			jobs: []*unstructured.Unstructured{
 				newTestJob("fail-job-1", "pre-deploy"),
 				newTestJob("fail-job-2", "pre-deploy"),
@@ -366,7 +376,112 @@ func TestPreDeployJobRunnerRun(t *testing.T) {
 				})
 			},
 			maxRetries:    0,
-			expectedError: "all 2 pre-deploy job(s) failed",
+			expectedError: "pre-deploy job \"fail-job-1\" failed after 0 attempts:",
+		},
+		"optional job failure does not block deploy": {
+			jobs: []*unstructured.Unstructured{newOptionalTestJob("optional-job")},
+			setupReactor: func(cs *kubefake.Clientset) {
+				cs.PrependReactor("get", "jobs", func(action k8stesting.Action) (bool, runtime.Object, error) {
+					return true, &batchv1.Job{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      action.(k8stesting.GetAction).GetName(),
+							Namespace: namespace,
+						},
+						Status: batchv1.JobStatus{
+							Conditions: []batchv1.JobCondition{
+								{Type: batchv1.JobFailed, Status: corev1.ConditionTrue, Message: "migration failed"},
+							},
+						},
+					}, nil
+				})
+			},
+			maxRetries:  0,
+			expectedOut: "optional pre-deploy job",
+		},
+		"optional job failure with mandatory success": {
+			jobs: []*unstructured.Unstructured{
+				newTestJob("mandatory-job", "pre-deploy"),
+				newOptionalTestJob("optional-job"),
+			},
+			setupReactor: func(cs *kubefake.Clientset) {
+				cs.PrependReactor("get", "jobs", func(action k8stesting.Action) (bool, runtime.Object, error) {
+					name := action.(k8stesting.GetAction).GetName()
+					if name == "mandatory-job" {
+						return true, &batchv1.Job{
+							ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+							Status: batchv1.JobStatus{
+								Conditions: []batchv1.JobCondition{
+									{Type: batchv1.JobComplete, Status: corev1.ConditionTrue},
+								},
+							},
+						}, nil
+					}
+					return true, &batchv1.Job{
+						ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+						Status: batchv1.JobStatus{
+							Conditions: []batchv1.JobCondition{
+								{Type: batchv1.JobFailed, Status: corev1.ConditionTrue, Message: "optional failed"},
+							},
+						},
+					}, nil
+				})
+			},
+			maxRetries:  0,
+			expectedOut: "completed successfully",
+		},
+		"mandatory job fails while optional succeeds": {
+			jobs: []*unstructured.Unstructured{
+				newTestJob("mandatory-job", "pre-deploy"),
+				newOptionalTestJob("optional-job"),
+			},
+			setupReactor: func(cs *kubefake.Clientset) {
+				cs.PrependReactor("get", "jobs", func(action k8stesting.Action) (bool, runtime.Object, error) {
+					name := action.(k8stesting.GetAction).GetName()
+					if name == "optional-job" {
+						return true, &batchv1.Job{
+							ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+							Status: batchv1.JobStatus{
+								Conditions: []batchv1.JobCondition{
+									{Type: batchv1.JobComplete, Status: corev1.ConditionTrue},
+								},
+							},
+						}, nil
+					}
+					return true, &batchv1.Job{
+						ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+						Status: batchv1.JobStatus{
+							Conditions: []batchv1.JobCondition{
+								{Type: batchv1.JobFailed, Status: corev1.ConditionTrue, Message: "mandatory failed"},
+							},
+						},
+					}, nil
+				})
+			},
+			maxRetries:    0,
+			expectedError: "pre-deploy job \"mandatory-job\" failed after 0 attempts:",
+		},
+		"all optional jobs fail": {
+			jobs: []*unstructured.Unstructured{
+				newOptionalTestJob("optional-job-1"),
+				newOptionalTestJob("optional-job-2"),
+			},
+			setupReactor: func(cs *kubefake.Clientset) {
+				cs.PrependReactor("get", "jobs", func(action k8stesting.Action) (bool, runtime.Object, error) {
+					return true, &batchv1.Job{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      action.(k8stesting.GetAction).GetName(),
+							Namespace: namespace,
+						},
+						Status: batchv1.JobStatus{
+							Conditions: []batchv1.JobCondition{
+								{Type: batchv1.JobFailed, Status: corev1.ConditionTrue, Message: "failed"},
+							},
+						},
+					}, nil
+				})
+			},
+			maxRetries:  0,
+			expectedOut: "optional pre-deploy job",
 		},
 	}
 
