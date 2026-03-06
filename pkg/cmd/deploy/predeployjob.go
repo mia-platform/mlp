@@ -219,7 +219,10 @@ func (r *PreDeployJobRunner) waitForJobCompletion(ctx context.Context, name stri
 		case <-timeoutCtx.Done():
 			return fmt.Errorf("job %q timed out after %s", name, r.timeout)
 		case <-ticker.C:
-			job, err := r.clientSet.BatchV1().Jobs(r.namespace).Get(timeoutCtx, name, metav1.GetOptions{})
+			if timeoutCtx.Err() != nil {
+				return fmt.Errorf("job %q timed out after %s", name, r.timeout)
+			}
+			job, err := r.clientSet.BatchV1().Jobs(r.namespace).Get(ctx, name, metav1.GetOptions{})
 			if err != nil {
 				return fmt.Errorf("failed to get job %q status: %w", name, err)
 			}

@@ -673,6 +673,24 @@ func TestWaitForJobCompletion(t *testing.T) {
 			timeout:       5 * time.Second,
 			expectedError: `failed to get job "test-job" status`,
 		},
+		// Regression test: when ticker.C and timeoutCtx.Done() fire simultaneously, Go's
+		// non-deterministic select may pick the ticker case. The reactor used here sleeps
+		// well past the timeout to guarantee the context is already cancelled by the time
+		// Get is called. Without the fix the error would be "failed to get job status:
+		// context deadline exceeded" rather than the canonical "timed out" message.
+		"timeout error is reported correctly when ticker races with timeout": {
+			setupReactor: func(cs *kubefake.Clientset) {
+				cs.PrependReactor("get", "jobs", func(action k8stesting.Action) (bool, runtime.Object, error) {
+					// sleep long enough to ensure the timeout fires before or during Get
+					time.Sleep(200 * time.Millisecond)
+					return true, &batchv1.Job{
+						ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: namespace},
+					}, nil
+				})
+			},
+			timeout:       10 * time.Millisecond,
+			expectedError: `job "test-job" timed out`,
+		},
 	}
 
 	for name, test := range tests {
