@@ -1,12 +1,10 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: pre-deploy-migration-fail
+  name: filtered-migration
   annotations:
     mia-platform.eu/deploy: pre-deploy
 spec:
-  # backoffLimit is also enforced to 0 by mlp at apply time
-  backoffLimit: 0
   template:
     metadata: {}
     spec:
@@ -16,5 +14,5 @@ spec:
         args:
         - /bin/sh
         - -c
-        - echo "migration failed!" && exit 1
+        - echo "running failing migration" && exit 1
       restartPolicy: Never

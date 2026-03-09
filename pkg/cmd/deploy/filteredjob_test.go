@@ -33,7 +33,7 @@ import (
 )
 
 // newTestJob creates an unstructured Job resource for testing with the given name and optional
-// pre-deploy annotation value. If annotationValue is empty, no annotation is added.
+// filtered job annotation value. If annotationValue is empty, no annotation is added.
 func newTestJob(name, annotationValue string) *unstructured.Unstructured {
 	obj := &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -60,14 +60,14 @@ func newTestJob(name, annotationValue string) *unstructured.Unstructured {
 
 	if annotationValue != "" {
 		obj.SetAnnotations(map[string]string{
-			preDeployAnnotation: annotationValue,
+			filteredJobAnnotationKey: annotationValue,
 		})
 	}
 
 	return obj
 }
 
-// newOptionalTestJob creates a pre-deploy Job with the deploy-optional annotation set to "true".
+// newOptionalTestJob creates a filtered Job with the deploy-optional annotation set to "true".
 func newOptionalTestJob(name string) *unstructured.Unstructured {
 	job := newTestJob(name, "pre-deploy")
 	annotations := job.GetAnnotations()
@@ -76,7 +76,7 @@ func newOptionalTestJob(name string) *unstructured.Unstructured {
 	return job
 }
 
-func TestFilterPreDeployJobs(t *testing.T) {
+func TestFilterAnnotatedJobs(t *testing.T) {
 	t.Parallel()
 
 	tests := map[string]struct {
@@ -130,7 +130,7 @@ func TestFilterPreDeployJobs(t *testing.T) {
 						"kind":       "ConfigMap",
 						"metadata": map[string]interface{}{
 							"name":        "cm-with-annotation",
-							"annotations": map[string]interface{}{preDeployAnnotation: "pre-deploy"},
+							"annotations": map[string]interface{}{filteredJobAnnotationKey: "pre-deploy"},
 						},
 					},
 				},
@@ -172,7 +172,7 @@ func TestFilterPreDeployJobs(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			jobs, remaining := FilterPreDeployJobs(test.resources, test.annotationValue)
+			jobs, remaining := FilterAnnotatedJobs(test.resources, test.annotationValue)
 			assert.Len(t, jobs, test.expectedJobs)
 			assert.Len(t, remaining, test.expectedRemaining)
 		})
@@ -226,7 +226,7 @@ func TestStripAnnotatedJobs(t *testing.T) {
 						"kind":       "ConfigMap",
 						"metadata": map[string]interface{}{
 							"name":        "cm-annotated",
-							"annotations": map[string]interface{}{preDeployAnnotation: "pre-deploy"},
+							"annotations": map[string]interface{}{filteredJobAnnotationKey: "pre-deploy"},
 						},
 					},
 				},
@@ -252,7 +252,7 @@ func TestStripAnnotatedJobs(t *testing.T) {
 	}
 }
 
-func TestPreDeployJobRunnerRun(t *testing.T) {
+func TestFilteredJobRunnerRun(t *testing.T) {
 	t.Parallel()
 
 	namespace := "test-ns"
@@ -320,7 +320,7 @@ func TestPreDeployJobRunnerRun(t *testing.T) {
 				})
 			},
 			maxRetries:    1,
-			expectedError: "pre-deploy job \"fail-job\" failed after 1 attempts:",
+			expectedError: "filtered job \"fail-job\" failed after 1 attempts:",
 		},
 		"partial success stops at first failure": {
 			jobs: []*unstructured.Unstructured{
@@ -353,7 +353,7 @@ func TestPreDeployJobRunnerRun(t *testing.T) {
 			},
 			maxRetries:    0,
 			expectedOut:   "completed successfully",
-			expectedError: "pre-deploy job \"fail-job\" failed after 0 attempts:",
+			expectedError: "filtered job \"fail-job\" failed after 0 attempts:",
 		},
 		"multiple jobs stops at first failure": {
 			jobs: []*unstructured.Unstructured{
@@ -376,7 +376,7 @@ func TestPreDeployJobRunnerRun(t *testing.T) {
 				})
 			},
 			maxRetries:    0,
-			expectedError: "pre-deploy job \"fail-job-1\" failed after 0 attempts:",
+			expectedError: "filtered job \"fail-job-1\" failed after 0 attempts:",
 		},
 		"optional job failure does not block deploy": {
 			jobs: []*unstructured.Unstructured{newOptionalTestJob("optional-job")},
@@ -396,7 +396,7 @@ func TestPreDeployJobRunnerRun(t *testing.T) {
 				})
 			},
 			maxRetries:  0,
-			expectedOut: "optional pre-deploy job",
+			expectedOut: "optional filtered job",
 		},
 		"optional job failure with mandatory success": {
 			jobs: []*unstructured.Unstructured{
@@ -458,7 +458,7 @@ func TestPreDeployJobRunnerRun(t *testing.T) {
 				})
 			},
 			maxRetries:    0,
-			expectedError: "pre-deploy job \"mandatory-job\" failed after 0 attempts:",
+			expectedError: "filtered job \"mandatory-job\" failed after 0 attempts:",
 		},
 		"all optional jobs fail": {
 			jobs: []*unstructured.Unstructured{
@@ -481,7 +481,7 @@ func TestPreDeployJobRunnerRun(t *testing.T) {
 				})
 			},
 			maxRetries:  0,
-			expectedOut: "optional pre-deploy job",
+			expectedOut: "optional filtered job",
 		},
 	}
 
@@ -495,7 +495,7 @@ func TestPreDeployJobRunnerRun(t *testing.T) {
 			}
 
 			writer := new(strings.Builder)
-			runner := NewPreDeployJobRunner(fakeClientset, namespace, test.maxRetries, 5*time.Second, writer, test.dryRun)
+			runner := NewFilteredJobRunner(fakeClientset, namespace, test.maxRetries, 5*time.Second, writer, test.dryRun)
 			runner.pollInterval = 10 * time.Millisecond
 
 			err := runner.Run(t.Context(), test.jobs)
@@ -594,7 +594,7 @@ func TestRunJobWithRetries(t *testing.T) {
 			test.setupReactor(fakeClientset)
 
 			writer := new(strings.Builder)
-			runner := NewPreDeployJobRunner(fakeClientset, namespace, test.maxRetries, 5*time.Second, writer, false)
+			runner := NewFilteredJobRunner(fakeClientset, namespace, test.maxRetries, 5*time.Second, writer, false)
 			runner.pollInterval = 10 * time.Millisecond
 
 			job := newTestJob("test-job", "pre-deploy")
@@ -701,7 +701,7 @@ func TestWaitForJobCompletion(t *testing.T) {
 			test.setupReactor(fakeClientset)
 
 			writer := new(strings.Builder)
-			runner := NewPreDeployJobRunner(fakeClientset, namespace, 3, test.timeout, writer, false)
+			runner := NewFilteredJobRunner(fakeClientset, namespace, 3, test.timeout, writer, false)
 			runner.pollInterval = 10 * time.Millisecond
 
 			err := runner.waitForJobCompletion(t.Context(), "test-job")
@@ -760,7 +760,7 @@ func TestCreateAndWaitForJob(t *testing.T) {
 			test.setupReactor(fakeClientset)
 
 			writer := new(strings.Builder)
-			runner := NewPreDeployJobRunner(fakeClientset, namespace, 3, 5*time.Second, writer, false)
+			runner := NewFilteredJobRunner(fakeClientset, namespace, 3, 5*time.Second, writer, false)
 			runner.pollInterval = 10 * time.Millisecond
 
 			err := runner.createAndWaitForJob(t.Context(), test.job)
@@ -787,7 +787,7 @@ func TestDeleteJob(t *testing.T) {
 	})
 
 	writer := new(strings.Builder)
-	runner := NewPreDeployJobRunner(fakeClientset, namespace, 3, 30*time.Second, writer, false)
+	runner := NewFilteredJobRunner(fakeClientset, namespace, 3, 30*time.Second, writer, false)
 
 	err := runner.deleteJob(t.Context(), "test-job")
 	require.NoError(t, err)

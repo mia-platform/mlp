@@ -1,13 +1,10 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: pre-deploy-migration-fail
+  name: filtered-sleep
   annotations:
     mia-platform.eu/deploy: pre-deploy
-    mia-platform.eu/deploy-optional: 'true'
 spec:
-  # backoffLimit is also enforced to 0 by mlp at apply time
-  backoffLimit: 0
   template:
     metadata: {}
     spec:
@@ -17,5 +14,5 @@ spec:
         args:
         - /bin/sh
         - -c
-        - echo "migration failed!" && exit 1
+        - echo 'Inizio...' && sleep 2 && echo 'Fine attesa!'
       restartPolicy: Never

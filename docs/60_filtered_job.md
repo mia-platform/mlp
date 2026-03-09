@@ -1,13 +1,13 @@
-# Pre-Deploy Jobs
+# Filtered Jobs
 
-`mlp` supports the execution of Kubernetes `Job` resources before the main deploy phase. These pre-deploy jobs
+`mlp` supports the execution of Kubernetes `Job` resources before the main deploy phase. These filtered jobs
 can be used to run database migrations, data transformations, or any other task that must complete successfully
 before the rest of the resources are applied to the cluster.
 
 ## How It Works
 
-Pre-deploy jobs are identified by the annotation `mia-platform.eu/deploy` on a `Job` resource. When the
-`--pre-deploy-job-annotation` flag is provided to the `deploy` command, `mlp` will scan the resources and
+Filtered jobs are identified by the annotation `mia-platform.eu/deploy` on a `Job` resource. When the
+`--filtered-job-annotation` flag is provided to the `deploy` command, `mlp` will scan the resources and
 separate all `Job` resources whose annotation value matches the one provided.
 
 These jobs are executed before the remaining resources are applied. If the flag is not provided, any `Job`
@@ -16,7 +16,7 @@ applied at all.
 
 ## Annotating a Job
 
-To mark a `Job` as a pre-deploy job, add the `mia-platform.eu/deploy` annotation with the desired value:
+To mark a `Job` as a filtered job, add the `mia-platform.eu/deploy` annotation with the desired value:
 
 ```yaml
 apiVersion: batch/v1
@@ -38,12 +38,12 @@ spec:
 Then pass the matching value to the deploy command:
 
 ```sh
-mlp deploy --pre-deploy-job-annotation pre-deploy ...
+mlp deploy --filtered-job-annotation pre-deploy ...
 ```
 
 ## Optional Jobs
 
-A pre-deploy job can be marked as optional by adding the annotation `mia-platform.eu/deploy-optional: "true"`.
+A filtered job can be marked as optional by adding the annotation `mia-platform.eu/deploy-optional: "true"`.
 Optional jobs are non-blocking: if they fail, the failure is logged as a warning and the deploy process
 continues normally. Mandatory jobs (those without the optional annotation) will block and fail the deploy if
 they cannot complete successfully.
@@ -68,15 +68,15 @@ spec:
 
 ## Retry and Timeout
 
-Each pre-deploy job is retried automatically on failure. Before each retry the failed job is deleted from
+Each filtered job is retried automatically on failure. Before each retry the failed job is deleted from
 the cluster so that a fresh instance can be created. The number of retries and the per-execution timeout
 can be controlled via dedicated flags:
 
 | Flag | Default | Description |
 |---|---|---|
-| `--pre-deploy-job-annotation` | _(empty)_ | Annotation value used to identify pre-deploy jobs |
-| `--pre-deploy-job-max-retries` | `3` | Maximum number of retry attempts for a failed job |
-| `--pre-deploy-job-timeout` | `30s` | Timeout for a single job execution attempt |
+| `--filtered-job-annotation` | _(empty)_ | Annotation value used to identify filtered jobs |
+| `--filtered-job-max-retries` | `3` | Maximum number of retry attempts for a failed job |
+| `--filtered-job-timeout` | `30s` | Timeout for a single job execution attempt |
 
 If a job exceeds the configured timeout it is considered failed and the retry logic applies as normal.
 

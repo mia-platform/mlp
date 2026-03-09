@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: pre-deploy-optional
+  name: filtered-optional
   annotations:
     mia-platform.eu/deploy: pre-deploy
     mia-platform.eu/deploy-optional: 'true'

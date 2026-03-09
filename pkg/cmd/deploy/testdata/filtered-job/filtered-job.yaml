@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: pre-deploy-migration
+  name: filtered-migration
   annotations:
     mia-platform.eu/deploy: pre-deploy
 spec:

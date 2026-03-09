@@ -31,14 +31,14 @@ import (
 )
 
 const (
-	preDeployAnnotation      = "mia-platform.eu/deploy"
+	filteredJobAnnotationKey = "mia-platform.eu/deploy"
 	deployOptionalAnnotation = "mia-platform.eu/deploy-optional"
 	jobKind                  = "Job"
 )
 
-// PreDeployJobRunner handles the creation, execution and monitoring of pre-deploy jobs
+// FilteredJobRunner handles the creation, execution and monitoring of filtered jobs
 // with configurable retry and timeout support.
-type PreDeployJobRunner struct {
+type FilteredJobRunner struct {
 	clientSet    kubernetes.Interface
 	namespace    string
 	maxRetries   int
@@ -48,10 +48,10 @@ type PreDeployJobRunner struct {
 	dryRun       bool
 }
 
-// NewPreDeployJobRunner creates a new PreDeployJobRunner configured with the specified parameters
-// for running pre-deploy jobs against the target cluster.
-func NewPreDeployJobRunner(clientSet kubernetes.Interface, namespace string, maxRetries int, timeout time.Duration, writer io.Writer, dryRun bool) *PreDeployJobRunner {
-	return &PreDeployJobRunner{
+// NewFilteredJobRunner creates a new FilteredJobRunner configured with the specified parameters
+// for running filtered jobs against the target cluster.
+func NewFilteredJobRunner(clientSet kubernetes.Interface, namespace string, maxRetries int, timeout time.Duration, writer io.Writer, dryRun bool) *FilteredJobRunner {
+	return &FilteredJobRunner{
 		clientSet:    clientSet,
 		namespace:    namespace,
 		maxRetries:   maxRetries,
@@ -62,36 +62,36 @@ func NewPreDeployJobRunner(clientSet kubernetes.Interface, namespace string, max
 	}
 }
 
-// FilterPreDeployJobs separates pre-deploy jobs from the remaining resources based on the
+// FilterAnnotatedJobs separates filtered jobs from the remaining resources based on the
 // mia-platform.eu/deploy annotation matching the provided annotation value.
-// It returns two slices: the matching pre-deploy jobs and the remaining resources.
-func FilterPreDeployJobs(resources []*unstructured.Unstructured, annotationValue string) ([]*unstructured.Unstructured, []*unstructured.Unstructured) {
-	var preDeployJobs []*unstructured.Unstructured
+// It returns two slices: the matching filtered jobs and the remaining resources.
+func FilterAnnotatedJobs(resources []*unstructured.Unstructured, annotationValue string) ([]*unstructured.Unstructured, []*unstructured.Unstructured) {
+	var filteredJobs []*unstructured.Unstructured
 	var remainingResources []*unstructured.Unstructured
 
 	for _, res := range resources {
 		if res.GetKind() == jobKind {
 			annotations := res.GetAnnotations()
-			if val, ok := annotations[preDeployAnnotation]; ok && val == annotationValue {
-				preDeployJobs = append(preDeployJobs, res)
+			if val, ok := annotations[filteredJobAnnotationKey]; ok && val == annotationValue {
+				filteredJobs = append(filteredJobs, res)
 				continue
 			}
 		}
 		remainingResources = append(remainingResources, res)
 	}
 
-	return preDeployJobs, remainingResources
+	return filteredJobs, remainingResources
 }
 
 // StripAnnotatedJobs removes all Job resources that carry the mia-platform.eu/deploy
-// annotation, regardless of its value. This is used to exclude pre-deploy jobs from the
-// normal apply flow when the pre-deploy-job-annotation flag is not provided.
+// annotation, regardless of its value. This is used to exclude filtered jobs from the
+// normal apply flow when the --filtered-job-annotation flag is not provided.
 func StripAnnotatedJobs(resources []*unstructured.Unstructured) []*unstructured.Unstructured {
 	var remaining []*unstructured.Unstructured
 
 	for _, res := range resources {
 		if res.GetKind() == jobKind {
-			if _, ok := res.GetAnnotations()[preDeployAnnotation]; ok {
+			if _, ok := res.GetAnnotations()[filteredJobAnnotationKey]; ok {
 				continue
 			}
 		}
@@ -101,65 +101,65 @@ func StripAnnotatedJobs(resources []*unstructured.Unstructured) []*unstructured.
 	return remaining
 }
 
-// isOptionalPreDeployJob reports whether the job carries the deploy-optional annotation set to "true".
-func isOptionalPreDeployJob(job *unstructured.Unstructured) bool {
+// isOptionalFilteredJob reports whether the job carries the deploy-optional annotation set to "true".
+func isOptionalFilteredJob(job *unstructured.Unstructured) bool {
 	return job.GetAnnotations()[deployOptionalAnnotation] == "true"
 }
 
-// Run executes all pre-deploy jobs with retry and timeout support. Each job is retried
+// Run executes all filtered jobs with retry and timeout support. Each job is retried
 // up to maxRetries times upon failure. Jobs annotated with mia-platform.eu/deploy-optional=true
 // are treated as non-blocking: their failure is logged as a warning but never counted as an
 // error. For mandatory jobs an error is returned only if ALL of them fail; if at least one
 // mandatory job succeeds, the deploy process can continue.
-func (r *PreDeployJobRunner) Run(ctx context.Context, jobs []*unstructured.Unstructured) error {
+func (r *FilteredJobRunner) Run(ctx context.Context, jobs []*unstructured.Unstructured) error {
 	logger := logr.FromContextOrDiscard(ctx)
 
 	if len(jobs) == 0 {
-		logger.V(3).Info("no pre-deploy jobs to run")
+		logger.V(3).Info("no filtered jobs to run")
 		return nil
 	}
 
 	if r.dryRun {
 		for _, job := range jobs {
-			fmt.Fprintf(r.writer, "pre-deploy job %q would be executed (dry-run)\n", job.GetName())
+			fmt.Fprintf(r.writer, "filtered job %q would be executed (dry-run)\n", job.GetName())
 		}
 		return nil
 	}
 
-	logger.V(3).Info("starting pre-deploy jobs", "count", len(jobs))
+	logger.V(3).Info("starting filtered jobs", "count", len(jobs))
 
 	for _, job := range jobs {
 		jobName := job.GetName()
-		optional := isOptionalPreDeployJob(job)
+		optional := isOptionalFilteredJob(job)
 
 		err := r.runJobWithRetries(ctx, job)
 		if err != nil {
 			if optional {
-				logger.V(3).Info("optional pre-deploy job failed, continuing", "name", jobName, "error", err)
-				fmt.Fprintf(r.writer, "optional pre-deploy job %q failed, continuing\n", jobName)
+				logger.V(3).Info("optional filtered job failed, continuing", "name", jobName, "error", err)
+				fmt.Fprintf(r.writer, "optional filtered job %q failed, continuing\n", jobName)
 			} else {
-				logger.V(3).Info("pre-deploy job failed", "name", jobName, "error", err)
-				return fmt.Errorf("pre-deploy job %q failed after %d attempts: %w", jobName, r.maxRetries, err)
+				logger.V(3).Info("filtered job failed", "name", jobName, "error", err)
+				return fmt.Errorf("filtered job %q failed after %d attempts: %w", jobName, r.maxRetries, err)
 			}
 		} else {
-			fmt.Fprintf(r.writer, "pre-deploy job %q completed successfully\n", jobName)
+			fmt.Fprintf(r.writer, "filtered job %q completed successfully\n", jobName)
 		}
 	}
 
-	logger.V(3).Info("pre-deploy jobs completed")
+	logger.V(3).Info("filtered jobs completed")
 	return nil
 }
 
-// runJobWithRetries attempts to run a single pre-deploy job, retrying up to maxRetries times
+// runJobWithRetries attempts to run a single filtered job, retrying up to maxRetries times
 // on failure. The failed job is deleted before each retry attempt.
-func (r *PreDeployJobRunner) runJobWithRetries(ctx context.Context, jobUnstr *unstructured.Unstructured) error {
+func (r *FilteredJobRunner) runJobWithRetries(ctx context.Context, jobUnstr *unstructured.Unstructured) error {
 	logger := logr.FromContextOrDiscard(ctx)
 	var lastErr error
 
 	for attempt := 0; attempt <= r.maxRetries; attempt++ {
 		if attempt > 0 {
-			logger.V(3).Info("retrying pre-deploy job", "name", jobUnstr.GetName(), "attempt", attempt)
-			fmt.Fprintf(r.writer, "retrying pre-deploy job %q (attempt %d/%d)\n", jobUnstr.GetName(), attempt, r.maxRetries)
+			logger.V(3).Info("retrying filtered job", "name", jobUnstr.GetName(), "attempt", attempt)
+			fmt.Fprintf(r.writer, "retrying filtered job %q (attempt %d/%d)\n", jobUnstr.GetName(), attempt, r.maxRetries)
 		}
 
 		lastErr = r.createAndWaitForJob(ctx, jobUnstr)
@@ -167,7 +167,7 @@ func (r *PreDeployJobRunner) runJobWithRetries(ctx context.Context, jobUnstr *un
 			return nil
 		}
 
-		logger.V(5).Info("pre-deploy job attempt failed", "name", jobUnstr.GetName(), "attempt", attempt, "error", lastErr)
+		logger.V(5).Info("filtered job attempt failed", "name", jobUnstr.GetName(), "attempt", attempt, "error", lastErr)
 
 		// Clean up the failed job before retrying
 		if cleanErr := r.deleteJob(ctx, jobUnstr.GetName()); cleanErr != nil {
@@ -181,7 +181,7 @@ func (r *PreDeployJobRunner) runJobWithRetries(ctx context.Context, jobUnstr *un
 // createAndWaitForJob creates a single job in the cluster and waits for its completion.
 // It converts the unstructured resource to a typed Job, sets the namespace, and monitors
 // the job status until completion, failure, or timeout.
-func (r *PreDeployJobRunner) createAndWaitForJob(ctx context.Context, jobUnstr *unstructured.Unstructured) error {
+func (r *FilteredJobRunner) createAndWaitForJob(ctx context.Context, jobUnstr *unstructured.Unstructured) error {
 	logger := logr.FromContextOrDiscard(ctx)
 
 	var job batchv1.Job
@@ -194,7 +194,7 @@ func (r *PreDeployJobRunner) createAndWaitForJob(ctx context.Context, jobUnstr *
 	job.ResourceVersion = ""
 	job.Status = batchv1.JobStatus{}
 
-	logger.V(5).Info("creating pre-deploy job", "name", job.Name, "namespace", r.namespace)
+	logger.V(5).Info("creating filtered job", "name", job.Name, "namespace", r.namespace)
 
 	if _, err := r.clientSet.BatchV1().Jobs(r.namespace).Create(ctx, &job, metav1.CreateOptions{}); err != nil {
 		return fmt.Errorf("failed to create job %q: %w", job.Name, err)
@@ -205,7 +205,7 @@ func (r *PreDeployJobRunner) createAndWaitForJob(ctx context.Context, jobUnstr *
 
 // waitForJobCompletion polls the job status at regular intervals until the job completes,
 // fails, or the configured timeout expires.
-func (r *PreDeployJobRunner) waitForJobCompletion(ctx context.Context, name string) error {
+func (r *FilteredJobRunner) waitForJobCompletion(ctx context.Context, name string) error {
 	logger := logr.FromContextOrDiscard(ctx)
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, r.timeout)
@@ -242,7 +242,7 @@ func (r *PreDeployJobRunner) waitForJobCompletion(ctx context.Context, name stri
 }
 
 // deleteJob removes a job and its associated pods from the cluster using background propagation
-func (r *PreDeployJobRunner) deleteJob(ctx context.Context, name string) error {
+func (r *FilteredJobRunner) deleteJob(ctx context.Context, name string) error {
 	propagation := metav1.DeletePropagationBackground
 	return r.clientSet.BatchV1().Jobs(r.namespace).Delete(ctx, name, metav1.DeleteOptions{
 		PropagationPolicy: &propagation,
