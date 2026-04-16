@@ -73,6 +73,14 @@ If you want to run the cli in its environment or you want to test the cli you ca
 docker run ghcr.io/mia-platform/mlp:v2.6.0
 ```
 
+If you need Helm support (e.g. for `mlp kustomize --enable-helm`), use one of the Helm-enabled image variants:
+
+```sh
+docker run ghcr.io/mia-platform/mlp:v2.6.0-helm3  # includes Helm 3
+docker run ghcr.io/mia-platform/mlp:v2.6.0-helm4  # includes Helm 4
+docker run ghcr.io/mia-platform/mlp:v2.6.0-helm   # alias for -helm4
+```
+
 ### Windows
 
 `mlp` is not directly compatible with Windows, even if you have Go installed compilation on this OS
