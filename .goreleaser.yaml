@@ -1,6 +1,10 @@
 version: 2
 dist: bin
 
+before:
+  hooks:
+  - "{{ if and (not .IsSnapshot) (not .Prerelease) }}sed -i -E 's/v[0-9]+\\.[0-9]+\\.[0-9]+(-(rc|alpha|beta)[.0-9]*)?/v{{ .Version }}/g' README.md docs/*.md{{ else }}true{{ end }}"
+
 builds:
 - main: "{{ .Env.BUILD_PATH }}"
   binary: >-

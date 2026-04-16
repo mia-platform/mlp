@@ -72,7 +72,7 @@ VERSION_MODULE_NAME:= github.com/mia-platform/mlp/v2/pkg/cmd
 SUPPORTED_PLATFORMS:= linux/386 linux/amd64 linux/arm64 linux/arm/v6 linux/arm/v7
 # Default platform for which building the docker image (darwin can run linux images for the same arch)
 # as SUPPORTED_PLATFORMS it highly depends on which platform are supported by the base image
-DEFAULT_DOCKER_PLATFORM:= linux/$(GOARCH)/$(GOARM)
+DEFAULT_DOCKER_PLATFORM:= linux/$(GOARCH)$(if $(GOARM),/$(GOARM))
 # List of one or more container registries for tagging the resulting docker images
 CONTAINER_REGISTRIES:= docker.io/miaplatform ghcr.io/mia-platform
 # The description used on the org.opencontainers.description label of the container

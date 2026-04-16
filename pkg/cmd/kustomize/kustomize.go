@@ -18,6 +18,7 @@ package kustomize
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 
 	"github.com/MakeNowJust/heredoc/v2"
@@ -25,6 +26,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"sigs.k8s.io/kustomize/api/krusty"
+	"sigs.k8s.io/kustomize/api/types"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
 )
 
@@ -50,20 +52,36 @@ const (
 	outputFlagShort         = "o"
 	outputFlagUsage         = "If specified, write output to the file at this path"
 	outputIsADirectoryError = "output path is a directory instead of a file"
+
+	enableHelmFlagName  = "enable-helm"
+	helmCommandFlagName = "helm-command"
+	helmAPIVersionsName = "helm-api-versions"
+	helmKubeVersionName = "helm-kube-version"
+	loadRestrictorName  = "load-restrictor"
 )
 
 // Flags contains all the flags for the `kustomize` command. They will be converted to Options
 // that contains all runtime options for the command.
 type Flags struct {
-	outputPath string
+	outputPath      string
+	enableHelm      bool
+	helmCommand     string
+	helmAPIVersions []string
+	helmKubeVersion string
+	loadRestrictor  string
 }
 
 // Options have the data required to perform the kustomize operation
 type Options struct {
-	inputPath  string
-	outputPath string
-	fSys       filesys.FileSystem
-	writer     io.Writer
+	inputPath       string
+	outputPath      string
+	fSys            filesys.FileSystem
+	enableHelm      bool
+	helmCommand     string
+	helmAPIVersions []string
+	helmKubeVersion string
+	loadRestrictor  string
+	writer          io.Writer
 }
 
 // NewCommand return the command for build a kustomization target from a directory
@@ -92,6 +110,11 @@ func NewCommand() *cobra.Command {
 // AddFlags set the connection between Flags property to command line flags
 func (f *Flags) AddFlags(set *pflag.FlagSet) {
 	set.StringVarP(&f.outputPath, outputFlagName, outputFlagShort, "", outputFlagUsage)
+	set.BoolVar(&f.enableHelm, enableHelmFlagName, false, "enable Helm chart inflation")
+	set.StringVar(&f.helmCommand, helmCommandFlagName, "helm", "path or name of the helm binary")
+	set.StringSliceVar(&f.helmAPIVersions, helmAPIVersionsName, nil, "Kubernetes api versions used for Helm Capabilities.APIVersions")
+	set.StringVar(&f.helmKubeVersion, helmKubeVersionName, "", "Kubernetes version used for Helm Capabilities.KubeVersion")
+	set.StringVar(&f.loadRestrictor, loadRestrictorName, "rootOnly", `set the file loading restrictor: "rootOnly" or "none"`)
 }
 
 // ToOptions transform the command flags in command runtime arguments
@@ -109,10 +132,15 @@ func (f *Flags) ToOptions(args []string, fSys filesys.FileSystem, writer io.Writ
 	}
 
 	return &Options{
-		inputPath:  inputPath,
-		outputPath: f.outputPath,
-		fSys:       fSys,
-		writer:     writer,
+		inputPath:       inputPath,
+		outputPath:      f.outputPath,
+		fSys:            fSys,
+		enableHelm:      f.enableHelm,
+		helmCommand:     f.helmCommand,
+		helmAPIVersions: f.helmAPIVersions,
+		helmKubeVersion: f.helmKubeVersion,
+		loadRestrictor:  f.loadRestrictor,
+		writer:          writer,
 	}, nil
 }
 
@@ -121,7 +149,29 @@ func (o *Options) Run(ctx context.Context) error {
 	logger := logr.FromContextOrDiscard(ctx)
 
 	logger.V(5).Info("reading kustomize files", "path", o.inputPath)
-	kustomizer := krusty.MakeKustomizer(krusty.MakeDefaultOptions())
+	opts := krusty.MakeDefaultOptions()
+
+	if o.enableHelm {
+		opts.PluginConfig.HelmConfig.Enabled = true
+		opts.PluginConfig.HelmConfig.Command = o.helmCommand
+		if len(o.helmAPIVersions) > 0 {
+			opts.PluginConfig.HelmConfig.ApiVersions = o.helmAPIVersions
+		}
+		if o.helmKubeVersion != "" {
+			opts.PluginConfig.HelmConfig.KubeVersion = o.helmKubeVersion
+		}
+	}
+
+	switch o.loadRestrictor {
+	case "none":
+		opts.LoadRestrictions = types.LoadRestrictionsNone
+	case "rootOnly":
+		opts.LoadRestrictions = types.LoadRestrictionsRootOnly
+	default:
+		return fmt.Errorf("invalid load-restrictor value %q: must be \"rootOnly\" or \"none\"", o.loadRestrictor)
+	}
+
+	kustomizer := krusty.MakeKustomizer(opts)
 	resourceMap, err := kustomizer.Run(o.fSys, o.inputPath)
 	if err != nil {
 		return err

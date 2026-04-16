@@ -54,24 +54,32 @@ docker/%/multiarch:
 	$(eval ACTION:= $(word 1,$(subst /, , $*)))
 	$(eval IS_PUSH:= $(filter push,$(ACTION)))
 	$(eval ADDITIONAL_PARAMETER:= $(if $(IS_PUSH), --push))
-	$(info Building image for following platforms: $(SUPPORTED_PLATFORMS))
+	$(info Building image for following platforms: $(SUPPORTED_PLATFORMS) [target: $(DOCKER_TARGET)])
 	$(DOCKER_CMD) buildx build --platform "$(DOCKER_SUPPORTED_PLATFORMS)" \
 		--build-arg CMD_NAME=$(CMDNAME) \
 		--provenance=false \
-		$(IMAGE_TAGS) \
+		$(DOCKER_TARGET_FLAG) \
+		$(DOCKER_TARGET_IMAGE_TAGS) \
 		$(DOCKER_LABELS) \
 		$(DOCKER_ANNOTATIONS) \
 		--file ./Dockerfile $(OUTPUT_DIR) $(ADDITIONAL_PARAMETER)
+
+DOCKER_TARGET?= base
+DOCKER_TARGET_FLAG= $(if $(DOCKER_TARGET),--target $(DOCKER_TARGET))
+DOCKER_TARGET_SUFFIX= $(if $(filter-out base,$(DOCKER_TARGET)),-$(DOCKER_TARGET))
+DOCKER_HELM_ALIAS_TAGS= $(if $(filter helm4,$(DOCKER_TARGET)),$(addprefix --tag , $(foreach REGISTRY, $(CONTAINER_REGISTRIES), $(foreach TAG, $(PARSED_TAGS), $(REGISTRY)/$(CMDNAME):$(TAG)-helm))))
+DOCKER_TARGET_IMAGE_TAGS= $(addprefix --tag , $(foreach REGISTRY, $(CONTAINER_REGISTRIES), $(foreach TAG, $(PARSED_TAGS), $(REGISTRY)/$(CMDNAME):$(TAG)$(DOCKER_TARGET_SUFFIX)))) $(DOCKER_HELM_ALIAS_TAGS)
 
 .PHONY: docker/build/%
 docker/build/%:
 	$(eval OS:= $(word 1,$(subst /, ,$*)))
 	$(eval ARCH:= $(word 2,$(subst /, ,$*)))
 	$(eval ARM:= $(word 3,$(subst /, ,$*)))
-	$(info Building image for $(OS) $(ARCH) $(ARM))
+	$(info Building image for $(OS) $(ARCH) $(ARM) [target: $(DOCKER_TARGET)])
 	$(DOCKER_CMD) build --platform $* \
 		--build-arg CMD_NAME=$(CMDNAME) \
-		$(IMAGE_TAGS) \
+		$(DOCKER_TARGET_FLAG) \
+		$(DOCKER_TARGET_IMAGE_TAGS) \
 		$(DOCKER_LABELS) \
 		$(DOCKER_ANNOTATIONS) \
 		--file ./Dockerfile $(OUTPUT_DIR)
@@ -92,11 +100,41 @@ docker/buildx/teardown:
 .PHONY: docker-build
 docker-build: go/build/$(DEFAULT_DOCKER_PLATFORM) docker/build/$(DEFAULT_DOCKER_PLATFORM)
 
+.PHONY: docker-build-helm3
+docker-build-helm3: DOCKER_TARGET=helm3
+docker-build-helm3: docker-build
+
+.PHONY: docker-build-helm4
+docker-build-helm4: DOCKER_TARGET=helm4
+docker-build-helm4: docker-build
+
+.PHONY: docker-build-helm
+docker-build-helm: docker-build-helm4
+
 .PHONY: docker-setup-multiarch
 docker-setup-multiarch: docker/setup/multiarch
 
 .PHONY: docker-build-multiarch
 docker-build-multiarch: build-multiarch docker/buildx/setup docker/build/multiarch docker/buildx/teardown
 
+.PHONY: docker-build-multiarch-helm3
+docker-build-multiarch-helm3: DOCKER_TARGET=helm3
+docker-build-multiarch-helm3: docker-build-multiarch
+
+.PHONY: docker-build-multiarch-helm4
+docker-build-multiarch-helm4: DOCKER_TARGET=helm4
+docker-build-multiarch-helm4: docker-build-multiarch
+
+.PHONY: docker-build-multiarch-helm
+docker-build-multiarch-helm: docker-build-multiarch-helm4
+
 .PHONY: ci-docker
-ci-docker: docker/push/multiarch
+ci-docker: docker/push/multiarch ci-docker-helm3 ci-docker-helm4
+
+.PHONY: ci-docker-helm3
+ci-docker-helm3: DOCKER_TARGET=helm3
+ci-docker-helm3: docker/push/multiarch
+
+.PHONY: ci-docker-helm4
+ci-docker-helm4: DOCKER_TARGET=helm4
+ci-docker-helm4: docker/push/multiarch
