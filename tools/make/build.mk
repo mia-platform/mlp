@@ -73,7 +73,7 @@ build-multiarch: $(GORELEASER_PATH) go/build/multiarch
 endif
 
 .PHONY: build
-build: go/build/$(GOOS)/$(GOARCH)/$(GOARM)
+build: go/build/$(GOOS)/$(GOARCH)$(if $(GOARM),/$(GOARM))
 
 $(TOOLS_BIN)/goreleaser: $(TOOLS_DIR)/GORELEASER_VERSION
 	$(eval GORELEASER_VERSION:= $(shell cat $<))
