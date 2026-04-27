@@ -82,6 +82,17 @@ const (
 	waitFlagDefaultValue = true
 	waitFlagUsage        = "if true, wait for resources to be current before marking them as successfully applied"
 
+	filteredJobAnnotationFlagName  = "filtered-job-annotation"
+	filteredJobAnnotationFlagUsage = "the annotation value for mia-platform.eu/deploy to identify filtered jobs"
+
+	filteredJobMaxRetriesFlagName     = "filtered-job-max-retries"
+	filteredJobMaxRetriesDefaultValue = 3
+	filteredJobMaxRetriesFlagUsage    = "the maximum number of retries for a failed filtered job"
+
+	filteredJobTimeoutFlagName     = "filtered-job-timeout"
+	filteredJobTimeoutDefaultValue = 30 * time.Second
+	filteredJobTimeoutFlagUsage    = "the timeout for a single filtered job execution"
+
 	stdinToken    = "-"
 	fieldManager  = "mlp"
 	inventoryName = "eu.mia-platform.mlp"
@@ -97,25 +108,31 @@ var (
 // Flags contains all the flags for the `deploy` command. They will be converted to Options
 // that contains all runtime options for the command.
 type Flags struct {
-	ConfigFlags     *genericclioptions.ConfigFlags
-	inputPaths      []string
-	deployType      string
-	forceDeploy     bool
-	ensureNamespace bool
-	timeout         time.Duration
-	dryRun          bool
-	wait            bool
+	ConfigFlags           *genericclioptions.ConfigFlags
+	inputPaths            []string
+	deployType            string
+	forceDeploy           bool
+	ensureNamespace       bool
+	timeout               time.Duration
+	dryRun                bool
+	wait                  bool
+	filteredJobAnnotation string
+	filteredJobMaxRetries int
+	filteredJobTimeout    time.Duration
 }
 
 // Options have the data required to perform the deploy operation
 type Options struct {
-	inputPaths      []string
-	deployType      string
-	forceDeploy     bool
-	ensureNamespace bool
-	timeout         time.Duration
-	dryRun          bool
-	wait            bool
+	inputPaths            []string
+	deployType            string
+	forceDeploy           bool
+	ensureNamespace       bool
+	timeout               time.Duration
+	dryRun                bool
+	wait                  bool
+	filteredJobAnnotation string
+	filteredJobMaxRetries int
+	filteredJobTimeout    time.Duration
 
 	clientFactory util.ClientFactory
 	clock         clock.PassiveClock
@@ -185,6 +202,9 @@ func (f *Flags) AddFlags(flags *pflag.FlagSet) {
 	flags.DurationVar(&f.timeout, timeoutFlagName, timeoutDefaultValue, timeoutFlagUsage)
 	flags.BoolVar(&f.dryRun, dryRunFlagName, dryRunDefaultValue, dryRunFlagUsage)
 	flags.BoolVar(&f.wait, waitFlagName, waitFlagDefaultValue, waitFlagUsage)
+	flags.StringVar(&f.filteredJobAnnotation, filteredJobAnnotationFlagName, "", filteredJobAnnotationFlagUsage)
+	flags.IntVar(&f.filteredJobMaxRetries, filteredJobMaxRetriesFlagName, filteredJobMaxRetriesDefaultValue, filteredJobMaxRetriesFlagUsage)
+	flags.DurationVar(&f.filteredJobTimeout, filteredJobTimeoutFlagName, filteredJobTimeoutDefaultValue, filteredJobTimeoutFlagUsage)
 }
 
 // ToOptions transform the command flags in command runtime arguments
@@ -194,12 +214,15 @@ func (f *Flags) ToOptions(reader io.Reader, writer io.Writer) (*Options, error) 
 	}
 
 	return &Options{
-		inputPaths:      f.inputPaths,
-		deployType:      f.deployType,
-		forceDeploy:     f.forceDeploy,
-		ensureNamespace: f.ensureNamespace,
-		timeout:         f.timeout,
-		wait:            f.wait,
+		inputPaths:            f.inputPaths,
+		deployType:            f.deployType,
+		forceDeploy:           f.forceDeploy,
+		ensureNamespace:       f.ensureNamespace,
+		timeout:               f.timeout,
+		wait:                  f.wait,
+		filteredJobAnnotation: f.filteredJobAnnotation,
+		filteredJobMaxRetries: f.filteredJobMaxRetries,
+		filteredJobTimeout:    f.filteredJobTimeout,
 
 		clientFactory: util.NewFactory(f.ConfigFlags),
 		reader:        reader,
@@ -244,6 +267,16 @@ func (o *Options) Run(ctx context.Context) error {
 	}
 
 	if err := o.ensuringNamespace(ctx, namespace); err != nil {
+		return nil
+	}
+
+	var stop bool
+	resources, stop, err = o.runFilteredJobPhase(ctx, namespace, resources)
+	if err != nil {
+		return err
+	}
+	if stop {
+		logger.V(3).Info("filtered jobs executed, skipping remaining resources apply")
 		return nil
 	}
 
@@ -299,13 +332,45 @@ loop:
 		return nil
 	}
 
+	return errors.New(formatApplyErrors(errorsDuringApplying))
+}
+
+func formatApplyErrors(errs []error) string {
 	builder := new(strings.Builder)
-	fmt.Fprintf(builder, "applying process has encountered %d error(s):\n", len(errorsDuringApplying))
-	for _, err := range errorsDuringApplying {
+	fmt.Fprintf(builder, "applying process has encountered %d error(s):\n", len(errs))
+	for _, err := range errs {
 		fmt.Fprintf(builder, "\t- %s\n", err)
 	}
+	return builder.String()
+}
 
-	return errors.New(builder.String())
+// runFilteredJobPhase handles filtered job execution. When the --filtered-job-annotation
+// flag is set, matching jobs are extracted and executed; if any are found the
+// caller should stop the normal apply phase (stop=true). If the flag is set but no jobs
+// match the filter, nothing is applied (stop=true with empty resources). When the flag is
+// absent, annotated jobs are stripped from the resource list so they are never applied as
+// regular resources.
+func (o *Options) runFilteredJobPhase(ctx context.Context, namespace string, resources []*unstructured.Unstructured) ([]*unstructured.Unstructured, bool, error) {
+	if o.filteredJobAnnotation == "" {
+		return StripAnnotatedJobs(resources), false, nil
+	}
+
+	filteredJobs, remaining := FilterAnnotatedJobs(resources, o.filteredJobAnnotation)
+	if len(filteredJobs) == 0 {
+		return nil, true, nil
+	}
+
+	clientSet, err := o.clientFactory.KubernetesClientSet()
+	if err != nil {
+		return nil, false, err
+	}
+
+	runner := NewFilteredJobRunner(clientSet, namespace, o.filteredJobMaxRetries, o.filteredJobTimeout, o.writer, o.dryRun)
+	if err := runner.Run(ctx, filteredJobs); err != nil {
+		return nil, false, err
+	}
+
+	return remaining, true, nil
 }
 
 func deployTypeFlagCompletionfunc(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {

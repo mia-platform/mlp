@@ -1,0 +1,19 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: filtered-optional
+  annotations:
+    mia-platform.eu/deploy: pre-deploy
+    mia-platform.eu/deploy-optional: 'true'
+spec:
+  template:
+    metadata: {}
+    spec:
+      containers:
+        - name: migration
+          image: busybox
+          args:
+            - /bin/sh
+            - '-c'
+            - echo "running migration && exit $(( RANDOM % 2 ))"
+      restartPolicy: Never

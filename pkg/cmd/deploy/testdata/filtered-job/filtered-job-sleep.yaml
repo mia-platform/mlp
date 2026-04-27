@@ -1,0 +1,18 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: filtered-sleep
+  annotations:
+    mia-platform.eu/deploy: pre-deploy
+spec:
+  template:
+    metadata: {}
+    spec:
+      containers:
+      - name: migration
+        image: busybox
+        args:
+        - /bin/sh
+        - -c
+        - echo 'Inizio...' && sleep 2 && echo 'Fine attesa!'
+      restartPolicy: Never

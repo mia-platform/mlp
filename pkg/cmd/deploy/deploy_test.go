@@ -95,18 +95,24 @@ func TestOptions(t *testing.T) {
 	configFlags := genericclioptions.NewConfigFlags(false)
 
 	expectedOpts := &Options{
-		inputPaths:    []string{"input"},
-		deployType:    "smart_deploy",
-		reader:        reader,
-		writer:        buffer,
-		clientFactory: util.NewFactory(configFlags),
-		clock:         clock.RealClock{},
-		wait:          false,
+		inputPaths:            []string{"input"},
+		deployType:            "smart_deploy",
+		filteredJobTimeout:    5 * time.Minute,
+		filteredJobMaxRetries: 3,
+		filteredJobAnnotation: "pre-deploy",
+		reader:                reader,
+		writer:                buffer,
+		clientFactory:         util.NewFactory(configFlags),
+		clock:                 clock.RealClock{},
+		wait:                  false,
 	}
 
 	flag := &Flags{
-		inputPaths: []string{"input"},
-		deployType: "smart_deploy",
+		inputPaths:            []string{"input"},
+		deployType:            "smart_deploy",
+		filteredJobTimeout:    5 * time.Minute,
+		filteredJobMaxRetries: 3,
+		filteredJobAnnotation: "pre-deploy",
 	}
 	_, err := flag.ToOptions(reader, buffer)
 	assert.ErrorContains(t, err, "config flags are required")

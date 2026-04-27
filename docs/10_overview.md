@@ -39,3 +39,4 @@ Below, you can find additional documentation for `mlp`:
 - [Generation Configuration](./30_generate.md)
 - [Hydration Logic](./40_hydrate.md)
 - [Interpolatation Template](./50_interpolate.md)
+- [Filtered Jobs](./60_filtered_job.md)
