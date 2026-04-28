@@ -25,8 +25,10 @@ the ability to use different configuration for different runtime environments.
 	with all the files and patches found
 - `interpolate`: will run through all the files passed and run through a templating function for render the final
 	manifests
-- `kustomize`: is the same command of `kustomize build` and can be used if you project is using the kustomize structure
-	to render the resources to pass to the `interpolate` command
+- `kustomize`: is the same command of `kustomize build` and can be used if your project is using the kustomize structure
+	to render the resources to pass to the `interpolate` command. It supports Helm chart inflation via the
+	`--enable-helm` flag, along with `--helm-command`, `--helm-api-versions`, `--helm-kube-version`, and
+	`--load-restrictor` options
 
 For more information about the various options available to the various commands you can always run
 `mlp <command> --help` to see the helpers.
@@ -40,3 +42,4 @@ Below, you can find additional documentation for `mlp`:
 - [Hydration Logic](./40_hydrate.md)
 - [Interpolatation Template](./50_interpolate.md)
 - [Filtered Jobs](./60_filtered_job.md)
+- [Kustomize](./70_kustomize.md)

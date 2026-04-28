@@ -15,7 +15,7 @@ The main subcommands that the tool has are:
 - `interpolate`: fill placeholders in kubernetes files with the values of ENV variables
 - `generate`: create files for kubernetes `ConfigMap` and `Secret` based on files and/or ENV values
 - `deploy`: create and/or update resources in a kubernetes namespace with the intepolated/generated files
-- `kustomize`: run kustomize build
+- `kustomize`: run kustomize build with optional Helm chart inflation support
 - `hydrate`: helper to fill kustomization.yml with resources and patches
 - `completion`: generate the autocompletion
 
@@ -43,6 +43,14 @@ To build the docker image locally run:
 
 ```sh
 make docker-build
+```
+
+To build Docker images with Helm included:
+
+```sh
+make docker-build-helm3  # image tagged with -helm3
+make docker-build-helm4  # image tagged with -helm4 and -helm
+make docker-build-helm   # alias for docker-build-helm4
 ```
 
 ## Testing `mlp`
