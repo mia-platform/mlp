@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v2.7.0] - 2026-04-28
+
+### Added
+
+- `filtered-job` subcommand in `deploy` for running and awaiting annotated Jobs before deploying remaining resources
+- support for optional filtered jobs that do not block deployment on failure
+- Helm chart inflation support in `kustomize` command via `--enable-helm` flag
+- `--load-restrictor` flag to `kustomize` command for controlling file loading restrictions
+
+### Changed
+
+- filtered job resources are now selected via annotations instead of a fixed naming convention
+
+### Fixed
+
+- handle empty job matches gracefully in filtered job phase (skip all resources)
+- improve job completion error handling and timeout scenarios in filtered jobs
+
 ## [v2.6.0] - 2026-01-30
 
 ###  Changed
