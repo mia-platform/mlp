@@ -119,6 +119,17 @@ ZZZZZZZZZZZZZZZZZZZZZZZZZZ
 			},
 			expectedResultsPath: filepath.Join(testdata, "results-contained"),
 		},
+		"interpolate recursive": {
+			option: &Options{
+				prefixes:   []string{"MLP_TEST_", "MLP_"},
+				inputPaths: []string{filepath.Join(testdata, "folder")},
+				recursive:  true,
+				outputPath: filepath.Join(testTmpDir, "outputs-recursive"),
+				fSys:       fSys,
+				reader:     new(bytes.Buffer),
+			},
+			expectedResultsPath: filepath.Join(testdata, "results-recursive"),
+		},
 		"interpolate from reader": {
 			option: &Options{
 				prefixes:   []string{"MLP_"},

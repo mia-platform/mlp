@@ -75,6 +75,11 @@ const (
 	allowMissingFilenamesFlagUsage   = "set to allow missing input filenames"
 	allowMissingFilenamesFlagDefault = false
 
+	recursiveFlagName    = "recursive"
+	recursiveFlagShort   = "r"
+	recursiveFlagUsage   = "recursively interpolate files in subdirectories"
+	recursiveFlagDefault = false
+
 	outputFlagName  = "out"
 	outputFlagShort = "o"
 	outputFlagUsage = "output directory where interpolated files are saved"
@@ -97,6 +102,7 @@ type Flags struct {
 	prefixes              []string
 	inputPaths            []string
 	allowMissingFilenames bool
+	recursive             bool
 	outputPath            string
 }
 
@@ -105,6 +111,7 @@ type Options struct {
 	prefixes              []string
 	inputPaths            []string
 	allowMissingFilenames bool
+	recursive             bool
 	outputPath            string
 	fSys                  filesys.FileSystem
 	reader                io.Reader
@@ -139,6 +146,7 @@ func (f *Flags) AddFlags(flags *pflag.FlagSet) {
 	flags.StringSliceVarP(&f.prefixes, prefixesFlagName, prefixesFlagShort, nil, prefixesFlagUsage)
 	flags.StringSliceVarP(&f.inputPaths, inputFlagName, inputFlagShort, nil, inputFlagUsage)
 	flags.BoolVar(&f.allowMissingFilenames, allowMissingFilenamesFlagName, allowMissingFilenamesFlagDefault, allowMissingFilenamesFlagUsage)
+	flags.BoolVarP(&f.recursive, recursiveFlagName, recursiveFlagShort, recursiveFlagDefault, recursiveFlagUsage)
 	flags.StringVarP(&f.outputPath, outputFlagName, outputFlagShort, "interpolated-files", outputFlagUsage)
 	if err := cobra.MarkFlagDirname(flags, outputFlagName); err != nil {
 		panic(err)
@@ -151,6 +159,7 @@ func (f *Flags) ToOptions(reader io.Reader, fSys filesys.FileSystem) (*Options, 
 		inputPaths:            f.inputPaths,
 		prefixes:              f.prefixes,
 		allowMissingFilenames: f.allowMissingFilenames,
+		recursive:             f.recursive,
 		outputPath:            f.outputPath,
 		fSys:                  fSys,
 		reader:                reader,
@@ -193,8 +202,20 @@ func (o *Options) Run(ctx context.Context) error {
 			return err
 		}
 
+		outputName := name
+		if o.recursive && path != stdinToken {
+			outputName = o.relativeOutputName(path)
+		}
+
+		outputFile := filepath.Join(o.outputPath, outputName)
+		if dir := filepath.Dir(outputFile); dir != o.outputPath {
+			if err := o.fSys.MkdirAll(dir); err != nil {
+				return err
+			}
+		}
+
 		logger.V(10).Info("saving interpolated file", "path", path)
-		if err := o.fSys.WriteFile(filepath.Join(o.outputPath, name), interpolatedData); err != nil {
+		if err := o.fSys.WriteFile(outputFile, interpolatedData); err != nil {
 			return err
 		}
 	}
@@ -241,8 +262,11 @@ func (o *Options) filesToInterpolate(ctx context.Context) ([]string, error) {
 				return err
 			}
 			if info.IsDir() && walkPath != path {
-				logger.V(10).Info("ignore folder inside a folder", "path", walkPath)
-				return fs.SkipDir
+				if !o.recursive {
+					logger.V(10).Info("ignore folder inside a folder", "path", walkPath)
+					return fs.SkipDir
+				}
+				return nil
 			}
 
 			addOnlyYAMLFiles(walkPath)
@@ -265,6 +289,17 @@ func (o *Options) readFile(path string) ([]byte, string, error) {
 
 	data, err := o.fSys.ReadFile(path)
 	return data, filepath.Base(path), err
+}
+
+func (o *Options) relativeOutputName(filePath string) string {
+	for _, inputPath := range o.inputPaths {
+		rel, err := filepath.Rel(inputPath, filePath)
+		if err == nil && !strings.HasPrefix(rel, "..") {
+			return rel
+		}
+	}
+
+	return filepath.Base(filePath)
 }
 
 // Interpolate will interpolate the data content with values from env values
